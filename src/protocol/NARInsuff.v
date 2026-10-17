@@ -538,14 +538,14 @@ Theorem notifBad_pres_tfs (m : Mode) (n n' : Network)
 Lemma tfs_pres_not_currSince m t i n n' p a
   (w : n -NA- a -NA> n') : tfs m t i n p ->
   tfs m t i n' (reachNetDisc n n' a p w) \/
-  (forall m' t' p', ~currSince m' t' i n p').
+  (forall m' t' p', ~ failSafe m' -> ~currSince m' t' i n p').
 Proof.
   intro U.
   lets D : tfsStateNet_dec i n'. unfold decidable in D.
   destruct D as [D | D].
   - left. apply tfsDisc; assumption.
-  - right. intros m' t' p'.
-    eapply (tfsState_not_currSince m' t' i n n' p' a w).
+  - right. intros m' t' p' NFS.
+    eapply (tfsState_not_currSince m' t' i n n' p' a w NFS).
     + eapply tfs_rel_state. eassumption.
     + assumption.
 Qed.
@@ -610,7 +610,7 @@ Theorem instant_insuff_bad (n : Network) (m : Mode) (l l0 : Position)
   which contradicts a hypothesis. So we're done in any case.*)
   invertClearAs2 IH t0 TFS.
   lets TPNC : tfs_pres_not_currSince w TFS. elim_intro TPNC TF NCS.
-  right. right. exists t0. assumption. false. eapply NCS. eassumption.
+  right. right. exists t0. assumption. false. eapply NCS; eassumption.
   (*Delay inductive case: previous state must have delivered the message at some t' < AN.
   Then from (delivered_incomingNetNotif) and incomingNetNotif delay constructor,
   we have the LHS.*)

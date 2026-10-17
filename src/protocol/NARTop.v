@@ -121,7 +121,7 @@ Theorem ovWait_sent (n : Network) (m : Mode) (t x y : Time) (i : nat) (p : reach
   initNet_contra U.
   (*The discrete inductive case has three major cases, which we get by applying a back
   tracking result for ovWait*)
-  lets OWP : ovWait_prev_net_strong U s. or_flat.
+  lets OWP : ovWait_prev_net U s. or_flat.
   (*In the first case, our previous state was ovWait, in which case the I.H. and the
   discrete sent constructor will do.*)
   apply IHp in OR. ex_flat. exists x0 x1. constructor. assumption. assumption.
@@ -232,10 +232,12 @@ Theorem nextSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   timering. Qed.
 
 
-(*If we're in the tfsBc state, then we're not currSince.*)
+(** An entity in tfsBc is not currSince in a mode that is not fail safe: on entering tfsBc
+it switched to the fail-safe successor of its mode, which differs from the mode unless the
+mode was fail safe already (a fail-safe mode may be its own successor).*)
 Theorem tfsBc_not_currSince (n : Network) (m : Mode) (t  : Time)
   (i : nat) (p : reachableProtNet n) :
-  tfsBcStateNet i n -> currSince m t i n p -> False. Admitted. (*1*)
+  ~ failSafe m -> tfsBcStateNet i n -> currSince m t i n p -> False. Admitted. (*1*)
 (**Proof: Induction on currSince. The base case fails because tfsBcState is not switchListen.
 The delay case is easy because by (...backwards del pres state...) the previous state is
 tfsBc also, and we just apply the I.H. to get false. The discrete case proceeds by

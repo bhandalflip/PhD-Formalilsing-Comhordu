@@ -517,13 +517,15 @@ Proof.
 Qed.
 (**Proof: Obvious from outList semantics*)
 
-Conjecture inList_received_in : forall (l l' : InputList) (v : list BaseType),
-  l -il- v ?? -il> l' -> <(v, msgLatency)> _: inList l'.
-(**Proof: Obvious from inList semantics*)
-
-Conjecture notifList_received_in : forall (l l' : NotifList) (v : list BaseType),
-  l -nl- v ?? -nl> l' -> <(v, msgLatency)> _: notifList l'.
-(**Proof: Obvious from notifList semantics*)
+(** A message just received sits in the input list with timestamp zero, ready to be
+consumed. For notifications see notifList_in_hd.*)
+Lemma inList_received_in : forall (l l' : InputList) (v : list BaseType),
+  l -il- v ?? -il> l' -> <(v, zeroTime)> _: inList l'.
+Proof.
+  intros l l' v H. inversion H; subst.
+  - simpl. left. reflexivity.
+  - match goal with [Htl : stepTimedList _ _ _ |- _] => inversion Htl end.
+Qed.
 
 (*LOCAL TIDY*)
 

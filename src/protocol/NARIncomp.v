@@ -154,18 +154,21 @@ Theorem msgAbort_not_nextSince (n n' : Network) (a : ActDiscNet)
   eapply mapGrng; try eassumption. econstructor. eassumption.
   reflexivity.
   (*transition case- need to use fwd-tracking.*)
-  ex_flat. lets GMN : gotRange_next H3 H2. ex_flat.
-  (*Lift state predicates to entity level.*)
+  ex_flat.
+  (*Lift the state predicate to the entity level and track it across the step: the listener
+  is still in gotRange, or it read the current mode and is in currPincCheck with it.*)
   assert (gotRangeStateEnt m'' r ([|p1 $||$ p2 $||$ p3, l, h0, k0|])) as GRE.
   constructor. assumption.
-  assert (currPincCheckStateEnt x1 m'' r ([|p1' $||$ p2' $||$ p3', l, h, k0|])) as CPC.
-  do 2 constructor. assumption.
-  (*Add entity-level tracking result.*)
-  lets GGE : gotRange_currPincCheck_track_ent GRE CPC U3. 
-  (*Now we have msgAbortPath from the constructor.*)
-  exand_flat. left. econstructor. eapply mapCuco. econstructor.
-  eapply currPincCheck_cond_false. apply H8. rewrite <- AND2.
-  eassumption. eassumption. assumption. eassumption.
+  lets RE : reachable_net_ent rn H0.
+  lets GGE : gotRange_track_ent RE GRE U3. elim_intro GGE GRE' CPC.
+  (*Still gotRange: the path is preserved.*)
+  ent_state_comp GRE'. left. econstructor;[ | apply U1].
+  eapply mapGrng; try eassumption. econstructor. eassumption. reflexivity.
+  (*currPincCheck with the current mode: the condition is false, so currComp follows.*)
+  ent_state_comp CPC. simpl in CPC.
+  left. econstructor. eapply mapCuco. econstructor.
+  eapply currPincCheck_cond_false. apply H8. exact CPC.
+  eassumption. assumption. eassumption.
   (*---------------------Case 3: currComp -----------------*) 
   (*Then dive into the gotMsg state predicate to the lowest level and sovle this
   thing with tracking etc.*)
@@ -358,12 +361,12 @@ pending consumption, b) the message in question is being processed along the "ms
 or c) we have initiated a transition to tfs this instant.*)
 Theorem instant_incomp_tfs (n : Network) (t : Time) (l l' : Position) (i : nat)
   (m m' : Mode) (p : reachableProtNet n) :
-  currSince m t i n p -> inPosNet l i n -> 0 < t ->
+  ~ failSafe m -> currSince m t i n p -> inPosNet l i n -> 0 < t ->
   received [baseMode m', basePosition l'] zeroTime i n p ->
   dist2d l l' -nn- speedMax *nn* msgLatency < possIncDist m m' ->
   incomingNet [baseMode m', basePosition l'] i n \/
   msgBadPathNet i n \/ tfs m zeroTime i n p.
-  intros H H0 U. intros.
+  intros NFS H H0 U. intros.
   (*Induction on received.*)
   dependent induction H1.
   (*Incoming is easy to show for the base case- it follows from the network semantics.*)
@@ -413,7 +416,7 @@ Theorem instant_incomp_tfs (n : Network) (t : Time) (l l' : Position) (i : nat)
   lets MD : msgBad_disc_net p w H5 J. elim_intro MD MD1 MD2. right. left. assumption.
   right. right. apply MD2.
   (*We can also show that tfs in turn is preserved with time 0.*)
-  right. right. apply tfs_zero_disc_pres. assumption.
+  right. right. apply tfs_zero_disc_pres; [exact J | exact NFS | assumption].
   (*The delay inductive case can be thrown out because the time parameter to received is 0.*)
   assert (0 < t0 + d) as Q. apply Rplus_lt_weaken_rl. timeNonneg.
   delPos. rewrite <- x in Q. false. eapply Rlt_irrefl. apply Q. Qed.
@@ -426,11 +429,11 @@ more recent than t, and the following inequality holds, with l our current
 position: (|l - l0| - Smax*mL) + Smax*t' < Dpi m1 m2, then we are tfs m t'.*)
 Theorem incomp_tfs  (n : Network) (t t' : Time) (l l' : Position) (i : nat)
   (m m' : Mode) (p : reachableProtNet n) :
-  currSince m t i n p -> inPosNet l i n ->
+  ~ failSafe m -> currSince m t i n p -> inPosNet l i n ->
   received [baseMode m', basePosition l'] t' i n p ->
   zeroTime < t' -> t' < t  ->
   dist2d l l' -nn- speedMax*nn*msgLatency + speedMax*t' < possIncDist m m' ->
-  tfs m t' i n p. intros.
+  tfs m t' i n p. intro NFS. intros.
   (*We first need to show that speedMax * t is less than possIncDist m m' in order
   to be able to apply a special equivalence result later for our (annoying!)
   subNonnegTot function.*)
@@ -450,7 +453,7 @@ Theorem incomp_tfs  (n : Network) (t t' : Time) (l l' : Position) (i : nat)
   addHyp (IHreceived H2 TLP l H6 H4 t H H5). clear IHreceived. 
   constructor. assumption. apply tfs_rel_state in H7. addHyp (tfsStateNet_dec i n').
   appDisj H8. apply False_ind. eapply tfsState_not_currSince. apply w.
-  apply H7. assumption. apply H.
+  apply NFS. apply H7. assumption. apply H.
   (*Now for the timed case. We first observe that currSince carries to the previous
   state because it is preserved backwards by delay*)
   dependent destruction H. 
@@ -547,7 +550,7 @@ Theorem incomp_tfs  (n : Network) (t t' : Time) (l l' : Position) (i : nat)
   lets RLS : Rminus_lt_subNonnegTot ZPD.
   rewrite <- multNonneg_Rmult_eq in H10. apply RLS in H10.
   (*Back to the main proof.*)
-  addHyp (instant_incomp_tfs n t l1 l' i m m' p H H5 U H1 H10).
+  addHyp (instant_incomp_tfs n t l1 l' i m m' p NFS H H5 U H1 H10).
   decompose [or] H11; clear H11.
   (*The first two disjuncts fail because it can be shown that delay is
   impossible in these cases (incomingNet-urgent), (...EA::msgBadPath-urgent...).*)

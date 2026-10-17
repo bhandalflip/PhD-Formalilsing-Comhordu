@@ -132,17 +132,70 @@ Finally, backtracking also gives that the transition was an output to
 the mode state causing a mode switch, so the next mode of the previous state,
 which was failsafe, is now the current mode.*)
 
-Lemma tfsNext_currMode e m :
-  reachableProtEnt e -> tfsNextStateEnt m e -> currModeEnt e = m.
-  introz U.
-  (*Proof: Induction on reachableProtEnt.*)
-(*Base case fails. So we're left with
-the case where there was a previous state. Now, either this is tfsNext or
-it is not. If it is not, then we can see by tracking that the action to get
-here was a read of the current mode from the mode state and so the two
-must coincide. If the previous state is also tfsNext, it can be shown that
-no mode state change is possible because only the overlap component is capable
-of doing this.*) Admitted. (*D- reachableEnt*)
+(** A reachable entity whose overlap component is in tfsNext m has a current mode with the
+same fail-safe successor as m. The component entered tfsNext by reading the current mode
+off the mode state, and while it stays there nothing writes on mCurr. The modes themselves
+need not agree: tfsNext shows its mode only through that successor (tfsNext_bisim_param).*)
+Theorem tfsNext_currMode (e : Entity) (m : Mode) :
+  reachableProtEnt e -> tfsNextStateEnt m e -> failSafeSucc (currModeEnt e) = failSafeSucc m.
+Proof.
+  intro R. revert m.
+  induction R as [e I | e e' a R IH S | e e' d R IH S]; intros m TN.
+  - (* initial: the overlap is dormant *)
+    inversion I; subst. ent_state_comp TN. exfalso. red in TN.
+    prot_outProc_in_not_body. refute_by_chan TN.
+  - destruct e as [p l0 h k]. lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
+    inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+    ent_state_destr TN p1' p2' p3' l' h' k'.
+    assert (OSE : overlapStateEnt ([|p1 $||$ p2 $||$ p3, l0, h, k|]))
+      by (constructor; constructor; exact OS).
+    assert (TNE0 : tfsNextStateEnt m ([|p1' $||$ p2' $||$ p3', l', h', k'|]))
+      by (constructor; constructor; exact TN).
+    destruct (tfsNext_prev_ent m _ _ _ OSE TNE0 S) as [TNE | TSE].
+    + (* the overlap stays in tfsNext m, so the current mode is unchanged *)
+      ent_state_comp TNE.
+      assert (TNE' : tfsNextStateEnt m ([|p1 $||$ p2 $||$ p3, l0, h, k|]))
+        by (constructor; constructor; exact TNE).
+      specialize (IH m TNE'). simpl in IH |- *.
+      rewrite <- IH. f_equal.
+      inversion S; subst; try reflexivity;
+        try (match goal with [K : _ -ms- _ -ms> _ |- _] => inversion K; subst; reflexivity end).
+      (* the software wrote on mCurr: no component of the triple can *)
+      exfalso.
+      match goal with [TW : _ $||$ _ $||$ _ -PA- chanMCurr *! -PA> _ |- _] =>
+        triple_disc_nonTau TW end.
+      * eapply broadcast_mCurr_out_not; eassumption.
+      * match goal with [T2 : p2 -PA- _ -PA> _ |- _] =>
+          destruct (bisim_disc_match _ _ _ _ TNE T2) as [q Q] end.
+        unfold tfsNext in Q. invert_disc_prefixes.
+      * eapply listener_mCurr_out_not; eassumption.
+    + (* the overlap was tfsStart: it read the current mode *)
+      ent_state_comp TSE.
+      destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [ACT _]]]]].
+      * injection EQ; intros; subst. exfalso.
+        pose proof (bisim_trans _ _ _ (bisim_symm _ _ TSE) TN) as BT.
+        prot_outProc_in_not_body. refute_by_chan BT.
+      * assert (ACT' : forall b, p2 -PA- b -PA> p2' -> exists v, b = chanMCurr ;? [baseMode v]).
+        { intros b B. destruct (tfsStart_next_act _ _ _ B TSE) as [v [Eb _]]. eauto. }
+        destruct (triple_mCurr_read_ov _ _ _ _ _ _ _ PS T ACT') as [EQ | [T2 [v Ec]]].
+        -- subst p2'. exfalso.
+           pose proof (bisim_trans _ _ _ (bisim_symm _ _ TSE) TN) as BT.
+           prot_outProc_in_not_body. refute_by_chan BT.
+        -- subst c. destruct (ACT v eq_refl) as [Ev Ek]. subst v k'.
+           destruct (tfsStart_next_act _ _ _ T2 TSE) as [v' [Ev' TN']].
+           injection Ev' as Ev'; subst v'.
+           simpl. apply tfsNext_bisim_param.
+           eapply bisim_trans; [apply bisim_symm; exact TN' | exact TN].
+  - (* a delay: the overlap was tfsNext m already, and delay keeps the current mode *)
+    destruct e as [p l0 h k]. lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
+    inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+    ent_state_destr TN p1' p2' p3' l' h' k'.
+    lets T : triple_del_ent S. destruct T as [_ [D2 _]].
+    assert (TN0 : tfsNextState m p2).
+    { red. apply (overlap_del_bkwd (tfsNext m) _ _ _ OS D2 TN).
+      intros m0 e2 e3 e4 B. ovWait_bisim_contra B. }
+    rewrite <- (stepTimedEnt_currMode _ _ _ S). apply IH. constructor. constructor. exact TN0.
+Qed.
 
 (**If we're in the state switchCurr m', then the next mode is m'.
 Corollary: switchCurr is urgent.*)
@@ -320,9 +373,8 @@ Lemma tfsNext_urgent : forall (m : Mode) (e e' : Entity) (d : Delay),
   (*Need to ensure the current mode equals the parameter to tfsNext.*)
   lets TCM : tfsNext_currMode U U0.
   urgency_pre_tac2_1 tfsNextStateEnt tfsNextStateProt tfsNextState.
-  lets FS : failSafeSucc_successor m.
-  assert (k0 -mtr-> failSafeSucc m) as FS2. simpl in TCM.
-  rewrite TCM. assumption.
+  assert (k0 -mtr-> failSafeSucc m) as FS2.
+  simpl in TCM. rewrite <- TCM. apply failSafeSucc_successor.
   (*The mode state reads either mStable or the fail-safe successor on mNext, and the
   overlap offers both.*)
   destruct (mState_stable_next_enabled _ _ FS2) as [MS | MS];
@@ -450,7 +502,7 @@ Proof.
     lets PP : stepEnt_disc_pres_pos S. simpl in PP. subst l'.
     assert (IH' : bcReadyState m l p1 -> l0 = l).
     { intro B. exact (IH m l ltac:(constructor; constructor; exact B)). }
-    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T ACT]]].
+    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [ACT _]]]].
     + inversion EQ; subst. simpl. apply IH'. exact BR.
     + assert (ACT' : forall b, p1 -PA- b -PA> p1' -> b = chanPos ;? [basePosition l]) by
         (intros b B; eapply bcReady_prev; eassumption).
@@ -494,7 +546,7 @@ Proof.
     lets PP : stepEnt_disc_pres_pos S. simpl in PP. subst l'.
     assert (IH' : ovReadyStateExp m t l p2 -> l0 = l).
     { intro B. exact (IH m t l ltac:(constructor; constructor; exact B)). }
-    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T ACT]]].
+    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [ACT _]]]].
     + inversion EQ; subst. simpl. apply IH'. exact OR.
     + assert (ACT' : forall b, p2 -PA- b -PA> p2' -> b = chanPos ;? [basePosition l]) by
         (intros b B; eapply ovReady_prev_act; eassumption).
@@ -603,9 +655,60 @@ Lemma switchCurr_switch_ent (e : Entity) :
 
 (*LOCAL TIDY*)
 
-Lemma nextEq_mode (m' m'' : Mode) (e : Entity) :
-  nextEqStateEnt m' m'' e -> nextModeEnt e = Some m'.
-  introz U. inversion U. Admitted. (*D*)
+(** A step of an entity whose listener is in currOK: the listener stays, read stable and is
+listening, or read a next mode m' and is in nextEq m' m''. The mode comes from the mode
+state, where it is the next mode, or from the overlap component writing the fail-safe
+successor of its mode in tfsNext, which the listener can meet within the software before the
+mode state does.*)
+Theorem currOK_track_ent (e e' : Entity) (a : ActDiscEnt) (m'' : Mode) :
+  reachableProtEnt e -> currOKStateEnt m'' e -> e -EA- a ->> e' ->
+  currOKStateEnt m'' e' \/ listeningStateEnt e' \/
+  exists m', nextEqStateEnt m' m'' e' /\
+    (nextModeEnt e = Some m' \/ exists m, tfsNextStateEnt m e /\ m' = failSafeSucc m).
+Proof.
+  intros R G S. destruct e as [p l h k].
+  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
+  inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+  ent_state_comp G.
+  destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ S) as [p1' [p2' [p3' [l' [h' [k' [E _]]]]]]].
+  subst e'.
+  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [_ ACT]]]]].
+  - injection EQ; intros; subst. left. constructor. constructor. exact G.
+  - destruct c as [c0 v0 | c0 v0 | ].
+    + (* an input of the triple is an input of one component *)
+      triple_disc_nonTau T; try (left; constructor; constructor; exact G).
+      match goal with [T3 : _ -PA- c0 ;? v0 -PA> _ |- _] =>
+        destruct (currOK_next_act _ _ _ _ T3 G) as [[Ea L] | [v [Ea N]]] end.
+      * right. left. constructor. constructor. exact L.
+      * injection Ea; intros; subst. destruct (ACT v eq_refl) as [NM _].
+        right. right. exists v. split; [constructor; constructor; exact N | left; exact NM].
+    + (* currOK does not output *)
+      triple_disc_nonTau T; try (left; constructor; constructor; exact G).
+      match goal with [T3 : _ -PA- c0 ;! v0 -PA> _ |- _] =>
+        destruct (currOK_next_act _ _ _ _ T3 G) as [[Ea L] | [v [Ea N]]] end; discriminate.
+    + (* a tau: a synchronisation within the software *)
+      destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
+      decompose [or and] H; clear H;
+      try match goal with [E : p3 = p3' |- _] =>
+        subst p3'; left; constructor; constructor; exact G end;
+      try match goal with [H1 : p3 -PA- _ ;! _ -PA> p3' |- _] =>
+        destruct (currOK_next_act _ _ _ _ H1 G) as [[X _] | [? [X _]]]; discriminate X end;
+      match goal with [H1 : p3 -PA- ?c1 ;? ?v1 -PA> p3' |- _] =>
+        destruct (currOK_next_act _ _ _ _ H1 G) as [[X L] | [v [X N]]];
+        injection X as X1 X2; subst c1 v1 end;
+      first
+        [ match goal with [H2 : p1 -PA- _ ;! _ -PA> _ |- _] =>
+            exfalso; pose proof (broadcast_out_outProc _ _ _ _ BS H2); discriminate end
+        | match goal with [L : listeningState p3' |- _] =>
+            right; left; constructor; constructor; exact L end
+        | match goal with [H2 : p2 -PA- chanMNext ;! _ -PA> _, N : nextEqState ?v _ p3' |- _] =>
+            destruct (overlap_mNext_out _ _ _ OS H2) as [m0 [TM Ev]];
+            injection Ev as Ev; subst v;
+            right; right; eexists; split;
+              [constructor; constructor; exact N
+              | right; exists m0; split; [constructor; constructor; exact TM | reflexivity]]
+          end ].
+Qed.
 
 Lemma nextMode_ent_mState p l h k m :
   nextModeEnt ([|p, l, h, k|]) = Some m -> nextModeMState k = Some m.
@@ -629,13 +732,31 @@ Lemma gotMsg_gotRange_track_ent (m m' : Mode) (l l' l1 : Position)
 (*Proof: Entity tracking result: possibly use generic tactic? Use software tracking
 result? Use inter-component relationship result/tactics?*)
 (*+*)
-Lemma gotRange_currPincCheck_track_ent (m2 m1' m2' : Mode) (l l' : Position)
-  (r r' : Distance) (p p' : ProcTerm) h h' k k' a :
-  gotRangeStateEnt m2 r ([|p, l, h, k|]) ->
-  currPincCheckStateEnt m1' m2' r' ([|p', l', h', k'|]) ->
-  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
-  m2 = m2' /\ r = r' /\ m1' = currModeMState k.
-  Admitted.
+(** A step of an entity whose listener is in gotRange: the listener stays, or it read the
+current mode off the mode state and is in currPincCheck with it. Bisimilar currPincCheck
+need not agree on their parameters, so the lemma states the derivative's state rather than
+equalities between parameters.*)
+Theorem gotRange_track_ent (e e' : Entity) (a : ActDiscEnt) (m2 : Mode) (r : Distance) :
+  reachableProtEnt e -> gotRangeStateEnt m2 r e -> e -EA- a ->> e' ->
+  gotRangeStateEnt m2 r e' \/ currPincCheckStateEnt (currModeEnt e) m2 r e'.
+Proof.
+  intros R G S. destruct e as [p l h k].
+  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
+  inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+  ent_state_comp G.
+  destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ S) as [p1' [p2' [p3' [l' [h' [k' [E _]]]]]]].
+  subst e'.
+  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [ACT _]]]]].
+  - injection EQ; intros; subst. left. constructor. constructor. exact G.
+  - assert (ACT' : forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurr ;? [baseMode v]).
+    { intros b B. destruct (gotRange_next_act _ _ _ _ _ B G) as [v [Eb _]]. eauto. }
+    destruct (triple_mCurr_read_li _ _ _ _ _ _ _ PS T ACT') as [EQ | [T3 [v Ec]]].
+    + subst p3'. left. constructor. constructor. exact G.
+    + subst c. destruct (ACT v eq_refl) as [Ev _]. subst v.
+      destruct (gotRange_next_act _ _ _ _ _ T3 G) as [v' [Ev' C]].
+      injection Ev' as Ev'; subst v'.
+      right. simpl. constructor. constructor. exact C.
+Qed.
 (*+*)
 Lemma currComp_listening_track_ent m'' r l l' p p' h h' k k' a :
   currCompStateEnt m'' r ([|p, l, h, k|]) ->
