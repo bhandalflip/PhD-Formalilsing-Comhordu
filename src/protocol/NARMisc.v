@@ -588,14 +588,19 @@ Proof.
     clear - TR. unfold abortOvlp in TR. msgAbort_paused_disj_net_inv.
 Qed.
 
-(** If we are switching from a tfs state to a non tfs state, then we cannot be currSince.*)
+(** An entity that leaves the tfs states in a discrete step was not currSince in a mode
+that is not fail safe: while its mode is not fail safe, a discrete step keeps it in the tfs
+states (tfs_currMode_disc_pres). A fail-safe mode is its own fail-safe successor, so an
+entity in such a mode can run through the tfs states and out again in one instant, which
+is why the hypothesis is needed.*)
 Lemma tfsState_not_currSince (m : Mode) (t : Time) (i : nat) (n n' : Network)
   (p : reachableProtNet n) (a : ActDiscNet) (w : n -NA- a -NA> n') :
-  tfsStateNet i n -> ~tfsStateNet i n' -> ~currSince m t i n p. Admitted. (*3*)
-(**Proof: Well, such a switch would mean we are going from tfsListen to dormant. And we can
-show in a separate result that the tfsListen state implies that we're not currSince (which
-in turn is because the tfsBc state is not currSince, which again in turn is because it is
-preceded by an output on mCurr to switch the mode to some fail safe mode*)
+  ~ failSafe m -> tfsStateNet i n -> ~tfsStateNet i n' -> ~currSince m t i n p.
+Proof.
+  intros NFS TS NTS CS. apply NTS.
+  eapply (tfs_currMode_disc_pres n n' a i m); [exact p | exact w | | exact NFS | exact TS].
+  eapply currSince_curr. exact CS.
+Qed.
 
 Lemma msgBad_disc_net (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mode)
   (p : reachableProtNet n) (w : n -NA- a -NA> n') :
@@ -603,17 +608,19 @@ Lemma msgBad_disc_net (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mode)
   msgBadPathNet i n' \/ tfs m zeroTime i n' (reachNetDisc n n' a p w). Admitted. (*3*)
 (**Proof: Decompose msgBadPath. For all cases but one, fwd-tracking gives that either the state is preserved or the next state is also on the bad path, which is the LHS. The only exception is the badOvlp state, in which case the future may be the listening state. In this case though, fwd-tracking gives that the transition was an output on bad. Now, this must be matched in order for a synch to occur, and the only possible match is from the overlap component. There are 3 states in which this listens on bad. We can eliminate tfsListen and tfsCurr because they would imply that the entity is alredy tfs, which contradicts the assumption that it was on the msgBadPath: the definition of msgBadPath dictates that an entity is not tfs. Thus the remaining case is the transition from ovWait to tfsStart, giving the base case for tfs, which is the RHS exactly.*)
 
-(*Needs some inter-component results for its proof*)
-(** With a time parameter of 0, the tfs relation is preserved*)
+(** With a time parameter of 0, the tfs relation is preserved by a discrete step, as long
+as the entity's mode is not fail safe. The mode is tfs's own mode m, which the caller knows
+to be current. See tfsState_not_currSince for why a fail-safe mode is excluded.*)
 Lemma tfs_zero_disc_pres (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mode)
   (p : reachableProtNet n) (w : n -NA- a -NA> n') :
+  currModeNet m i n -> ~ failSafe m ->
   tfs m zeroTime i n p ->
-  tfs m zeroTime i n' (reachNetDisc n n' a p w). Admitted. (*4*)
-(**Proof: A state that is tfs with 0 time parameter must be either tfsStart, tfsNext or a guarded tfsCurr. It can be shown
-by tracking that the first two cases are either preserved or go to the next case, ending at tfsCurr. This in turn is then delay
-guarded, because a next mode has just been written to the mode state and the state can only be left by writing mCurr to the mode
-state, which is only possible when this delay expires. But since the time parameter to tfs is 0, time can't pass, and so the entity
-remains stuck in this state.*)
+  tfs m zeroTime i n' (reachNetDisc n n' a p w).
+Proof.
+  intros CM NFS T. apply tfsDisc; [exact T | ].
+  eapply (tfs_currMode_disc_pres n n' a i m); [exact p | exact w | exact CM | exact NFS | ].
+  eapply tfs_rel_state. exact T.
+Qed.
 
 Lemma ovWait_nextSince_time (n : Network) (m : Mode) (x y t t1: Time) (i : nat)
   (p : reachableProtNet n) :
@@ -626,7 +633,6 @@ Hence both sides of the inequality increase by the same amount, which can be
 cancelled, and then the I.H. is applicable.*)
   intros OW NS. generalize dependent OW. induction NS; intro OW.
   lets OWT : ovReady_wait_track_net H0 H1 w. andflat EQ.
-  invertClearAs2 EQ1 pr EQM. subst. clear EQ.
   (*
   state_pred_elim_net OW H1; unique_exps; my_applys_eq (Rle_refl 0); ring.
   (*Discrete inductive case*)

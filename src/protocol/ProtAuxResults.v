@@ -788,6 +788,23 @@ Proof.
     apply bisim_refl.
 Qed.
 
+(** tfsNext shows its mode only through the fail-safe successor it writes on mNext, so two
+bisimilar tfsNext agree on that successor and need not agree on the mode.*)
+Lemma tfsNext_bisim_param (v m : Mode) :
+  tfsNext v ~p~ tfsNext m -> failSafeSucc v = failSafeSucc m.
+Proof.
+  intro B.
+  eassert (S : tfsNext v -PA- chanMNext ;! [baseMode (failSafeSucc v)] -PA> _)
+    by (unfold tfsNext; step_search).
+  destruct (bisim_disc_match _ _ _ _ B S) as [q R]. unfold tfsNext in R.
+  invert_disc_prefixes.
+  repeat match goal with
+    | [H : evalExpLists _ _ |- _] => inversion H; subst; clear H
+    | [H : evalExp (eFailSafeSucc _) _ |- _] => inversion H; subst; clear H
+    | [H : evalExp (eBase _) _ |- _] => inversion H; subst; clear H end.
+  congruence.
+Qed.
+
 (** After a step into ovWait, the overlap component was init, or was ovReady and the step
 was its broadcast. The mode and position of that ovReady are whatever values it held: tying
 them to m and to the output takes a timing argument, since ovWait's parameters are only
@@ -884,6 +901,225 @@ Proof.
       | apply del_bisim_guard;
         match goal with [E : evalExpFunTime _ = Some zeroTime |- _] => rewrite E end;
         reflexivity].
+Qed.
+
+(*** ovWait's parameters under bisimilarity ***)
+(** ovWait shows its parameters only through its timers: x and y directly, the mode m through
+the pause and the broadcast, and t only through the timers it sets after the broadcast,
+which subtract the period of the mode from it. So two ovWait whose parameters evaluate to
+the same times, the first up to the period, are bisimilar. The relation below pairs them,
+with the ovReady they broadcast from and with pairs already bisimilar, and its steps
+match.*)
+
+Inductive ovWaitRel (m : Mode) : ProcTerm -> ProcTerm -> Prop :=
+  | owrWait (p q : ProcTerm) (u u' x x' y y' : Exp) (tu tu' tx ty : Time) :
+      p ~p~ ovWait m u x y -> q ~p~ ovWait m u' x' y' ->
+      evalExpFunTime u = Some tu -> evalExpFunTime u' = Some tu' ->
+      time tu -nn- time (period m) = time tu' -nn- time (period m) ->
+      evalExpFunTime x = Some tx -> evalExpFunTime x' = Some tx ->
+      evalExpFunTime y = Some ty -> evalExpFunTime y' = Some ty ->
+      ovWaitRel m p q
+  | owrReady (p q : ProcTerm) (u u' : Exp) (l : Position) (tu tu' : Time) :
+      p ~p~ ovReady m u l -> q ~p~ ovReady m u' l ->
+      evalExpFunTime u = Some tu -> evalExpFunTime u' = Some tu' ->
+      time tu -nn- time (period m) = time tu' -nn- time (period m) ->
+      ovWaitRel m p q
+  | owrBisim (p q : ProcTerm) : p ~p~ q -> ovWaitRel m p q.
+
+Lemma ovWaitRel_sym m p q : ovWaitRel m p q -> ovWaitRel m q p.
+Proof.
+  intro R. destruct R.
+  - eapply owrWait; try eassumption. symmetry. assumption.
+  - eapply owrReady; try eassumption. symmetry. assumption.
+  - apply owrBisim. apply bisim_symm. assumption.
+Qed.
+
+
+
+(** The derivative of ovWait's body after a delay, or an application's unfolding, is an
+ovWait with the timers that are left, with zero for a timer that has run out.*)
+Ltac ovWait_timers_bisim := unfold ovWait; repeat apply choice_bisim_context;
+  first [apply bisim_refl
+    | apply bisim_symm; apply (del_zero_bisim (liftTimeExp zeroTime)); reflexivity].
+
+(** Closes ovWaitRel for the derivatives of a delay: both are ovWait up to the timers
+left, whose values are those literal times.*)
+Ltac close_wait Br Bq' Eu Eu' Emod :=
+  eapply owrWait;
+  [ eapply bisim_trans; [exact Br | ovWait_timers_bisim]
+  | eapply bisim_trans; [apply bisim_symm; exact Bq' | ovWait_timers_bisim]
+  | exact Eu | exact Eu' | exact Emod
+  | apply evalExpFunTime_time | apply evalExpFunTime_time
+  | apply evalExpFunTime_time | apply evalExpFunTime_time ].
+
+Lemma ovWaitRel_step m p q : ovWaitRel m p q ->
+  forall a p', p -P- a -P> p' -> exists q', q -P- a -P> q' /\ ovWaitRel m p' q'.
+Proof.
+  intro R. destruct R as [p q u u' x x' y y' tu tu' tx ty Bp Bq Eu Eu' Emod Ex Ex' Ey Ey'
+    | p q u u' l tu tu' Bp Bq Eu Eu' Emod | p q B].
+  - (* ovWait *)
+    intros a p' S. inversion S as [a0 p1 SD | d p1 SD]; subst.
+    + (* a discrete step: abort, bad, the position read or the pause *)
+      destruct (bisim_step_disc _ _ _ _ Bp SD) as [r [SR Br]].
+      unfold ovWait in SR. invert_disc_prefixes; explicit_typed_input; output_values.
+      * (* abort *)
+        eassert (SR' : ovWait m u' x' y' -PA- chanAbort *? -PA> _)
+          by (unfold ovWait; do 3 apply stepDpChoiceL; apply stepDpIn; typed_vals).
+        destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPDisc; exact SQ | ].
+        apply owrBisim. exact (bisim_trans _ _ _ Br Bq').
+      * (* bad *)
+        eassert (SR' : ovWait m u' x' y' -PA- chanBad *? -PA> _)
+          by (unfold ovWait; do 2 apply stepDpChoiceL; apply stepDpChoiceR; apply stepDpIn;
+              typed_vals).
+        destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPDisc; exact SQ | ].
+        apply owrBisim. exact (bisim_trans _ _ _ Br Bq').
+      * (* the position read: y has run out, so y' has too *)
+        match goal with [Ez : evalExpFunTime y = Some zeroTime |- _] =>
+          rewrite Ey in Ez; injection Ez as Ez; subst ty end.
+        match goal with [ |- context [chanPos ;? [basePosition ?p0]] ] =>
+          eassert (SR' : ovWait m u' x' y' -PA- chanPos ;? [basePosition p0] -PA> _)
+            by (unfold ovWait; apply stepDpChoiceL; apply stepDpChoiceR; apply stepDpTimeOut;
+                [apply stepDpIn; typed_vals | exact Ey']) end.
+        destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPDisc; exact SQ | ].
+        eapply owrReady with (u := u) (u' := u'); try eassumption.
+        -- eapply bisim_trans; [exact Br | ]. unfold_app_bisim.
+           rewrite (subExp_eval_id _ u _ Eu). apply bisim_refl.
+        -- eapply bisim_trans; [apply bisim_symm; exact Bq' | ]. unfold_app_bisim.
+           rewrite (subExp_eval_id _ u' _ Eu'). apply bisim_refl.
+      * (* the pause: x has run out, so x' has too *)
+        match goal with [Ez : evalExpFunTime x = Some zeroTime |- _] =>
+          rewrite Ex in Ez; injection Ez as Ez; subst tx end.
+        eassert (SR' : ovWait m u' x' y' -PA- chanPause *! -PA> _)
+          by (unfold ovWait; apply stepDpChoiceR; apply stepDpTimeOut;
+              [apply stepDpOut; constructor | exact Ex']).
+        destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPDisc; exact SQ | ].
+        apply owrBisim. exact (bisim_trans _ _ _ Br Bq').
+    + (* a delay: each timer counts down or runs out *)
+      destruct (bisim_step_del _ _ _ _ Bp SD) as [r [SR Br]].
+      unfold ovWait in SR. invert_del_prefixes.
+      all: try (rewrite Ex in *; discriminate).
+      all: try (rewrite Ey in *; discriminate).
+      all: rewrite Ex in *; rewrite Ey in *.
+      all: repeat match goal with [E : Some ?a = Some ?b |- _] =>
+        injection E as E; symmetry in E; subst end.
+      * (* both run out *)
+        match goal with [H1 : Rplus _ _ = Rplus _ _ |- _] =>
+          assert (ED : tx +dt+ d = ty +dt+ d0) by (apply delayEqR; simpl; exact H1) end.
+        eassert (SR' : ovWait m u' x' y' -PD- ty +dt+ d0 -PD> _).
+        { unfold ovWait. apply stepTpSum; [apply stepTpSum; [apply stepTpSum | ] | ].
+          - apply stepTpIn.
+          - apply stepTpIn.
+          - apply stepTpDelAdd; [apply stepTpIn | exact Ey'].
+          - rewrite <- ED. apply stepTpDelAdd; [apply stepTpOut | exact Ex']. }
+        destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPTimed; exact SQ | ].
+        close_wait Br Bq' Eu Eu' Emod.
+      * (* y runs out, x counts down *)
+        eassert (SR' : ovWait m u' x' y' -PD- ty +dt+ d0 -PD> _).
+        { unfold ovWait. apply stepTpSum; [apply stepTpSum; [apply stepTpSum | ] | ].
+          - apply stepTpIn.
+          - apply stepTpIn.
+          - apply stepTpDelAdd; [apply stepTpIn | exact Ey'].
+          - eapply stepTpDelSub; exact Ex'. }
+        destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPTimed; exact SQ | ].
+        close_wait Br Bq' Eu Eu' Emod.
+      * (* x runs out, y counts down *)
+        eassert (SR' : ovWait m u' x' y' -PD- tx +dt+ d0 -PD> _).
+        { unfold ovWait. apply stepTpSum; [apply stepTpSum; [apply stepTpSum | ] | ].
+          - apply stepTpIn.
+          - apply stepTpIn.
+          - eapply stepTpDelSub; exact Ey'.
+          - apply stepTpDelAdd; [apply stepTpOut | exact Ex']. }
+        destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPTimed; exact SQ | ].
+        close_wait Br Bq' Eu Eu' Emod.
+      * (* both count down *)
+        eassert (SR' : ovWait m u' x' y' -PD- d -PD> _).
+        { unfold ovWait. apply stepTpSum; [apply stepTpSum; [apply stepTpSum | ] | ].
+          - apply stepTpIn.
+          - apply stepTpIn.
+          - eapply stepTpDelSub; exact Ey'.
+          - eapply stepTpDelSub; exact Ex'. }
+        destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+        exists q'. split; [apply stepPTimed; exact SQ | ].
+        close_wait Br Bq' Eu Eu' Emod.
+  - (* ovReady: it broadcasts, into ovWait with the timers computed from its own *)
+    intros a p' S. inversion S as [a0 p1 SD | d p1 SD]; subst.
+    + destruct (bisim_step_disc _ _ _ _ Bp SD) as [r [SR Br]].
+      unfold ovReady in SR. invert_disc_prefixes; output_values.
+      eassert (SR' : ovReady m u' l -PA- chanOutProc ;! [baseMode m, basePosition l] -PA> _)
+        by (unfold ovReady; apply stepDpOut; repeat constructor).
+      destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+      exists q'. split; [apply stepPDisc; exact SQ | ].
+      eapply owrWait with (u := u (-) ePeriod m) (u' := u' (-) ePeriod m)
+        (x := u (-) ePeriod m) (x' := u' (-) ePeriod m) (y := ePeriod m) (y' := ePeriod m)
+        (tu := mkTime (time tu -nn- time (period m)))
+        (tu' := mkTime (time tu' -nn- time (period m)))
+        (tx := mkTime (time tu -nn- time (period m))) (ty := period m).
+      * eapply bisim_trans; [exact Br | ]. unfold_app_bisim. apply bisim_refl.
+      * eapply bisim_trans; [apply bisim_symm; exact Bq' | ]. unfold_app_bisim.
+        apply bisim_refl.
+      * apply evalExpFunTime_subtract_period. exact Eu.
+      * apply evalExpFunTime_subtract_period. exact Eu'.
+      * simpl. rewrite Emod. reflexivity.
+      * apply evalExpFunTime_subtract_period. exact Eu.
+      * rewrite Emod. apply evalExpFunTime_subtract_period. exact Eu'.
+      * apply evalExpFunTime_period.
+      * apply evalExpFunTime_period.
+    + destruct (bisim_step_del _ _ _ _ Bp SD) as [r [SR Br]].
+      unfold ovReady in SR. invert_del_prefixes.
+      eassert (SR' : ovReady m u' l -PD- d -PD> _) by (unfold ovReady; apply stepTpOut).
+      destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ Bq) SR') as [q' [SQ Bq']].
+      exists q'. split; [apply stepPTimed; exact SQ | ].
+      eapply owrReady; [exact Br | apply bisim_symm; exact Bq' | exact Eu | exact Eu' | exact Emod].
+  - (* bisimilar already *)
+    intros a p' S. destruct B as [F _]. destruct (F a p' S) as [q' [S' B']].
+    exists q'. split; [exact S' | apply owrBisim; exact B'].
+Qed.
+
+(** ovWait with parameters that evaluate to the same times, the first up to the period
+of the mode, are bisimilar: the first parameter is only ever seen through the timers it
+sets after the next broadcast, which subtract the period from it.*)
+Theorem ovWait_params_bisim (m : Mode) (u u' x x' y y' : Exp) (tu tu' tx ty : Time) :
+  evalExpFunTime u = Some tu -> evalExpFunTime u' = Some tu' ->
+  time tu -nn- time (period m) = time tu' -nn- time (period m) ->
+  evalExpFunTime x = Some tx -> evalExpFunTime x' = Some tx ->
+  evalExpFunTime y = Some ty -> evalExpFunTime y' = Some ty ->
+  ovWait m u x y ~p~ ovWait m u' x' y'.
+Proof.
+  intros. apply (bisim_coind (ovWaitRel m)).
+  - intros p q R. split.
+    + apply ovWaitRel_step. exact R.
+    + intros a q' S. apply ovWaitRel_sym in R.
+      destruct (ovWaitRel_step _ _ _ R a q' S) as [p' [S' R']].
+      exists p'. split; [exact S' | apply ovWaitRel_sym; exact R'].
+  - apply (owrWait m (ovWait m u x y) (ovWait m u' x' y') u u' x x' y y' tu tu' tx ty);
+      first [apply bisim_refl | assumption].
+Qed.
+
+(** The timers of an ovWait that evaluate can be replaced by their values.*)
+Corollary ovWaitStateExp_time (m : Mode) (u x y : Exp) (tu tx ty : Time) (p : ProcTerm) :
+  evalExpFunTime u = Some tu -> evalExpFunTime x = Some tx -> evalExpFunTime y = Some ty ->
+  ovWaitStateExp m u x y p -> ovWaitState m tu tx ty p.
+Proof.
+  intros Eu Ex Ey S. red in S |- *. eapply bisim_trans; [exact S | ].
+  apply (ovWait_params_bisim m u tu x tx y ty tu tu tx ty);
+    first [assumption | reflexivity | apply evalExpFunTime_time].
+Qed.
+
+(** ovWait's first parameter counts only up to the period of the mode.*)
+Corollary ovWaitState_period (m : Mode) (t t' x y : Time) (p : ProcTerm) :
+  time t -nn- time (period m) = time t' -nn- time (period m) ->
+  ovWaitState m t x y p -> ovWaitState m t' x y p.
+Proof.
+  intros E S. red in S |- *. eapply bisim_trans; [exact S | ].
+  apply (ovWait_params_bisim m t t' x x y y t t' x y);
+    first [assumption | apply evalExpFunTime_time].
 Qed.
 
 (** After a step into switchCurr, the overlap component was switchBc.*)
@@ -1007,6 +1243,21 @@ Proof.
     currOK_next_unfold_app. apply bisim_refl.
 Qed.
 
+(** The same, with the action: currOK reads stable, into listening, or reads a next mode,
+into nextEq with it.*)
+Lemma currOK_next_act (p p' : ProcTerm) (a : DiscAct) (m'' : Mode) :
+  p -PA- a -PA> p' -> currOKState m'' p ->
+  (a = chanMStable *? /\ listeningState p') \/
+  (exists m, a = chanMNext ;? [baseMode m] /\ nextEqState m m'' p').
+Proof.
+  intros TR CS. unfold currOKState in CS. unfold currOK in CS.
+  currOK_next_fwd_pre.
+  - left. split; [reflexivity | ]. unfold listeningState.
+    eapply bisim_trans; [eassumption | ]. currOK_next_listening_app.
+  - right. eexists. split; [reflexivity | ]. unfold nextEqState.
+    eapply bisim_trans; [eassumption | ]. currOK_next_unfold_app. apply bisim_refl.
+Qed.
+
 Theorem rangeBad_next (p p' : ProcTerm) (a : DiscAct) (m'' : Mode) :
   p -PA- a -PA> p' -> rangeBadState m'' p ->
   (exists m, currEqState m m'' p').
@@ -1031,6 +1282,17 @@ Proof.
   currOK_next_fwd_pre.
   eexists. unfold currPincCheckState. eapply bisim_trans; [eassumption | ].
   currOK_next_unfold_app. apply bisim_refl.
+Qed.
+
+(** The same, with the action: the only step of gotRange reads a mode on mCurr.*)
+Lemma gotRange_next_act (p p' : ProcTerm) (a : DiscAct) (m'' : Mode) (r : Distance) :
+  p -PA- a -PA> p' -> gotRangeState m'' r p ->
+  exists m, a = chanMCurr ;? [baseMode m] /\ currPincCheckState m m'' r p'.
+Proof.
+  intros TR CS. unfold gotRangeState in CS. unfold gotRange in CS.
+  currOK_next_fwd_pre.
+  eexists. split; [reflexivity | ]. unfold currPincCheckState.
+  eapply bisim_trans; [eassumption | ]. currOK_next_unfold_app. apply bisim_refl.
 Qed.
 
 Theorem currComp_next (p p' : ProcTerm)
@@ -1073,6 +1335,17 @@ Proof.
   currOK_next_fwd_pre.
   eexists. unfold tfsNextState. eapply bisim_trans; [eassumption | ].
   currOK_next_unfold_app. apply bisim_refl.
+Qed.
+
+(** The same, with the action: the only step of tfsStart reads a mode on mCurr.*)
+Lemma tfsStart_next_act (p p' : ProcTerm) (a : DiscAct) :
+  p -PA- a -PA> p' -> tfsStartState p ->
+  exists m, a = chanMCurr ;? [baseMode m] /\ tfsNextState m p'.
+Proof.
+  intros TR CS. unfold tfsStartState in CS. unfold tfsStart in CS.
+  currOK_next_fwd_pre.
+  eexists. split; [reflexivity | ]. unfold tfsNextState.
+  eapply bisim_trans; [eassumption | ]. currOK_next_unfold_app. apply bisim_refl.
 Qed.
   
 (****************** Conditionals ******************)
@@ -1706,6 +1979,56 @@ Proof. intros S T. destruct (overlapState_shape _ S); prot_outProc_in_not_contra
 
 Lemma listener_pos_out_not p p' v : listenerState p -> p -PA- chanPos ;! v -PA> p' -> False.
 Proof. intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra. Qed.
+
+(** No component of the protocol offers a mode on mCurr: the overlap only writes the empty
+tuple there, to switch mode.*)
+Lemma broadcast_mCurr_out_not p p' v :
+  broadcastState p -> p -PA- chanMCurr ;! v -PA> p' -> False.
+Proof. intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
+
+Lemma overlap_mCurr_out_not p p' v vs :
+  overlapState p -> p -PA- chanMCurr ;! (v :: vs) -PA> p' -> False.
+Proof.
+  intros S T. destruct (overlapState_shape _ S); try prot_outProc_in_not_contra;
+  prot_outProc_in_not_unfold;
+  match goal with [B : ?p ~p~ ?q, TR : ?p -PA- ?a -PA> ?p' |- _] =>
+    destruct (bisim_disc_match _ _ _ _ B TR) as [q' TR'] end;
+  prot_outProc_in_not_body; invert_disc_prefixes;
+  match goal with [E : evalExpLists [] (_ :: _) |- _] => inversion E end.
+Qed.
+
+Lemma listener_mCurr_out_not p p' v :
+  listenerState p -> p -PA- chanMCurr ;! v -PA> p' -> False.
+Proof. intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra. Qed.
+
+(** The broadcaster outputs only on outProc.*)
+Lemma broadcast_out_outProc p p' c v :
+  broadcastState p -> p -PA- c ;! v -PA> p' -> c = chanOutProc.
+Proof.
+  intros S T. destruct (broadcastState_shape _ S) as [B | m e B | m l B];
+    try prot_outProc_in_not_contra.
+  destruct (bisim_disc_match _ _ _ _ B T) as [q R]. unfold bcReady in R.
+  invert_disc_prefixes. reflexivity.
+Qed.
+
+(** The overlap component outputs on mNext only in tfsNext, where it writes the fail-safe
+successor of its mode.*)
+Lemma overlap_mNext_out p p' v :
+  overlapState p -> p -PA- chanMNext ;! v -PA> p' ->
+  exists m, tfsNextState m p /\ v = [baseMode (failSafeSucc m)].
+Proof.
+  intros S T. destruct (overlapState_shape _ S)
+    as [B | m B | m e2 e3 e4 B | m e2 l B | m B | B | B | B | B | m B | B | B | B];
+    try prot_outProc_in_not_contra.
+  destruct (bisim_disc_match _ _ _ _ B T) as [q R]. unfold tfsNext in R.
+  invert_disc_prefixes.
+  repeat match goal with
+    | [H : evalExpLists _ _ |- _] => inversion H; subst; clear H
+    | [H : evalExp (eFailSafeSucc _) _ |- _] => inversion H; subst; clear H
+    | [H : evalExp (eBase _) _ |- _] => inversion H; subst; clear H end.
+  match goal with [B' : p ~p~ tfsNext ?m0 |- _] =>
+    exists m0; split; [exact B' | reflexivity] end.
+Qed.
 (* end helpers *)
 
 (** A step of a protocol triple whose broadcast component can only have stepped by reading
@@ -1749,6 +2072,53 @@ Proof.
       lets X : ACT H1; injection X as X1 X2; subst c1 v1; exfalso;
       first [eapply broadcast_pos_out_not; [exact BS | exact H2]
             | eapply listener_pos_out_not; [exact LS | exact H2]] end.
+Qed.
+
+(** A step of a protocol triple whose listener can only have stepped by reading a mode on
+mCurr: either it did not step, or the whole triple read that mode, since no component
+offers a mode on mCurr. So for the overlap component below.*)
+Lemma triple_mCurr_read_li p1 p2 p3 p1' p2' p3' c :
+  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
+  (forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurr ;? [baseMode v]) ->
+  p3 = p3' \/ (p3 -PA- c -PA> p3' /\ exists v, c = chanMCurr ;? [baseMode v]).
+Proof.
+  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
+  destruct c as [c0 v0 | c0 v0 | ].
+  - triple_disc_nonTau T;
+      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
+  - triple_disc_nonTau T;
+      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
+  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
+    decompose [or and] H; clear H;
+    try match goal with [E : p3 = p3' |- _] => left; exact E end;
+    try match goal with [H1 : p3 -PA- _ ;! _ -PA> p3' |- _] =>
+      destruct (ACT _ H1) as [? X]; discriminate X end;
+    match goal with [H1 : p3 -PA- ?c1 ;? ?v1 -PA> p3', H2 : _ -PA- ?c1 ;! ?v1 -PA> _ |- _] =>
+      destruct (ACT _ H1) as [v X]; injection X as X1 X2; subst c1 v1; exfalso;
+      first [eapply broadcast_mCurr_out_not; [exact BS | exact H2]
+            | eapply overlap_mCurr_out_not; [exact OS | exact H2]] end.
+Qed.
+
+Lemma triple_mCurr_read_ov p1 p2 p3 p1' p2' p3' c :
+  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
+  (forall b, p2 -PA- b -PA> p2' -> exists v, b = chanMCurr ;? [baseMode v]) ->
+  p2 = p2' \/ (p2 -PA- c -PA> p2' /\ exists v, c = chanMCurr ;? [baseMode v]).
+Proof.
+  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
+  destruct c as [c0 v0 | c0 v0 | ].
+  - triple_disc_nonTau T;
+      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
+  - triple_disc_nonTau T;
+      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
+  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
+    decompose [or and] H; clear H;
+    try match goal with [E : p2 = p2' |- _] => left; exact E end;
+    try match goal with [H1 : p2 -PA- _ ;! _ -PA> p2' |- _] =>
+      destruct (ACT _ H1) as [? X]; discriminate X end;
+    match goal with [H1 : p2 -PA- ?c1 ;? ?v1 -PA> p2', H2 : _ -PA- ?c1 ;! ?v1 -PA> _ |- _] =>
+      destruct (ACT _ H1) as [v X]; injection X as X1 X2; subst c1 v1; exfalso;
+      first [eapply broadcast_mCurr_out_not; [exact BS | exact H2]
+            | eapply listener_mCurr_out_not; [exact LS | exact H2]] end.
 Qed.
   
 Ltac link_partriptau_tac c v U :=

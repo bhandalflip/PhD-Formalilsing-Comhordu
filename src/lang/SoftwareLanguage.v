@@ -1824,10 +1824,32 @@ Corollary patienceSoft (p : ProcTerm) : ~discActEnabled p tauAct -> exists d,
   timedActEnabled p d. intros. addHyp (progressSoft p). invertClear H0.
   apply False_ind. apply H. assumption. assumption. Qed.
 
+(** A delay of d' from a guard with d already taken off it is a delay of d + d' from the
+original guard. The guard must evaluate to t: an ill-formed guard idles instead.*)
 Lemma delProc_minus_guard t d d' H p p' e :
+  evalExpFunTime e = Some t ->
   $< minusTime t (delay d) H >$ p -PD- d' -PD> p' ->
   $< e >$ p -PD- d +d+ d' -PD> p'.
-Proof using PNames PDefs. Admitted.
+Proof using PNames PDefs.
+  intros E S. inversion S; subst; clear S;
+    match goal with [E2 : evalExpFunTime (eBase (baseTime _)) = _ |- _] =>
+      rewrite evalExpFunTime_time in E2; try (inversion E2; subst; clear E2) end.
+  - (* the remaining guard runs out within d' *)
+    replace (d +d+ (minusTime t (delay d) H +dt+ d0)) with (t +dt+ d0).
+    + apply stepTpDelAdd; assumption.
+    + apply delayEqR. simpl. ring.
+  - (* d' is within the remaining guard *)
+    match goal with [H0 : pos (delay d') <= _ |- _] =>
+    assert (H' : pos (delay (d +d+ d')) <= nonneg (time t))
+      by (simpl in H0 |- *;
+          replace (nonneg (time t)) with (pos (delay d) + (nonneg (time t) - pos (delay d)))
+            by ring;
+          apply Rplus_le_compat_l; exact H0);
+    replace ($< minusTime (minusTime t (delay d) H) (delay d') H0 >$ p)
+      with ($< minusTime t (delay (d +d+ d')) H' >$ p) end.
+    + apply stepTpDelSub; assumption.
+    + do 3 f_equal. apply timeEqR. simpl. ring.
+Qed.
 
 (** If p can delay to p' and p' can delay to p'',
  then p can delay to p'' by the sum of the two original delays.*)

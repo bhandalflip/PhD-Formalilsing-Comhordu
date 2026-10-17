@@ -186,6 +186,15 @@ Lemma curr_switch_mState (k k' : ModeState) (a : ActModeState) :
   a = chanMCurr @?. intros H H0. invertClear H;
   try (false; apply H0; subst; reflexivity). reflexivity. Qed.
 
+(** A mode output on mCurr is the current mode, and one on mNext is the next mode; neither
+changes the mode state.*)
+Lemma mState_curr_out k k' m : k -ms- chanMCurr .! m -ms> k' -> m = currModeMState k /\ k' = k.
+Proof. intro S. inversion S; subst; split; reflexivity. Qed.
+
+Lemma mState_next_out k k' m :
+  k -ms- chanMNext .! m -ms> k' -> nextModeMState k = Some m /\ k' = k.
+Proof. intro S. inversion S; subst; split; reflexivity. Qed.
+
 Lemma timeSplit_mState (k k'' : ModeState) (d d' d'' : Delay) :
   k -ms- d'' -ms> k'' -> d'' = d +d+ d' ->
   exists k', k -ms- d -ms> k' /\ k' -ms- d' -ms> k''.

@@ -52,6 +52,7 @@ Definition tfsBcStateEnt := liftProcEnt tfsBcStateProt.
 Definition switchBcStateEnt m := liftProcEnt (switchBcStateProt m).
 Definition ovWaitStateEnt (m : Mode) (t x y : Time) : Entity -> Prop :=
 liftProcEnt (ovWaitStateProt m t x y).
+Definition ovWaitTypedEnt := liftProcEnt ovWaitTypedProt.
 Definition tfsCurrStateEnt := liftProcEnt tfsCurrStateProt.
 Definition tfsNextStateEnt m := liftProcEnt (tfsNextStateProt m).
 
@@ -65,6 +66,7 @@ Definition abortOvlpStateEnt := liftProcEnt abortOvlpStateProt.
 Definition badOvlpStateEnt := liftProcEnt badOvlpStateProt.
 Definition nextEqStateEnt m m' := liftProcEnt (nextEqStateProt m m').
 Definition currEqStateEnt m m'' := liftProcEnt (currEqStateProt m m'').
+Definition currOKStateEnt m'' := liftProcEnt (currOKStateProt m'').
 Definition gotMsgStateEnt m l := liftProcEnt (gotMsgStateProt m l).
 Definition gotRangeStateEnt m r := liftProcEnt (gotRangeStateProt m r).
 Definition currPincCheckStateEnt m m'' r := liftProcEnt (currPincCheckStateProt m m'' r).

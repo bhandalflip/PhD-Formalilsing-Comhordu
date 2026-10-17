@@ -494,6 +494,26 @@ Definition evalExpFunTime (e : Exp) : option Time :=
   | _ => None
   end.
 
+Lemma evalExpFunTime_some (e : Exp) (t : Time) :
+  evalExpFunTime e = Some t -> exists b, evalExpFun e = Some b.
+Proof.
+  unfold evalExpFunTime. destruct (evalExpFun e) as [b | ]; [ | discriminate].
+  intros _. exists b. reflexivity.
+Qed.
+
+Lemma evalExpFunTime_period (m : Mode) : evalExpFunTime (ePeriod m) = Some (period m).
+Proof. unfold evalExpFunTime. simpl. destruct (period m) as [r]. reflexivity. Qed.
+
+(** Subtracting the period of a mode from a time expression gives the truncated difference.*)
+Lemma evalExpFunTime_subtract_period (m : Mode) (e : Exp) (t : Time) :
+  evalExpFunTime e = Some t ->
+  evalExpFunTime (eSubtract e (ePeriod m)) = Some (mkTime (time t -nn- time (period m))).
+Proof.
+  unfold evalExpFunTime. simpl. destruct (evalExpFun e) as [b | ]; [ | discriminate].
+  destruct (evalBaseNonnegFun b) as [r | ]; [ | discriminate].
+  intro E. injection E as E. subst t. destruct (period m) as [r2]. simpl. reflexivity.
+Qed.
+
 (**List the eval relation to work between lists of expressions and lists of values.
 l1 l2 is a member of this relation iff the ith element of l1 evaluates to the ith element
 of l2 for all i.*)
@@ -2608,6 +2628,14 @@ leaves it unchanged. The intuition is that evaluation entails no free variables.
 Lemma eval_pres_sub e b s : e |_| b -> subExp s e = e. intros. induction H; simpl;
   try (rewrite IHevalExp1; rewrite IHevalExp2); try rewrite IHevalExp; reflexivity.
   Qed.
+
+(** The same for an expression that evaluates to a time.*)
+Lemma subExp_eval_id (s : Subst) (e : Exp) (t : Time) :
+  evalExpFunTime e = Some t -> subExp s e = e.
+Proof.
+  intro E. destruct (evalExpFunTime_some _ _ E) as [b Eb].
+  apply (eval_pres_sub e b s). apply evalExpFunRel. exact Eb.
+Qed.
 
 (** A stronger version of the uniqueness property of the evalution relation over
 expressions. In this version, any substitution is allowed to be applied to the

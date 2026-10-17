@@ -581,14 +581,20 @@ Lemma stepEnt_disc_pres_pos (e e' : Entity) a :
 
 (** The software step inside a discrete entity step, when there is one: if it is an input on
 chanPos, the value read is the entity's position, since only the position read rule
-matches such an input.*)
+matches such an input. Likewise a mode read on mCurr or mNext is the mode state's current
+or next mode, and leaves the mode state as it was.*)
 Lemma ent_disc_proc_act p l h k p' l' h' k' a :
   [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
-  p = p' \/ exists c, p -PA- c -PA> p' /\ forall v, c = chanPos ;? [basePosition v] -> v = l.
+  p = p' \/ exists c, p -PA- c -PA> p' /\
+    (forall v, c = chanPos ;? [basePosition v] -> v = l) /\
+    (forall m, c = chanMCurr ;? [baseMode m] -> m = currModeMState k /\ k' = k) /\
+    (forall m, c = chanMNext ;? [baseMode m] -> nextModeMState k = Some m /\ k' = k).
 Proof.
   intro S. inversion S; subst; try (left; reflexivity); right;
     match goal with [T : _ -PA- ?c -PA> _ |- _] => exists c; split; [exact T | ] end;
-    intros vv E; congruence.
+    (split; [ | split]); intros vv E; try congruence.
+  - injection E as E; subst. apply mState_curr_out. assumption.
+  - injection E as E; subst. apply mState_next_out. assumption.
 Qed.
 
 End EntityLanguage.

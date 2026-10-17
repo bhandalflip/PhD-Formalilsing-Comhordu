@@ -147,7 +147,7 @@ Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
   language, and hence our little computing entities, deals with.*)
   lets RPL : Rminus_plus_lt_subNonnegTot H36.
   rewrite <- multNonneg_Rmult_eq in H34. apply RPL in H34. clear H36.
-  addHyp (incomp_tfs n t2 t l2 l' j m2 m1 X H8 H27 H25 H35 H15 H34).
+  addHyp (incomp_tfs n t2 t l2 l' j m2 m1 X H4 H8 H27 H25 H35 H15 H34).
   apply tfs_bound in H36. simpl in H18. assert (transMax < t).
   eapply Rle_lt_trans;[ |apply H18]. apply Rmax_r.
   eapply Rlt_not_le. apply H37. eapply Rle_trans. apply H36.

@@ -136,6 +136,7 @@ Definition dormantStateNet := liftEntNet dormantStateEnt.
 Definition tfsStartStateNet := liftEntNet tfsStartStateEnt.
 Definition initStateNet m := liftEntNet (initStateEnt m).
 Definition ovWaitStateNet m t x y := liftEntNet (ovWaitStateEnt m t x y).
+Definition ovWaitTypedNet := liftEntNet ovWaitTypedEnt.
 Definition ovReadyStateNet m t l := liftEntNet (ovReadyStateEnt m t l).
 Definition switchCurrStateNet := liftEntNet switchCurrStateEnt.
 Definition switchListenStateNet := liftEntNet switchListenStateEnt.
@@ -681,18 +682,6 @@ Lemma init_nextMode_net m i n :
 
 (*LOCAL TIDY*)
 
-Lemma ovReady_prev_net_strong m t l n n' i a : reachableProtNet n ->
-  ovReadyStateNet m t l i n' -> n -NA- a -NA> n' ->
-  ovReadyStateNet m t l i n \/
-  (exists x0 y0, ovWaitStateNet m t x0 y0 i n).
-  Admitted. (*#lift-track-net #strong*)
-
-Lemma ovWait_prev_net_strong m t x y n n' i a : reachableProtNet n ->
-  ovWaitStateNet m t x y i n' -> n -NA- a -NA> n' ->
-  ovWaitStateNet m t x y i n \/
-  (exists t0 l0, ovReadyStateNet m t0 l0 i n) \/
-  initStateNet m i n. Admitted. (*#lift-track-net #strong*)
-
 Lemma nextMode_pres_fwd_net m i n n' a :
   reachableProtNet n -> nextModeNet m i n -> 
   ~(switchCurrStateNet i n \/ ovAbortStateNet i n \/
@@ -730,10 +719,10 @@ Lemma ovWait_ovReady_nextMode_net m t x y l i n :
   (exists t0 l0, ovReadyStateNet m t0 l0 i n) \/
   initStateNet m i n) as PREV.
   elim_intro V OVW OVR.
-  lets OWP : ovWait_prev_net_strong OVW s. elim_intro OWP OWL OWR.
+  lets OWP : ovWait_prev_net OVW s. elim_intro OWP OWL OWR.
   left. do 3 eexists. eassumption. right. or_flat; ex_flat.
   left. do 2 eexists. eassumption. right. eassumption.
-  lets ORP : ovReady_prev_net_strong OVR s. or_flat.
+  lets ORP : ovReady_prev_net OVR s. or_flat.
   right. left. do 2 eexists. eassumption.
   left. ex_flat. do 3 eexists. eassumption.
   (*Now we have that the previous state was either ovWait, ovReady or init,
@@ -937,13 +926,15 @@ lenWitness.*)
 Ltac netState_ent_net_tac := eapply lenWitness;
   [eassumption | eassumption].
 
+(** The network lift of tfsNext_currMode: the current mode and tfsNext's mode have the same
+fail-safe successor.*)
 Lemma tfsNext_currModeNet_eq m1 m2 i n : reachableProtNet n -> currModeNet m1 i n ->
-  tfsNextStateNet m2 i n -> m1 = m2. Admitted. (*5*)
-(*Proof: On initially entering this state, the mode is read from the mode state,
-giving the equality. In the discrete inductive case it can be shown by
-currModeNet_switch_states that the mode state doesn't change- (?) because if it were to change
-that would imply a contradictory condition on the state predicates?. In the delay inductive
-case, delay preservation for both mode state and tfsNext prevail.*)
+  tfsNextStateNet m2 i n -> failSafeSucc m1 = failSafeSucc m2.
+Proof.
+  intros RN CM TN. apply currMode_ent_ex in CM. destruct CM as [e [EIN CE]].
+  inversion TN as [e' TE EIN']. lets EQ : entInNetUnique EIN EIN'. subst e'.
+  rewrite <- CE. apply (tfsNext_currMode e m2); [eapply reachable_net_ent; eassumption | exact TE].
+Qed.
 
 (** The nextSinceState relation can be broken down into the following cases.*)
 Lemma nexSinceStateNet_cases i n :
@@ -1008,12 +999,18 @@ Ltac state_pred_elim_net H H1 :=
 
 (***************************** Lifted results *****************************)
 
-Lemma tfsStart_prev_net i n n' a : reachableProtNet n -> tfsStartStateNet i n' ->
-  n -NA- a -NA> n' -> tfsStartStateNet i n \/ dormantStateNet i n \/
+(** The overlap's backtracking lemmas, lifted. The process-level lemmas leave the earlier
+ovWait's timers as expressions, which a reachable component may hold ill formed; these
+conclude times, so they assume the timers well typed (ovWaitTypedNet). ovWait_prev_net
+below needs no such hypothesis: the ovWait it starts from is typed already, and an ovReady
+whose broadcast reaches a typed ovWait holds a time.*)
+Lemma tfsStart_prev_net i n n' a : reachableProtNet n -> ovWaitTypedNet i n ->
+  tfsStartStateNet i n' -> n -NA- a -NA> n' ->
+  tfsStartStateNet i n \/ dormantStateNet i n \/
   exists m t x y, ovWaitStateNet m t x y i n.
   Admitted. (*#lift-track-net*)
 
-Lemma ovReady_prev_net m t l i n n' a : reachableProtNet n ->
+Lemma ovReady_prev_net m t l i n n' a : reachableProtNet n -> ovWaitTypedNet i n ->
   ovReadyStateNet m t l i n' -> n -NA- a -NA> n' ->
   ovReadyStateNet m t l i n \/
   exists x y, ovWaitStateNet m t x y i n. Admitted. (*#lift-track-net*)
@@ -1072,7 +1069,7 @@ Proof.
     by (eapply currMode_intro; [reflexivity | exact EIN]).
   lets EQ : tfsNext_currModeNet_eq RN CM U. simpl in EQ.
   assert (currModeMState k -mtr-> failSafeSucc m) as FS
-    by (rewrite EQ; apply failSafeSucc_successor).
+    by (rewrite <- EQ; apply failSafeSucc_successor).
   destruct (mState_stable_next_enabled _ _ FS) as [MS | MS].
   - eapply ent_del_sync_mState_not with (a := chanMStable *!); [ | exact MS | exact ED].
     dae_overlap. eapply tfsNext_mStable_out. exact TS.
@@ -1093,26 +1090,35 @@ Proof.
   dae_overlap. apply tfsStart_mCurr_in. exact TS.
 Qed.
 
+(** Across the broadcast from ovReady, the mode carries over and the position timer is set
+to the period. ovWait's first parameter is only visible up to the period of the mode
+(ovWait_params_bisim), so the earlier timer of ovReady and the new first parameter cannot
+be tied to each other here.*)
 Lemma ovReady_wait_track_net m t l i m' t' x y n n' a :
   ovReadyStateNet m t l i n -> ovWaitStateNet m' t' x y i n' ->
-  n -NA- a -NA> n' -> m = m' /\
-  (exists p, t' = minusTime t (period m) p) /\ x = t' /\ y = period m.
+  n -NA- a -NA> n' -> m = m' /\ y = period m.
   Admitted. (*5*)
 (*Proof: #lift-track-net*)
 
+(** ovWait does not step to ovWait, so across a step its parameters are the same, the first
+up to the period of the mode.*)
 Lemma ovWait_track_net m m' t t' x x' y y' i n n' a :
   ovWaitStateNet m t x y i n -> ovWaitStateNet m' t' x' y' i n' ->
-  n -NA- a -NA> n' -> m = m' /\ t = t' /\ x = x' /\ y = y'. Admitted. (*5*)
+  n -NA- a -NA> n' ->
+  m = m' /\ time t -nn- time (period m) = time t' -nn- time (period m) /\ x = x' /\ y = y'.
+  Admitted. (*5*)
 (**Proof: Apply a tactic to extract the underlying process state predicates- at the
 lowest level e.g. ovWaitState p2 (tactic already exists I think?).
 Then apply a matching tactic at this level, and you should be done.*)
 
-(*Perhaps modify this to get rid of the "t + period m" and replace it with some existential
-instead. Then do a separate tracking result to get the "t + period m".*)
+(** After a step into ovWait, the entity was in ovWait already, in init, or in an ovReady
+whose broadcast set the pause timer to its own timer less the period and the position
+timer to the period.*)
 Lemma ovWait_prev_net m t x y i n n' a : reachableProtNet n -> ovWaitStateNet m t x y i n' ->
   n -NA- a -NA> n' ->
   ovWaitStateNet m t x y i n \/
-  (exists l, ovReadyStateNet m (t +t+ period m) l i n) \/
+  (exists t0 l, ovReadyStateNet m t0 l i n /\
+    time x = time t0 -nn- time (period m) /\ y = period m) \/
   initStateNet m i n.
   Admitted. (*#lift-track-net*)
 

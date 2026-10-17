@@ -50,6 +50,16 @@ Definition ovWaitStateExp (m : Mode) (t x y : Exp) (p : ProcTerm) : Prop :=
 Definition ovReadyStateExp (m : Mode) (t : Exp) (l : Position) (p : ProcTerm) : Prop :=
   p ~p~ ovReady m t l.
 
+(** The overlap component is well typed: whenever it is ovWait, its timers evaluate to
+times. In the protocol a timer comes from the wait time between the modes read on mCurr
+and mNext, which is defined when the mode state allows that change of mode. That the mode
+state of a reachable entity always does is an invariant that is not proved here, so the
+lemmas that conclude times rather than expressions take this as a hypothesis.*)
+Definition ovWaitTyped (p : ProcTerm) : Prop :=
+  forall m u x y, ovWaitStateExp m u x y p ->
+  exists tu tx ty : Time,
+    evalExpFunTime u = Some tu /\ evalExpFunTime x = Some tx /\ evalExpFunTime y = Some ty.
+
 Definition switchBcState (m : Mode) (p : ProcTerm) : Prop :=
   p ~p~ switchBc m.
 
@@ -196,6 +206,7 @@ Definition tfsStartStateProt := liftOverlap tfsStartState.
 Definition initStateProt m := liftOverlap (initState m).
 Definition ovReadyStateProt m t l := liftOverlap (ovReadyState m t l).
 Definition ovReadyStateExpProt m t l := liftOverlap (ovReadyStateExp m t l).
+Definition ovWaitTypedProt := liftOverlap ovWaitTyped.
 Definition switchCurrStateProt := liftOverlap switchCurrState.
 Definition switchListenStateProt := liftOverlap switchListenState.
 

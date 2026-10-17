@@ -55,6 +55,21 @@ CoFixpoint bisim_symm p q : p ~p~ q -> q ~p~ p.
   apply bisim_symm in AND0. exists x. split; assumption.
   Qed.
 
+(** A relation whose pairs match each other's steps, into pairs of the relation again, is
+contained in bisimilarity.*)
+Lemma bisim_coind (R : ProcTerm -> ProcTerm -> Prop) :
+  (forall p q, R p q ->
+    (forall a p', p -P- a -P> p' -> exists q', q -P- a -P> q' /\ R p' q') /\
+    (forall a q', q -P- a -P> q' -> exists p', p -P- a -P> p' /\ R p' q')) ->
+  forall p q, R p q -> p ~p~ q.
+Proof.
+  intro H. cofix CIH. intros p q Rpq. destruct (H p q Rpq) as [F B]. constructor.
+  - intros a p' S. destruct (F a p' S) as [q' [S' R']]. exists q'. split; [exact S' | ].
+    apply CIH. exact R'.
+  - intros a q' S. destruct (B a q' S) as [p' [S' R']]. exists p'. split; [exact S' | ].
+    apply CIH. exact R'.
+Qed.
+
 (*** Matching Steps ***)
 
 (** One side of a bisimulation matches a discrete step of the other, with bisimilar
@@ -713,15 +728,14 @@ Lemma cond_bisim_true p b : evalBoolExp b true ->
 
 (*TOGO: LanguageFoundations*)
 
+(** Only this direction holds: the total function also returns false when the expression
+does not evaluate at all.*)
 Theorem evalBoolExpFalseTot : forall (e : BoolExp),
-  evalBoolExp e false <-> evalBoolExpFunTot e = false.
+  evalBoolExp e false -> evalBoolExpFunTot e = false.
 Proof using.
-  split; intros. apply evalBoolExpRelFun in H.
+  intros e H. apply evalBoolExpRelFun in H.
   unfold evalBoolExpFunTot. rewrite H. reflexivity.
-  unfold evalBoolExpFunTot in H.
-  remember (evalBoolExpFun e) as EV. destruct EV.
-  subst. symmetry in HeqEV. apply evalBoolExpFunRel in HeqEV.
-  assumption. symmetry in HeqEV. Admitted.
+Qed.
   
 
 (*TOGO*)
