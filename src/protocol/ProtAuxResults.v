@@ -1925,6 +1925,31 @@ Proof.
     destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
 Qed.
 
+(** No component of the protocol reads from a channel it writes the mode state on.*)
+Lemma broadcast_write_in_not p p' c v :
+  broadcastState p -> c = chanMCurrWrite \/ c = chanMNextWrite \/ c = chanMStableWrite ->
+  p -PA- c ;? v -PA> p' -> False.
+Proof.
+  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
+    destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
+Qed.
+
+Lemma overlap_write_in_not p p' c v :
+  overlapState p -> c = chanMCurrWrite \/ c = chanMNextWrite \/ c = chanMStableWrite ->
+  p -PA- c ;? v -PA> p' -> False.
+Proof.
+  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
+    destruct (overlapState_shape _ S); prot_outProc_in_not_contra.
+Qed.
+
+Lemma listener_write_in_not p p' c v :
+  listenerState p -> c = chanMCurrWrite \/ c = chanMNextWrite \/ c = chanMStableWrite ->
+  p -PA- c ;? v -PA> p' -> False.
+Proof.
+  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
+    destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
+Qed.
+
 (** Only the overlap component switches mode.*)
 Lemma broadcast_mCurr_out_not p p' v :
   broadcastState p -> p -PA- chanMCurrWrite ;! v -PA> p' -> False.
@@ -2213,6 +2238,12 @@ Proof.
 Qed.
 (**Proof: Brute force analysis on overlap states and show that these are the only two matches*)
 
+Theorem listen_mStable_out_not (p p' : ProcTerm) :
+  p -PA- chanMStableWrite ;! [] -PA> p' -> listenerState p -> False.
+Proof.
+  intros TR S. destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
+Qed.
+
 Lemma bc_abort_out_not (p p' : ProcTerm) : 
   p -PA- chanAbort;! [] -PA> p' -> broadcastState p -> False.
 Proof.
@@ -2252,20 +2283,20 @@ Proof.
 Qed.
 
 (**The two cases where the overlap component can output on mStable: aborting an overlap,
-and the self-loop of tfsNext. The value tfsNext holds is whatever was read on mCurr.*)
-Theorem ovlp_mStable_out (p p' : ProcTerm) : 
+and the self-loop of tfsNext, which keeps its mode.*)
+Theorem overlap_mStable_out (p p' : ProcTerm) :
   p -PA- chanMStableWrite*! -PA> p' -> overlapState p ->
   (ovAbortState p /\ dormantState p') \/
-  (exists (v : BaseType), p ~p~ tfsNext v /\ p' ~p~ tfsNext v).
+  (exists m, tfsNextState m p /\ tfsNextState m p').
 Proof.
   intros TR S. destruct (overlapState_shape _ S)
-    as [B | v B | v e2 e3 e4 B SC | v1 e2 v3 B | m0 B | B | B | B | B | v B | B | B | B];
+    as [B | v B | v e2 e3 e4 B | v1 e2 v3 B | m0 B | B | B | B | B | v B | B | B | B];
     try solve [prot_outProc_in_not_contra];
     destruct (bisim_step_disc _ _ _ _ B TR) as [q [TQ BQ]];
     [unfold ovAbort in TQ | unfold tfsNext in TQ]; invert_disc_prefixes.
   - left. split; [exact B | ]. red. eapply bisim_trans; [exact BQ | ].
     apply app_bisim_nil; reflexivity.
-  - right. exists v. split; [exact B | ]. eapply bisim_trans; [exact BQ | ].
+  - right. exists v. split; [exact B | ]. red. eapply bisim_trans; [exact BQ | ].
     unfold_app_bisim. apply bisim_refl.
 Qed.
 

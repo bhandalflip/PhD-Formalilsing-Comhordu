@@ -34,8 +34,8 @@ Require Import ComhCoq.protocol.ProtocolBridge.
 Ltac state_disj_paused_notifAbort_dae_contra D :=
   let q := fresh "q" in let TR := fresh "TR" in
   destruct D as [q TR];
-  unfold rangeBad, currOK, abortOvlp, paused, tfsCurr, tfsStart, tfsBc,
-    switchListen, switchBc, switchCurr, ovReady, ovWait, init in TR;
+  unfold rangeBad, currOK, abortOvlp, paused, tfsCurr, tfsStart, tfsNext, tfsBc,
+    switchListen, switchBc, switchCurr, ovReady, ovWait, init, dormant in TR;
   repeat (match goal with [T : stepDiscProc _ _ _ |- _] =>
     inversion T; clear T; subst end).
 
@@ -94,6 +94,34 @@ Lemma state_disj_tfsCurr_switchListen : forall (i : nat) (n : Network),
   tfsCurrStateNet i n -> switchListenStateNet i n -> False.
 Proof.
   intros i n U V. inversion U as [e U1 U2]. inversion V as [e' V1 V2].
+  assert (e' = e) as EQ by (eapply entInNetUnique; eassumption). subst e'.
+  inversion U1 as [p l h k PP]; subst.
+  inversion PP as [p1 p2 p3 PS]; subst. clear PP.
+  lets PU : tfsCurr_abort_in PS. clear PS.
+  inversion V1; subst.
+  match goal with [X : _ (p1 $||$ p2 $||$ p3) |- _] => inversion X; subst end.
+  match goal with [RS : _ p2 |- _] =>
+    state_disj_paused_notifAbort_bisim_contra RS PU end.
+Qed.
+
+Lemma state_disj_tfsCurr_dormant : forall (i : nat) (n : Network),
+  tfsCurrStateNet i n -> dormantStateNet i n -> False.
+Proof.
+  intros i n U V. inversion U as [e U1 U2]. inversion V as [e' V1 V2].
+  assert (e' = e) as EQ by (eapply entInNetUnique; eassumption). subst e'.
+  inversion U1 as [p l h k PP]; subst.
+  inversion PP as [p1 p2 p3 PS]; subst. clear PP.
+  lets PU : tfsCurr_mCurr_out PS. clear PS.
+  inversion V1; subst.
+  match goal with [X : _ (p1 $||$ p2 $||$ p3) |- _] => inversion X; subst end.
+  match goal with [RS : _ p2 |- _] =>
+    state_disj_paused_notifAbort_bisim_contra RS PU end.
+Qed.
+
+Lemma state_disj_tfsCurr_tfsNext : forall (i : nat) (n : Network) (m : Mode),
+  tfsCurrStateNet i n -> tfsNextStateNet m i n -> False.
+Proof.
+  intros i n m U V. inversion U as [e U1 U2]. inversion V as [e' V1 V2].
   assert (e' = e) as EQ by (eapply entInNetUnique; eassumption). subst e'.
   inversion U1 as [p l h k PP]; subst.
   inversion PP as [p1 p2 p3 PS]; subst. clear PP.
@@ -371,9 +399,13 @@ Theorem tfs_transGuard (n : Network) (m : Mode) (t : Time) (i : nat)
   been in one of two states at n', because this is the only way that the mode state
   can change. However, the cases don't match, so this case is written off with
   contradiction.*)
-  apply False_ind. lets H5 : mState_switch_states p H8 w H6 H7.
-  invertClear H5; invertClear H9. eapply state_disj_tfsCurr_bc. apply H.
-  assumption. eapply state_disj_tfsCurr_switchListen. apply H. assumption.
+  apply False_ind. assert (unstable k) as UK by (subst k; constructor).
+  pose proof (mState_switch_states _ _ _ _ _ _ p UK H8 w H6 H7) as H5.
+  destruct H5 as [[_ B] | [[_ B] | [[_ B] | [m0 [_ B]]]]].
+  eapply state_disj_tfsCurr_bc. apply H. exact B.
+  eapply state_disj_tfsCurr_switchListen. apply H. exact B.
+  eapply state_disj_tfsCurr_dormant. apply H. exact B.
+  eapply state_disj_tfsCurr_tfsNext. apply H. exact B.
   (*So now we must deal with the case where the previous state wasn't tfsCurr.
   Here we can show (...PA::tracking...) that it was tfsNext and that the transition
   was an output to the mode state of the next mode.*)
