@@ -1992,21 +1992,14 @@ Proof.
     destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
 Qed.
 
-(** No component of the protocol reads from a channel it writes the mode state on.*)
+(** Neither the broadcaster nor the listener reads a channel the software writes the mode state
+on.*)
 Lemma broadcast_write_in_not p p' c v :
   broadcastState p -> c = chanMCurrWrite \/ c = chanMNextWrite \/ c = chanMStableWrite ->
   p -PA- c ;? v -PA> p' -> False.
 Proof.
   intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
     destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
-Lemma overlap_write_in_not p p' c v :
-  overlapState p -> c = chanMCurrWrite \/ c = chanMNextWrite \/ c = chanMStableWrite ->
-  p -PA- c ;? v -PA> p' -> False.
-Proof.
-  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
-    destruct (overlapState_shape _ S); prot_outProc_in_not_contra.
 Qed.
 
 Lemma listener_write_in_not p p' c v :
@@ -2036,24 +2029,6 @@ Proof.
   invert_disc_prefixes. reflexivity.
 Qed.
 
-(** The overlap component outputs on mNext only in tfsNext, where it writes the fail-safe
-successor of its mode.*)
-Lemma overlap_mNext_out p p' v :
-  overlapState p -> p -PA- chanMNextWrite ;! v -PA> p' ->
-  exists m, tfsNextState m p /\ v = [baseMode (failSafeSucc m)].
-Proof.
-  intros S T. destruct (overlapState_shape _ S)
-    as [B | m B | m e2 e3 e4 B | m e2 l B | m B | B | B | B | B | m B | B | B | B];
-    try prot_outProc_in_not_contra.
-  destruct (bisim_disc_match _ _ _ _ B T) as [q R]. unfold tfsNext in R.
-  invert_disc_prefixes.
-  repeat match goal with
-    | [H : evalExpLists _ _ |- _] => inversion H; subst; clear H
-    | [H : evalExp (eFailSafeSucc _) _ |- _] => inversion H; subst; clear H
-    | [H : evalExp (eBase _) _ |- _] => inversion H; subst; clear H end.
-  match goal with [B' : p ~p~ tfsNext ?m0 |- _] =>
-    exists m0; split; [exact B' | reflexivity] end.
-Qed.
 (* end helpers *)
 
 (** A step of a protocol triple whose broadcast component can only have stepped by reading
