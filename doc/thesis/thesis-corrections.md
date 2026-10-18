@@ -31,3 +31,15 @@ The proof keeps $\mathit{tfs}(m, 0)$ across a discrete step because **tfsCurr** 
 Definition 5.5 takes the sender's mode first and draws the safety margin from its period and transition time, as the proof of Theorem 6.1 needs. The listener passes its own mode first, so its margin comes from the receiver's mode, which may be smaller. Theorem 6.2 does the same, and its statement names modes $m_1$ and $m_2$ that it never introduces. Passing the sender's mode first in both corrects them, and the proof of Theorem 6.1 already reads them that way (p.142), so its result stands.
 
 **Where:** Definition 5.5 (p.108), the definitions of **currPincCheck** and **nextPincCheck** (p.122), Theorem 6.2 and its proof (p.143). **Found in:** [#14](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/14).
+
+## 6. Values are computed outside Boolean expressions too
+
+Remark 4.1 says that values are computed only in Boolean expressions, so that typing matters only there. But the protocol also computes them in the arguments it passes to its definitions: the listener computes its distance from a message's sender, and the overlap component computes its timers. Typing has to cover those arguments too, giving each computed value a type that its uses accept, such as a distance for the listener's range. The results stand once it does.
+
+**Where:** Remark 4.1 (p.65), the overlap component (p.115), the listener (p.122). **Found in:** [#15](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/15), from the pass-1 report's [root cause 5](../reports/2026-10-14-proof-completion-pass-1/root-causes-and-fixes.md#5-range-typing-esubtract-vs-bpossinc).
+
+## 7. Software components can bypass the mode state
+
+The software uses each of $chanStable$, $chanCurr$ and $chanNext$ both ways, to read the mode state and to write it, so two software components can synchronise on one of them directly (SYNC-LR and SYNC-RL). The listener can then take the next mode that the overlap component writes in **tfsNext**, before the mode state does. The overlap component is left waiting in **tfsCurr** for a mode change that never comes. That breaks the proof of Lemma 6.17, which assumes that **tfsNext**'s output reached the mode state, and with it Theorem 6.7. Splitting each of these channels into one that the software reads from and one that it writes to leaves only the mode state at the other end, and the results stand.
+
+**Where:** Table 4.3 (p.67), the mode-state rules of Table 4.15 (p.99) and their description (p.96), the overlap component (p.115), the listener (p.122), Theorem 6.7 (p.146), the proof of Lemma 6.17 (p.151). **Found in:** [#15](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/15), from the pass-1 report's [root cause 9](../reports/2026-10-14-proof-completion-pass-1/root-causes-and-fixes.md#9-internal-synchronisation-on-mode-state-channels).
