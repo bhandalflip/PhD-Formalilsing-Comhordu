@@ -707,6 +707,30 @@ Proof.
     apply bisim_refl.
 Qed.
 
+(** After a step into tfsCurr, the overlap component was tfsNext, or tfsCurr already.*)
+Lemma tfsCurr_prev (p p' : ProcTerm) (a : DiscAct) :
+  p -PA- a -PA> p' -> overlapState p -> tfsCurrState p' ->
+  tfsCurrState p \/ exists m, tfsNextState m p.
+Proof.
+  intros TR O SP. red in SP. backtrack_shape SP;
+    first [left; exact B | right; eexists; exact B].
+Qed.
+
+(** After a step into tfsBc, the overlap component was tfsCurr.*)
+Lemma tfsBc_prev (p p' : ProcTerm) (a : DiscAct) :
+  p -PA- a -PA> p' -> overlapState p -> tfsBcState p' -> tfsCurrState p.
+Proof.
+  intros TR O SP. red in SP. backtrack_shape SP; exact B.
+Qed.
+
+(** After a step into tfsListen, the overlap component was tfsBc, or tfsListen already.*)
+Lemma tfsListen_prev (p p' : ProcTerm) (a : DiscAct) :
+  p -PA- a -PA> p' -> overlapState p -> tfsListenState p' ->
+  tfsListenState p \/ tfsBcState p.
+Proof.
+  intros TR O SP. red in SP. backtrack_shape SP; first [left; exact B | right; exact B].
+Qed.
+
 (** tfsNext shows its mode only through the fail-safe successor it writes on mNext, so two
 bisimilar tfsNext agree on that successor and need not agree on the mode.*)
 Lemma tfsNext_bisim_param (v m : Mode) :
@@ -1276,6 +1300,38 @@ Proof.
   currOK_next_fwd_pre.
   eexists. split; [reflexivity | ]. unfold tfsNextState.
   eapply bisim_trans; [eassumption | ]. currOK_next_unfold_app. apply bisim_refl.
+Qed.
+
+(** The steps of tfsNext: it writes the fail-safe successor of its mode on mNext and moves to
+tfsCurr, or writes on mStable and stays.*)
+Lemma tfsNext_next_act (p p' : ProcTerm) (a : DiscAct) (m : Mode) :
+  p -PA- a -PA> p' -> tfsNextState m p ->
+  (a = chanMNextWrite ;! [baseMode (failSafeSucc m)] /\ tfsCurrState p') \/
+  (a = chanMStableWrite *! /\ tfsNextState m p').
+Proof.
+  intros T B. destruct (bisim_step_disc _ _ _ _ B T) as [q [TQ BQ]].
+  unfold tfsNext in TQ. invert_disc_prefixes;
+  repeat match goal with
+    | [H : evalExpLists _ _ |- _] => inversion H; subst; clear H
+    | [H : evalExp (eFailSafeSucc _) _ |- _] => inversion H; subst; clear H
+    | [H : evalExp (eBase _) _ |- _] => inversion H; subst; clear H end.
+  - left. split; [reflexivity | ]. red. eapply bisim_trans; [exact BQ | ].
+    apply app_bisim_nil; reflexivity.
+  - right. split; [reflexivity | ]. red. eapply bisim_trans; [exact BQ | ].
+    unfold_app_bisim. apply bisim_refl.
+Qed.
+
+(** The steps of tfsCurr: it switches mode on mCurr and moves to tfsBc, or takes an abort or a
+bad and stays.*)
+Lemma tfsCurr_next_act (p p' : ProcTerm) (a : DiscAct) :
+  p -PA- a -PA> p' -> tfsCurrState p ->
+  (a = chanMCurrWrite *! /\ tfsBcState p') \/ tfsCurrState p'.
+Proof.
+  intros T B. destruct (bisim_step_disc _ _ _ _ B T) as [q [TQ BQ]].
+  unfold tfsCurr in TQ. invert_disc_prefixes; explicit_typed_input; clean_proc_hyp BQ;
+  repeat match goal with [H : evalExpLists [] _ |- _] => inversion H; subst; clear H end;
+  (first [left; split; [reflexivity | ] | right]); red;
+  (eapply bisim_trans; [exact BQ | apply app_bisim_nil; reflexivity]).
 Qed.
   
 (****************** Conditionals ******************)
@@ -2088,6 +2144,29 @@ Proof.
       destruct (ACT _ H1) as [v X]; injection X as X1 X2; subst c1 v1; exfalso;
       first [eapply broadcast_read_out_not; [exact BS | left; reflexivity | exact H2]
             | eapply listener_read_out_not; [exact LS | left; reflexivity | exact H2]] end.
+Qed.
+
+(** A step of a protocol triple whose overlap component can only have stepped by writing on
+the mode state: either it did not step, or the whole triple made that write, since no other
+component reads it.*)
+Lemma triple_write_ov p1 p2 p3 p1' p2' p3' c :
+  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
+  (forall b, p2 -PA- b -PA> p2' -> exists c0 v, b = c0 ;! v /\
+    (c0 = chanMCurrWrite \/ c0 = chanMNextWrite \/ c0 = chanMStableWrite)) ->
+  p2 = p2' \/ p2 -PA- c -PA> p2'.
+Proof.
+  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
+  destruct c as [c0 v0 | c0 v0 | ].
+  - triple_disc_nonTau T; first [left; reflexivity | right; assumption].
+  - triple_disc_nonTau T; first [left; reflexivity | right; assumption].
+  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
+    decompose [or and] H; clear H;
+    try match goal with [E : p2 = p2' |- _] => left; exact E end;
+    match goal with [H2 : p2 -PA- _ -PA> p2' |- _] =>
+      destruct (ACT _ H2) as [c1 [v1 [X C]]] end;
+    first [discriminate X | injection X as X1 X2; subst]; exfalso;
+    first [eapply broadcast_write_in_not; [eassumption | exact C | eassumption]
+          | eapply listener_write_in_not; [eassumption | exact C | eassumption]].
 Qed.
   
 Ltac link_partriptau_tac c v U :=

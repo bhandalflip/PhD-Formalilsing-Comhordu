@@ -268,30 +268,12 @@ Proof.
   destruct M as [p l h E]. destruct M' as [p' l' h' E'].
   destruct (link_net_ent_disc _ _ _ _ _ _ S E E') as [EQ | [b B]].
   { injection EQ; intros; subst. contradiction NE; reflexivity. }
-  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ (reachableNet_ent _ _ _ _ R E)).
-  inversion PS as [p1 p2 p3 BS OS LS]; subst p.
-  (* the mode state reads leave it as it is, and it takes a next mode only when stable *)
-  inversion B; subst; try (contradiction NE; reflexivity);
-    try (match goal with [K : k -ms- _ -ms> k' |- _] => inversion K; subst end;
-         first [contradiction NE; reflexivity | inversion U]).
-  - (* WRITE-STBL: only the overlap component writes on mStable *)
-    match goal with [T : _ $||$ _ $||$ _ -PA- _ -PA> _ |- _] => triple_disc_nonTau T end.
-    + exfalso. eapply bc_mStable_out_not; eassumption.
-    + match goal with [T2 : p2 -PA- _ -PA> _ |- _] =>
-        destruct (overlap_mStable_out _ _ T2 OS) as [[A D] | [m0 [N N']]] end.
-      * right. right. left. split; [net_state_intro E; exact A | net_state_intro E'; exact D].
-      * right. right. right. exists m0.
-        split; [net_state_intro E; exact N | net_state_intro E'; exact N'].
-    + exfalso. eapply listen_mStable_out_not; eassumption.
-  - (* CURR-WRITE: only the overlap component writes on mCurr *)
-    match goal with [T : _ $||$ _ $||$ _ -PA- _ -PA> _ |- _] => triple_disc_nonTau T end.
-    + exfalso. eapply bc_mCurr_out_not; eassumption.
-    + match goal with [T2 : p2 -PA- _ -PA> _ |- _] =>
-        destruct (ovlp_mCurr_out _ _ T2 OS) as [[A D] | [A D]] end.
-      * right. left. split; [net_state_intro E; exact A | net_state_intro E'; exact D].
-      * left. split; [net_state_intro E; exact A | net_state_intro E'; exact D].
-    + exfalso. eapply listen_mCurr_out_not; eassumption.
+  destruct (mState_switch_states_ent _ _ _ _ _ _ _ _ _ (reachableNet_ent _ _ _ _ R E) U NE B)
+    as [[A D] | [[A D] | [[A D] | [m [A D]]]]];
+    [left | right; left | right; right; left | right; right; right; exists m];
+    (split; [econstructor; [exact A | exact E] | econstructor; [exact D | exact E']]).
 Qed.
+
 (**Proof: The mState_in_net predicates can be taken apart to show that there's an entity in the network. Then because the
 network is reachable, the software component of this entity is a protocolState process. Also, it can be shown from the semantics of
 entities that the only law (what about init?) that changes the mode state is that in which the software component outputs on mCurr.
@@ -539,7 +521,12 @@ Lemma tfsListen_failSafe_net m i n : reachableProtNet n ->
   tfsListenStateNet i n -> currModeNet m i n -> failSafe m.
 (*Proof: Similar result for tfsBc, and one for tfsCurr but for the next mode
 rather than the curr mode- perhaps inter-component results will be lifted
-for these?*) Admitted. (*#inter-component-lift-net*)
+for these?*)
+Proof.
+  intros R TL CM. destruct TL as [e TLe E].
+  lets CM' : liftEntNet_ent CM E. simpl in CM'. rewrite <- CM'.
+  exact (proj2 (proj2 (tfs_failSafe_ent e (reachableNet_ent _ _ _ _ R E))) TLe).
+Qed.
 
 (*-LOCAL TIDY*)
 

@@ -602,16 +602,17 @@ Proof.
   - injection E as E; subst. apply mState_next_out. assumption.
 Qed.
 
-(** Likewise a write on mCurr or mStable is taken by the mode state.*)
+(** Likewise a write on mCurr, mNext or mStable is taken by the mode state.*)
 Lemma ent_disc_proc_write p l h k p' l' h' k' a :
   [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
   p = p' \/ exists c, p -PA- c -PA> p' /\
     (c = chanMCurrWrite *! -> k -ms- chanMCurrWrite @? -ms> k') /\
-    (c = chanMStableWrite *! -> k -ms- chanMStableWrite @? -ms> k').
+    (c = chanMStableWrite *! -> k -ms- chanMStableWrite @? -ms> k') /\
+    (forall m, c = chanMNextWrite ;! [baseMode m] -> k -ms- chanMNextWrite .? m -ms> k').
 Proof.
   intro S. inversion S; subst; try (left; reflexivity); right;
     match goal with [T : _ -PA- ?c -PA> _ |- _] => exists c; split; [exact T | ] end;
-    split; intro E; first [discriminate | assumption].
+    (split; [ | split]); intros; congruence.
 Qed.
 
 End EntityLanguage.
