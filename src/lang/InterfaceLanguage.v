@@ -600,7 +600,7 @@ Lemma interface_outProc_in (h : Interface) (v : list BaseType) :
   (*Proof: Obvious from semantics*)
   destruct h. destruct lo0. repeat econstructor. Qed.
 
-Lemma inter_mStable_in_not h h' : h -i- chanMStable {! [] -i> h' -> False.
+Lemma inter_mStable_in_not h h' : h -i- chanMStableRead {! [] -i> h' -> False.
   introz U. inversion U. Qed.
 
 Lemma inter_abort_in_not h h' :

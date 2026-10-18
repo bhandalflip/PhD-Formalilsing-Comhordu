@@ -479,11 +479,11 @@ Qed.
 (*AMALGAMATE WITH OTHERS- cull repetitions?*)
 (* begin helpers for notifAbortPathNet_urgent *)
 Lemma notifAbortPathNet_urgent_rangeBad_in m m0 p :
-  rangeBadState m p -> discActEnabled p (chanMCurr ;? [baseMode m0]).
+  rangeBadState m p -> discActEnabled p (chanMCurrRead ;? [baseMode m0]).
 Proof. activation_tac. Qed.
 
 Lemma notifAbortPathNet_urgent_currOK_in m m0 p :
-  currOKState m p -> discActEnabled p (chanMNext ;? [baseMode m0]).
+  currOKState m p -> discActEnabled p (chanMNextRead ;? [baseMode m0]).
 Proof. activation_tac. Qed.
 
 (** An entity whose listener is in the rangeBad state can always read the
@@ -493,7 +493,7 @@ Lemma notifAbortPathNet_urgent_rangeBad_ent m p l h k e' d :
 Proof.
   intros RB ED. inversion RB as [p1 p2 p3 RB3 EQ]; subst.
   noSyncNow_tac.
-  destruct (NS (chanMCurr ;? [baseMode (currModeMState k)])) as [_ [DM _]].
+  destruct (NS (chanMCurrRead ;? [baseMode (currModeMState k)])) as [_ [DM _]].
   - dae_listener.
     exact (notifAbortPathNet_urgent_rangeBad_in m (currModeMState k) p3 RB3).
   - apply DM. exact (modeState_curr_enabled k).
@@ -507,7 +507,7 @@ Lemma notifAbortPathNet_urgent_currOK_ent m m' p l h k e' d :
 Proof.
   intros CO NM ED. inversion CO as [p1 p2 p3 CO3 EQ]; subst.
   noSyncNow_tac.
-  destruct (NS (chanMNext ;? [baseMode m'])) as [_ [DM _]].
+  destruct (NS (chanMNextRead ;? [baseMode m'])) as [_ [DM _]].
   - dae_listener.
     exact (notifAbortPathNet_urgent_currOK_in m m' p3 CO3).
   - apply DM. destruct k as [m0 | m0 m1 t0]; simpl in NM; inversion NM; subst.

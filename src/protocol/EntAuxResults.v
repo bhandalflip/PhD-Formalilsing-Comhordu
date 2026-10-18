@@ -162,7 +162,7 @@ Proof.
         try (match goal with [K : _ -ms- _ -ms> _ |- _] => inversion K; subst; reflexivity end).
       (* the software wrote on mCurr: no component of the triple can *)
       exfalso.
-      match goal with [TW : _ $||$ _ $||$ _ -PA- chanMCurr *! -PA> _ |- _] =>
+      match goal with [TW : _ $||$ _ $||$ _ -PA- chanMCurrWrite *! -PA> _ |- _] =>
         triple_disc_nonTau TW end.
       * eapply broadcast_mCurr_out_not; eassumption.
       * match goal with [T2 : p2 -PA- _ -PA> _ |- _] =>
@@ -175,7 +175,7 @@ Proof.
       * injection EQ; intros; subst. exfalso.
         pose proof (bisim_trans _ _ _ (bisim_symm _ _ TSE) TN) as BT.
         prot_outProc_in_not_body. refute_by_chan BT.
-      * assert (ACT' : forall b, p2 -PA- b -PA> p2' -> exists v, b = chanMCurr ;? [baseMode v]).
+      * assert (ACT' : forall b, p2 -PA- b -PA> p2' -> exists v, b = chanMCurrRead ;? [baseMode v]).
         { intros b B. destruct (tfsStart_next_act _ _ _ B TSE) as [v [Eb _]]. eauto. }
         destruct (triple_mCurr_read_ov _ _ _ _ _ _ _ PS T ACT') as [EQ | [T2 [v Ec]]].
         -- subst p2'. exfalso.
@@ -298,7 +298,7 @@ Qed.
 (* begin helpers for gotRangeStateEnt_urgent *)
 (** A process in the gotRange state can read any mode on the channel mCurr.*)
 Lemma gotRangeStateEnt_urgent_aux1 (p : ProcTerm) (m m0 : Mode) (r : Distance) :
-  gotRangeState m r p -> discActEnabled p (chanMCurr ;? [baseMode m0]).
+  gotRangeState m r p -> discActEnabled p (chanMCurrRead ;? [baseMode m0]).
   activation_tac. Qed.
 (* end helpers *)
 
@@ -316,12 +316,12 @@ Qed.
 (* begin helpers for currCompStateEnt_urgent *)
 (** A process in the currComp state can input on mStable.*)
 Lemma currCompStateEnt_urgent_aux1 (p : ProcTerm) (m : Mode) (r : Distance) :
-  currCompState m r p -> discActEnabled p (chanMStable *?).
+  currCompState m r p -> discActEnabled p (chanMStableRead *?).
   activation_tac. Qed.
 
 (** A process in the currComp state can input any mode on mNext.*)
 Lemma currCompStateEnt_urgent_aux2 (p : ProcTerm) (m m0 : Mode) (r : Distance) :
-  currCompState m r p -> discActEnabled p (chanMNext ;? [baseMode m0]).
+  currCompState m r p -> discActEnabled p (chanMNextRead ;? [baseMode m0]).
   activation_tac. Qed.
 (* end helpers *)
 
@@ -656,15 +656,11 @@ Lemma switchCurr_switch_ent (e : Entity) :
 (*LOCAL TIDY*)
 
 (** A step of an entity whose listener is in currOK: the listener stays, read stable and is
-listening, or read a next mode m' and is in nextEq m' m''. The mode comes from the mode
-state, where it is the next mode, or from the overlap component writing the fail-safe
-successor of its mode in tfsNext, which the listener can meet within the software before the
-mode state does.*)
+listening, or read the next mode m' off the mode state and is in nextEq m' m''.*)
 Theorem currOK_track_ent (e e' : Entity) (a : ActDiscEnt) (m'' : Mode) :
   reachableProtEnt e -> currOKStateEnt m'' e -> e -EA- a ->> e' ->
   currOKStateEnt m'' e' \/ listeningStateEnt e' \/
-  exists m', nextEqStateEnt m' m'' e' /\
-    (nextModeEnt e = Some m' \/ exists m, tfsNextStateEnt m e /\ m' = failSafeSucc m).
+  exists m', nextEqStateEnt m' m'' e' /\ nextModeEnt e = Some m'.
 Proof.
   intros R G S. destruct e as [p l h k].
   lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
@@ -681,12 +677,12 @@ Proof.
         destruct (currOK_next_act _ _ _ _ T3 G) as [[Ea L] | [v [Ea N]]] end.
       * right. left. constructor. constructor. exact L.
       * injection Ea; intros; subst. destruct (ACT v eq_refl) as [NM _].
-        right. right. exists v. split; [constructor; constructor; exact N | left; exact NM].
+        right. right. exists v. split; [constructor; constructor; exact N | exact NM].
     + (* currOK does not output *)
       triple_disc_nonTau T; try (left; constructor; constructor; exact G).
       match goal with [T3 : _ -PA- c0 ;! v0 -PA> _ |- _] =>
         destruct (currOK_next_act _ _ _ _ T3 G) as [[Ea L] | [v [Ea N]]] end; discriminate.
-    + (* a tau: a synchronisation within the software *)
+    + (* a tau: no other component writes on the channels the listener reads *)
       destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
       decompose [or and] H; clear H;
       try match goal with [E : p3 = p3' |- _] =>
@@ -695,19 +691,12 @@ Proof.
         destruct (currOK_next_act _ _ _ _ H1 G) as [[X _] | [? [X _]]]; discriminate X end;
       match goal with [H1 : p3 -PA- ?c1 ;? ?v1 -PA> p3' |- _] =>
         destruct (currOK_next_act _ _ _ _ H1 G) as [[X L] | [v [X N]]];
-        injection X as X1 X2; subst c1 v1 end;
+        injection X as X1 X2; subst c1 v1 end; exfalso;
       first
         [ match goal with [H2 : p1 -PA- _ ;! _ -PA> _ |- _] =>
-            exfalso; pose proof (broadcast_out_outProc _ _ _ _ BS H2); discriminate end
-        | match goal with [L : listeningState p3' |- _] =>
-            right; left; constructor; constructor; exact L end
-        | match goal with [H2 : p2 -PA- chanMNext ;! _ -PA> _, N : nextEqState ?v _ p3' |- _] =>
-            destruct (overlap_mNext_out _ _ _ OS H2) as [m0 [TM Ev]];
-            injection Ev as Ev; subst v;
-            right; right; eexists; split;
-              [constructor; constructor; exact N
-              | right; exists m0; split; [constructor; constructor; exact TM | reflexivity]]
-          end ].
+            eapply broadcast_read_out_not; [exact BS | | exact H2]; solve [auto] end
+        | match goal with [H2 : p2 -PA- _ ;! _ -PA> _ |- _] =>
+            eapply overlap_read_out_not; [exact OS | | exact H2]; solve [auto] end ].
 Qed.
 
 Lemma nextMode_ent_mState p l h k m :
@@ -748,7 +737,7 @@ Proof.
   subst e'.
   destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [ACT _]]]]].
   - injection EQ; intros; subst. left. constructor. constructor. exact G.
-  - assert (ACT' : forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurr ;? [baseMode v]).
+  - assert (ACT' : forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurrRead ;? [baseMode v]).
     { intros b B. destruct (gotRange_next_act _ _ _ _ _ B G) as [v [Eb _]]. eauto. }
     destruct (triple_mCurr_read_li _ _ _ _ _ _ _ PS T ACT') as [EQ | [T3 [v Ec]]].
     + subst p3'. left. constructor. constructor. exact G.
@@ -762,7 +751,7 @@ Lemma currComp_listening_track_ent m'' r l l' p p' h h' k k' a :
   currCompStateEnt m'' r ([|p, l, h, k|]) ->
   listeningStateEnt ([|p', l', h', k'|]) ->
   [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
-  k -ms- chanMStable @! -ms> k' /\ h = h'. Admitted.
+  k -ms- chanMStableRead @! -ms> k' /\ h = h'. Admitted.
   (*Add entity-level tracking result.*)
 (*+*)
 Lemma currComp_nextPincCheck_track_ent (m2 m1' m2' : Mode) (l l' : Position)

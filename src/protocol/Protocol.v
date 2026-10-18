@@ -60,9 +60,9 @@ Definition bcReady (m l : Exp) := chanOutProc$<[m, l]>$!bcWaitN $([m, (ePeriod m
 
 (******************Overlap Process*******************)
 
-Definition dormant := chanMNext$<vM'>$? initN $(eVar vM')$ $+$ chanAbort? dormantN $+$ chanBad? tfsStartN.
+Definition dormant := chanMNextRead$<vM'>$? initN $(eVar vM')$ $+$ chanAbort? dormantN $+$ chanBad? tfsStartN.
 
-Definition init (m' : Exp) := chanMCurr$<vM>$? ovWaitN $([m', (eAdd (eWaitTime vM m') (ePeriod m')), liftTimeExp zeroTime])$.
+Definition init (m' : Exp) := chanMCurrRead$<vM>$? ovWaitN $([m', (eAdd (eWaitTime vM m') (ePeriod m')), liftTimeExp zeroTime])$.
 
 Definition ovWait (m' t x y : Exp) := chanAbort? ovAbortN $+$ chanBad? tfsStartN $+$ $<y>$chanPos$<vL>$? ovReadyN $([m', t, eVar vL])$ $+$ $<x>$chanPause!switchBcN $(m')$.
 
@@ -70,21 +70,21 @@ Definition ovReady (m' t l : Exp) := chanOutProc$<[m', l]>$!ovWaitN $([m', (eSub
 
 Definition switchBc (m' : Exp) := chanWake$<m'>$!switchCurrN.
 
-Definition switchCurr := chanMCurr!switchListenN.
+Definition switchCurr := chanMCurrWrite!switchListenN.
 
 Definition switchListen := chanUnpause!dormantN.
 
-Definition tfsStart := chanMCurr$<vM>$? tfsNextN $(eVar vM)$.
+Definition tfsStart := chanMCurrRead$<vM>$? tfsNextN $(eVar vM)$.
 
-Definition tfsNext (m : Exp) := chanMNext$<eFailSafeSucc m>$!tfsCurrN $+$ chanMStable!tfsNextN $(m)$.
+Definition tfsNext (m : Exp) := chanMNextWrite$<eFailSafeSucc m>$!tfsCurrN $+$ chanMStableWrite!tfsNextN $(m)$.
 
-Definition tfsCurr := chanAbort? tfsCurrN $+$ chanBad? tfsCurrN $+$ chanMCurr!tfsBcN.
+Definition tfsCurr := chanAbort? tfsCurrN $+$ chanBad? tfsCurrN $+$ chanMCurrWrite!tfsBcN.
 
 Definition tfsBc := chanTrans!tfsListenN.
 
 Definition tfsListen := chanAbort? tfsListenN $+$ chanBad? tfsListenN $+$ chanUnpause!dormantN.
 
-Definition ovAbort := chanMStable!dormantN.
+Definition ovAbort := chanMStableWrite!dormantN.
 
 (******************Listener Process*******************)
 
@@ -97,13 +97,13 @@ Definition listening := chanAN$<[vR, vM'', vL']>$? checkRangeN $([eVar vM'', eVa
 
 Definition checkRange (m'' r : Exp) := (bSufficient m'' r $> listeningN) $+$ !~(bSufficient (m'') (r)) $> rangeBadN $(m'')$.
 
-Definition rangeBad (m'' : Exp) := chanMCurr$<vM>$? currEqN $([eVar vM, m''])$.
+Definition rangeBad (m'' : Exp) := chanMCurrRead$<vM>$? currEqN $([eVar vM, m''])$.
 
 Definition currEq (m m'' : Exp) := (m =b= m'') $> badOvlpN $+$ !~(m =b= m'') $> currOKN $(m'')$.
 
 Definition badOvlp := chanBad!listeningN.
 
-Definition currOK (m'' : Exp) := chanMStable? listeningN $+$ chanMNext$<vM'>$? nextEqN $([eVar vM', m''])$.
+Definition currOK (m'' : Exp) := chanMStableRead? listeningN $+$ chanMNextRead$<vM'>$? nextEqN $([eVar vM', m''])$.
 
 Definition nextEq (m' m'' : Exp) := (m' =b= m'') $> abortOvlpN $+$ !~(m' =b= m'') $> listeningN.
 
@@ -113,11 +113,11 @@ Definition abortOvlp := chanAbort!listeningN.
 
 Definition gotMsg (m'' l' : Exp) := chanPos$<vL>$? gotRangeN $([m'', (|vL , l'| (-) speedMax (.) msgLatency)])$.
 
-Definition gotRange (m'' r : Exp) := chanMCurr$<vM>$? currPincCheckN $([eVar vM, m'', r])$.
+Definition gotRange (m'' r : Exp) := chanMCurrRead$<vM>$? currPincCheckN $([eVar vM, m'', r])$.
 
 Definition currPincCheck (m m'' r  : Exp) := !~bPossInc m m'' r $> currCompN $([m'', r])$ $+$ bPossInc m m'' r $> badOvlpN.
 
-Definition currComp (m'' r : Exp) := chanMStable? listeningN $+$ chanMNext$<vM'>$? nextPincCheckN $([eVar vM', m'', r])$.
+Definition currComp (m'' r : Exp) := chanMStableRead? listeningN $+$ chanMNextRead$<vM'>$? nextPincCheckN $([eVar vM', m'', r])$.
 
 Definition nextPincCheck (m' m'' r : Exp) :=  !~bPossInc m' m'' r $> listeningN $+$ bPossInc m' m'' r $> abortOvlpN.
 

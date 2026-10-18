@@ -1071,9 +1071,9 @@ Proof.
   assert (currModeMState k -mtr-> failSafeSucc m) as FS
     by (rewrite <- EQ; apply failSafeSucc_successor).
   destruct (mState_stable_next_enabled _ _ FS) as [MS | MS].
-  - eapply ent_del_sync_mState_not with (a := chanMStable *!); [ | exact MS | exact ED].
+  - eapply ent_del_sync_mState_not with (a := chanMStableWrite *!); [ | exact MS | exact ED].
     dae_overlap. eapply tfsNext_mStable_out. exact TS.
-  - eapply ent_del_sync_mState_not with (a := chanMNext ;! [baseMode (failSafeSucc m)]);
+  - eapply ent_del_sync_mState_not with (a := chanMNextWrite ;! [baseMode (failSafeSucc m)]);
       [ | exact MS | exact ED].
     dae_overlap. apply tfsNext_mNext_out. exact TS.
 Qed.
@@ -1085,7 +1085,7 @@ Proof.
   destruct (del_net_ent e i n n' d EIN V) as [e' ED].
   inversion SE as [p l h k TP Hpe]. subst e.
   inversion TP as [p1 p2 p3 TS Hp]. subst p.
-  eapply ent_del_sync_mState_not with (a := chanMCurr ;? [baseMode (currModeMState k)]);
+  eapply ent_del_sync_mState_not with (a := chanMCurrRead ;? [baseMode (currModeMState k)]);
     [ | apply modeState_curr_enabled | exact ED].
   dae_overlap. apply tfsStart_mCurr_in. exact TS.
 Qed.

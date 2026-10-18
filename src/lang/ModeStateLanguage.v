@@ -84,17 +84,17 @@ Inductive stepModeState : ModeState -> ActModeState -> ModeState -> Prop :=
   | stepMsTimeout : forall (m m' : Mode) (t : Time) (d : Delay),
     t < d -> <| m , m' , t |> -ms- d -ms> <| m , m' , zeroTime |>
   | stepMsInit : forall (m m' : Mode) (p : m -mtr-> m'),
-    m -ms- chanMNext .? m' -ms> <| m , m' , modeTransTime m m' p |>
+    m -ms- chanMNextWrite .? m' -ms> <| m , m' , modeTransTime m m' p |>
   | stepMsSwitch : forall (m m' : Mode),
-    <| m , m' , zeroTime |> -ms- chanMCurr @? -ms> m'
+    <| m , m' , zeroTime |> -ms- chanMCurrWrite @? -ms> m'
   | stepMsAbort : forall (m m' : Mode) (t : Time),
-    <| m , m' , t |> -ms- chanMStable @? -ms> m
-  | stepMsOutCurrSing : forall m : Mode, m -ms- chanMCurr .! m -ms> m
+    <| m , m' , t |> -ms- chanMStableWrite @? -ms> m
+  | stepMsOutCurrSing : forall m : Mode, m -ms- chanMCurrRead .! m -ms> m
   | stepMsOutCurrTrans : forall (m m' : Mode) (t : Time),
-    <| m , m' , t |> -ms- chanMCurr .! m -ms> <| m , m' , t |>
+    <| m , m' , t |> -ms- chanMCurrRead .! m -ms> <| m , m' , t |>
   | stepMsOutNext : forall (m m' : Mode) (t : Time),
-    <| m , m' , t |> -ms- chanMNext .! m' -ms> <| m , m' , t |>
-  | stepMsOutStable : forall m : Mode, m -ms- chanMStable @! -ms> m
+    <| m , m' , t |> -ms- chanMNextRead .! m' -ms> <| m , m' , t |>
+  | stepMsOutStable : forall m : Mode, m -ms- chanMStableRead @! -ms> m
   where "m -ms- a -ms> m'" := (stepModeState m a m').
 
 (** A mode state is enabled on a discrete action if it can perform an input of
@@ -183,16 +183,16 @@ Lemma delEnabledMState : forall (a : ModeState) (d : Delay),
 channel mCurr.*)
 Lemma curr_switch_mState (k k' : ModeState) (a : ActModeState) :
   k -ms- a -ms> k' -> currModeMState k <> currModeMState k' ->
-  a = chanMCurr @?. intros H H0. invertClear H;
+  a = chanMCurrWrite @?. intros H H0. invertClear H;
   try (false; apply H0; subst; reflexivity). reflexivity. Qed.
 
 (** A mode output on mCurr is the current mode, and one on mNext is the next mode; neither
 changes the mode state.*)
-Lemma mState_curr_out k k' m : k -ms- chanMCurr .! m -ms> k' -> m = currModeMState k /\ k' = k.
+Lemma mState_curr_out k k' m : k -ms- chanMCurrRead .! m -ms> k' -> m = currModeMState k /\ k' = k.
 Proof. intro S. inversion S; subst; split; reflexivity. Qed.
 
 Lemma mState_next_out k k' m :
-  k -ms- chanMNext .! m -ms> k' -> nextModeMState k = Some m /\ k' = k.
+  k -ms- chanMNextRead .! m -ms> k' -> nextModeMState k = Some m /\ k' = k.
 Proof. intro S. inversion S; subst; split; reflexivity. Qed.
 
 Lemma timeSplit_mState (k k'' : ModeState) (d d' d'' : Delay) :
@@ -241,27 +241,27 @@ Lemma timeSplit_mState (k k'' : ModeState) (d d' d'' : Delay) :
 Inductive unstable : ModeState -> Prop :=
   | unstbl m m' t : unstable (<| m , m' , t |>).
 
-Lemma unstable_stable_in k : unstable k -> discActEnabledMState (chanMStable *?) k.
+Lemma unstable_stable_in k : unstable k -> discActEnabledMState (chanMStableWrite *?) k.
   intros. inversion H. subst. repeat econstructor. Qed.
 
 Lemma modeState_curr_enabled k :
-  discActEnabledMState (chanMCurr ;! [baseMode (currModeMState k)]) k.
+  discActEnabledMState (chanMCurrRead ;! [baseMode (currModeMState k)]) k.
   destruct k; econstructor; constructor. Qed.
 
 (** A mode state whose transition has timed out can take the switch on mCurr.*)
 Lemma mst_tout_mCurr_in m1 m2 :
-  discActEnabledMState (chanMCurr *?) (<| m1, m2, zeroTime |>).
+  discActEnabledMState (chanMCurrWrite *?) (<| m1, m2, zeroTime |>).
 Proof. repeat econstructor. Qed.
 
 Lemma mState_stable_next_enabled k m' : currModeMState k -mtr-> m' ->
-  discActEnabledMState (chanMStable*?) k \/
-  discActEnabledMState (chanMNext;? [baseMode m']) k.
+  discActEnabledMState (chanMStableWrite*?) k \/
+  discActEnabledMState (chanMNextWrite;? [baseMode m']) k.
   intros. destruct k. right. econstructor.
   lets SMI : stepMsInit H. apply SMI.
   left. econstructor. constructor. Qed.
 
 Lemma next_modeState_stable_not k k' m' :
-  nextModeMState k = Some m' -> k -ms- chanMStable @! -ms> k' -> False.
+  nextModeMState k = Some m' -> k -ms- chanMStableRead @! -ms> k' -> False.
 Proof.
   intros H Hs. destruct k; simpl in H; inversion Hs; subst; try discriminate.
 Qed.
@@ -272,7 +272,7 @@ Proof.
   intros H. inversion H. Qed.
 
 Lemma unstable_stable_out_not k : unstable k ->
-  ~ discActEnabledMState (chanMStable *!) k. unfold not. intros.
+  ~ discActEnabledMState (chanMStableRead *!) k. unfold not. intros.
   inversion H. inversion H0. subst. inversion H3. Qed.
 
 Lemma nextMode_unstable k m : nextModeMState k = Some m ->

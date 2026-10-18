@@ -159,9 +159,11 @@ Lemma eqDecExp : eqDec Exp. unfold eqDec. induction x1;
 
 
 
-(** A set of channels.*)
+(** A set of channels. Each mode-state channel comes in two: the software
+  reads from one and writes to the other, so its direction is in its name.*)
 Inductive Channel : Type :=
-  chanAN | chanMStable | chanMCurr | chanMNext
+  chanAN | chanMStableRead | chanMStableWrite | chanMCurrRead | chanMCurrWrite
+  | chanMNextRead | chanMNextWrite
   | chanPos | chanOutProc | chanInProc | chanIOEnv | chanTrans
   | chanWake | chanPause | chanUnpause | chanBad
   | chanAbort.
