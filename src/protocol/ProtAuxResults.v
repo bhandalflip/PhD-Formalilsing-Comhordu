@@ -344,11 +344,11 @@ Ltac prot_outProc_in_not_contra :=
 its initial process. Up to bisimilarity, such a component is in one of the named states.
 The modes, positions and distances it holds are values of those types, because they arrived
 by typed inputs; its timers and ranges are expressions, because they are computed. The
-listener's conditional states resolve at once to the branch their condition selects. One
-condition can be ill formed: the range gotMsg computes is a plain non-negative real where
-bPossInc wants a distance, so a listener that has received a message can be stuck, which is
-to say bisimilar to nilProc. The lemmas below prove these shapes, and the brute-force
-results about the components follow from them by case analysis.*)
+listener's conditional states resolve at once to the branch their condition selects. The
+shapes do not record that a range evaluates to a number, so a condition on one may be ill
+formed, and then the listener is stuck, which is to say bisimilar to nilProc. The lemmas
+below prove these shapes, and the brute-force results about the components follow from them
+by case analysis.*)
 
 Inductive broadcastShape (p : ProcTerm) : Prop :=
   | shSleeping : p ~p~ sleeping -> broadcastShape p
@@ -589,88 +589,6 @@ but works the opposite direction: starting with a predicate on p' and inferring 
 and p from there.*)
 
 (*** Bidirectional tracking (action/variable matching) ***)
-
-(* begin helpers for goMsg_gotRange_track *)
-Lemma goMsg_gotRange_track_tot X Y A B :
-  evalBoolExpFunTot (bPossInc X Y (eSubtract A B)) = false /\
-  evalBoolExpFunTot (bNot (bPossInc X Y (eSubtract A B))) = false.
-Proof.
-  unfold evalBoolExpFunTot; simpl.
-  destruct (evalExpFun A) as [b1| ]; destruct (evalExpFun B) as [b2| ];
-  try destruct (evalBaseNonnegFun b1); try destruct (evalBaseNonnegFun b2);
-  destruct (evalExpFun X) as [b3| ]; try destruct b3;
-  destruct (evalExpFun Y) as [b4| ]; try destruct b4; split; reflexivity.
-Qed.
-
-Lemma goMsg_gotRange_track_live (m' : Mode) (r : Distance) : exists (a1 : DiscAct) g2,
-  subProcTerm (listsToSub [vM] (listBaselistExp [baseMode m']))
-    (app currPincCheckN [eVar vM, eBase m', eBase r]) -PA- a1 -PA> g2.
-Proof.
-  simpl. remove_updates.
-  destruct (possIncBool m' m' r) eqn:PI.
-  - do 2 eexists. eapply stepDpApp; [reflexivity | ].
-    unfold currPincCheck. simpl. remove_resets. remove_updates.
-    apply stepDpChoiceR. eapply stepDpThen.
-    + eapply stepDpApp; [reflexivity | ]. unfold badOvlp. simpl.
-      apply stepDpOut. constructor.
-    + unfold evalBoolExpFunTot. simpl. rewrite PI. reflexivity.
-  - do 2 eexists. eapply stepDpApp; [reflexivity | ].
-    unfold currPincCheck. simpl. remove_resets. remove_updates.
-    apply stepDpChoiceL. eapply stepDpThen.
-    + eapply stepDpApp; [reflexivity | ]. unfold currComp. simpl.
-      apply stepDpChoiceL. apply (stepDpIn chanMStableRead [] []). typed_vals.
-    + unfold evalBoolExpFunTot. simpl. rewrite PI. reflexivity.
-Qed.
-
-Ltac goMsg_gotRange_track_kill :=
-  match goal with
-  | [H : evalBoolExpFunTot (bPossInc ?X ?Y (eSubtract ?A ?B)) = true |- _] =>
-    rewrite (proj1 (goMsg_gotRange_track_tot X Y A B)) in H; discriminate H
-  | [H : evalBoolExpFunTot (bNot (bPossInc ?X ?Y (eSubtract ?A ?B))) = true |- _] =>
-    rewrite (proj2 (goMsg_gotRange_track_tot X Y A B)) in H; discriminate H
-  end.
-
-Lemma goMsg_gotRange_track_stuck E1 A B (m' : Mode) q1 a1 q2 :
-  app gotRangeN [E1, eSubtract A B] -PA- chanMCurrRead ;? [baseMode m'] -PA> q1 ->
-  q1 -PA- a1 -PA> q2 -> False.
-Proof.
-  intros S1 S2.
-  inversion S1; subst. clear S1.
-  invert_def.
-  unfold gotRange in *. simpl in *.
-  match goal with [H : stepDiscProc (inPrefix _ _ _) _ _ |- _] => rename H into S4 end.
-  remove_resets_hyp S4. remove_updates_hyp S4.
-  inversion S4; subst. clear S4.
-  simpl in S2. remove_updates_hyp S2.
-  inversion S2; subst. clear S2.
-  invert_def.
-  unfold currPincCheck in *. simpl in *.
-  match goal with [H : stepDiscProc (_ $+$ _) _ _ |- _] => rename H into SS end.
-  remove_resets_hyp SS. remove_updates_hyp SS.
-  inversion SS; subst; clear SS;
-  match goal with [H : stepDiscProc (_ $> _) _ _ |- _] => inversion H; subst end;
-  goMsg_gotRange_track_kill.
-Qed.
-(* end helpers *)
-
-Lemma goMsg_gotRange_track m m' l r p p' a :
-  gotMsgState m l p -> gotRangeState m' r p' ->
-  p -PA- a -PA> p' -> exists l',
-  a = chanPos ;? [basePosition l'] /\
-  r = mkDistance (dist2d l l' -nn- speedMax *nn* msgLatency).
-Proof.
-  intros GM GR ST. exfalso.
-  destruct (bisim_step_disc _ _ _ _ GM ST) as [q [QS PQ]].
-  unfold gotMsg in QS. invert_disc_prefixes.
-  assert (G1 : gotRange m' r -PA- chanMCurrRead ;? [baseMode m'] -PA>
-     subProcTerm (listsToSub [vM] (listBaselistExp [baseMode m'])) (app currPincCheckN [eVar vM, eBase m', eBase r]))
-    by (apply stepDpIn; typed_vals).
-  destruct (bisim_step_disc _ _ _ _ (bisim_trans _ _ _ (bisim_symm _ _ GR) PQ) G1)
-    as [q1 [Q1 B1]].
-  destruct (goMsg_gotRange_track_live m' r) as [a1 [g2 GS]].
-  destruct (bisim_step_disc _ _ _ _ B1 GS) as [q2 [QS2 _]].
-  simpl in Q1. eapply goMsg_gotRange_track_stuck; eassumption.
-Qed.
 
 Lemma currOK_listening_track m p p' a : currOKState m p ->
   listeningState p' -> p -PA- a -PA> p' -> a = (chanMStableRead *?).
@@ -1408,7 +1326,7 @@ Proof.
   intros PI S. unfold currPincCheckState, badOvlpState in *.
   assert (B : evalBoolExp (bPossInc m m'' r) true).
   { rewrite <- (possInc_possIncBool m m'' r PI).
-    apply bevalPossInc; apply evalBase. }
+    apply bevalPossInc_dist; apply evalBase. }
   eapply bisim_trans. apply S. unfold currPincCheck.
   eapply bisim_trans. apply choice_bisim_symm.
   eapply bisim_trans. apply (if_then_bisim_true _ _ _ B).
@@ -1424,7 +1342,7 @@ Proof.
   { assert (F : possIncBool m m'' r = false).
     { unfold possIncBool. destruct (possIncDec m m'' r);
       [contradiction | reflexivity]. }
-    rewrite <- F. apply bevalPossInc; apply evalBase. }
+    rewrite <- F. apply bevalPossInc_dist; apply evalBase. }
   eapply bisim_trans. apply S. unfold currPincCheck.
   eapply bisim_trans. apply choice_bisim_symm.
   eapply bisim_trans. apply (if_then_bisim_false _ _ _ B).
@@ -1438,7 +1356,7 @@ Proof.
   intros PI S. unfold nextPincCheckState, abortOvlpState in *.
   assert (B : evalBoolExp (bPossInc m m'' r) true).
   { rewrite <- (possInc_possIncBool m m'' r PI).
-    apply bevalPossInc; apply evalBase. }
+    apply bevalPossInc_dist; apply evalBase. }
   eapply bisim_trans. apply S. unfold nextPincCheck.
   eapply bisim_trans. apply choice_bisim_symm.
   eapply bisim_trans. apply (if_then_bisim_true _ _ _ B).
@@ -1452,12 +1370,13 @@ Proof.
   intros NP U. red in U. red.
   assert (PB : possIncBool m m'' r = false).
   { unfold possIncBool. destruct (possIncDec m m'' r); [contradiction | reflexivity]. }
+  destruct r as [r].
   eapply bisim_trans; [exact U | ].
   unfold nextPincCheck.
   eapply bisim_trans.
   { apply choice_bisim_context.
     - apply cond_bisim_true. change true with (negb false). apply bevalNot.
-      rewrite <- PB. apply bevalPossInc; constructor.
+      rewrite <- PB. apply bevalPossInc_dist; constructor.
     - apply cond_bisim_false. unfold evalBoolExpFunTot. simpl.
       first [exact PB | rewrite PB; reflexivity]. }
   eapply bisim_trans; [apply choice_bism_unit_r | ].

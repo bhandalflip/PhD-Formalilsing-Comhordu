@@ -563,27 +563,43 @@ Fixpoint subBoolExp (s : Subst) (b : BoolExp) : BoolExp :=
   end.
 
 (**Evaluation relation on boolean expressions. A boolean expression may evaluate
-to a boolean value.*)
+to a boolean value. The distance in a threat test may be any non-negative number,
+whatever its type, as the time in a delay may.*)
 Inductive evalBoolExp : BoolExp -> bool -> Prop :=
-  | bevalSufficient : forall (e1 e2 : Exp) (m : Mode) (r : Distance),
-    evalExp e1 m -> evalExp e2 r ->
-    evalBoolExp (bSufficient e1 e2) (suffBool m r)
+  | bevalSufficient : forall (e1 e2 : Exp) (m : Mode) (b : BaseType) (r : nonnegreal),
+    evalExp e1 m -> evalExp e2 b -> b \_/ r ->
+    evalBoolExp (bSufficient e1 e2) (suffBool m (mkDistance r))
   | bevalNot : forall (e : BoolExp) (b : bool),
     evalBoolExp e b -> evalBoolExp (bNot e) (negb b)
   | bevalEqualTrue : forall (e1 e2 : Exp) (b : BaseType),
     evalExp e1 b -> evalExp e2 b -> evalBoolExp (bEqual e1 e2) true
   | bevalEqualFalse : forall (e1 e2 : Exp) (b1 b2 : BaseType),
     evalExp e1 b1 -> evalExp e2 b2 -> (b1 <> b2) -> evalBoolExp (bEqual e1 e2) false
-  | bevalPossInc : forall (e1 e2 e3 : Exp) (m1 m2 : Mode) (d : Distance),
-    evalExp e1 m1 -> evalExp e2 m2 -> evalExp e3 d ->
-    evalBoolExp (bPossInc e1 e2 e3) (possIncBool m1 m2 d).
+  | bevalPossInc : forall (e1 e2 e3 : Exp) (m1 m2 : Mode) (b : BaseType) (d : nonnegreal),
+    evalExp e1 m1 -> evalExp e2 m2 -> evalExp e3 b -> b \_/ d ->
+    evalBoolExp (bPossInc e1 e2 e3) (possIncBool m1 m2 (mkDistance d)).
+
+(** A threat test on a distance evaluates as on the number it holds.*)
+Lemma bevalSufficient_dist (e1 e2 : Exp) (m : Mode) (r : Distance) :
+  evalExp e1 m -> evalExp e2 r -> evalBoolExp (bSufficient e1 e2) (suffBool m r).
+Proof. intros E1 E2. destruct r as [r]. eapply bevalSufficient; [exact E1 | exact E2 | constructor]. Qed.
+
+Lemma bevalPossInc_dist (e1 e2 e3 : Exp) (m1 m2 : Mode) (d : Distance) :
+  evalExp e1 m1 -> evalExp e2 m2 -> evalExp e3 d ->
+  evalBoolExp (bPossInc e1 e2 e3) (possIncBool m1 m2 d).
+Proof.
+  intros E1 E2 E3. destruct d as [d].
+  eapply bevalPossInc; [exact E1 | exact E2 | exact E3 | constructor].
+Qed.
 
 (** A functional definition of the evaluation on boolean expressions.*)
 Fixpoint evalBoolExpFun (b : BoolExp) : option bool :=
   match b with 
   | bSufficient e1 e2 =>
     match (evalExpFun e1), (evalExpFun e2) with
-    | Some (baseMode m), Some (baseDistance r) => Some (suffBool m r)
+    | Some (baseMode m), Some b2 => match evalBaseNonnegFun b2 with
+      | Some r => Some (suffBool m (mkDistance r))
+      | None => None end
     | _, _ => None
     end
   | bNot b => option_map negb (evalBoolExpFun b)
@@ -598,8 +614,9 @@ Fixpoint evalBoolExpFun (b : BoolExp) : option bool :=
     end
   | bPossInc e1 e2 e3 =>
     match (evalExpFun e1), (evalExpFun e2), (evalExpFun e3) with
-    | Some (baseMode m1), Some (baseMode m2), Some (baseDistance d)
-      => Some (possIncBool m1 m2 d)
+    | Some (baseMode m1), Some (baseMode m2), Some b3 => match evalBaseNonnegFun b3 with
+      | Some d => Some (possIncBool m1 m2 (mkDistance d))
+      | None => None end
     | _, _, _ => None
     end
   end.
@@ -631,17 +648,20 @@ Theorem evalExpUnique : forall (e : Exp) (b1 b2 : BaseType),
 
 (**The boolean expression relation is sound with respect to the function.*)
 Theorem evalBoolExpRelFun : forall (e : BoolExp) (b : bool),
-  evalBoolExp e b -> evalBoolExpFun e = Some b. intros.
-  induction H. apply evalExpRelFun in H. apply evalExpRelFun in H0.
-  simpl. rewrite H, H0. reflexivity. simpl. rewrite IHevalBoolExp.
-  simpl. reflexivity. apply evalExpRelFun in H. apply evalExpRelFun in H0.
-  simpl. rewrite H, H0. addHyp (eqDecBase b b). destruct s. reflexivity.
-  apply False_ind. apply n. reflexivity. simpl.
-  apply evalExpRelFun in H. apply evalExpRelFun in H0.
-  simpl. rewrite H, H0. destruct (eqDecBase b1 b2). apply False_ind.
-  apply H1. assumption. reflexivity. apply evalExpRelFun in H1.
-  apply evalExpRelFun in H. apply evalExpRelFun in H0. simpl.
-  rewrite H, H0, H1. reflexivity. Qed.
+  evalBoolExp e b -> evalBoolExpFun e = Some b.
+Proof.
+  intros e b H. induction H; simpl.
+  - rewrite (evalExpRelFun _ _ H), (evalExpRelFun _ _ H0), (evalBaseNonneg_rel_fun _ _ H1).
+    reflexivity.
+  - rewrite IHevalBoolExp. reflexivity.
+  - rewrite (evalExpRelFun _ _ H), (evalExpRelFun _ _ H0).
+    destruct (eqDecBase b b) as [ | N]; [reflexivity | contradiction N; reflexivity].
+  - rewrite (evalExpRelFun _ _ H), (evalExpRelFun _ _ H0).
+    destruct (eqDecBase b1 b2); [contradiction | reflexivity].
+  - rewrite (evalExpRelFun _ _ H), (evalExpRelFun _ _ H0), (evalExpRelFun _ _ H1),
+      (evalBaseNonneg_rel_fun _ _ H2).
+    reflexivity.
+Qed.
 
 From Stdlib Require Import Bool.
 
@@ -649,10 +669,11 @@ From Stdlib Require Import Bool.
 Theorem evalBoolExpFunRel : forall (e : BoolExp) (b : bool),
   evalBoolExpFun e = Some b -> evalBoolExp e b. induction e; intros.
   (** bSufficient case*)
-  simpl in H. remember (evalExpFun e) as v1. remember (evalExpFun e0) as v2.
-  destruct v1, v2. destruct b0, b1; inversion H. symmetry in Heqv1, Heqv2.
-  apply evalExpFunRel in Heqv1. apply evalExpFunRel in Heqv2.
-  constructor; assumption. destruct b0; inversion H. inversion H. inversion H.
+  simpl in H. destruct (evalExpFun e) as [b1 | ] eqn:E1; [ | discriminate].
+  destruct b1; try discriminate. destruct (evalExpFun e0) as [b2 | ] eqn:E2; [ | discriminate].
+  destruct (evalBaseNonnegFun b2) as [r | ] eqn:E3; [ | discriminate].
+  injection H as H. subst b. eapply bevalSufficient; [apply evalExpFunRel; exact E1
+    | apply evalExpFunRel; exact E2 | apply evalBaseNonneg_fun_rel; exact E3].
   (** bNot case*)
   rewrite negb_involutive_reverse. constructor. apply IHe. inversion H.
   remember (evalBoolExpFun e) as v. destruct v. simpl in H1.
@@ -668,14 +689,14 @@ Theorem evalBoolExpFunRel : forall (e : BoolExp) (b : bool),
   assumption. eapply bevalEqualFalse. apply Heqv1. apply Heqv2.
   assumption. inversion H. inversion H. inversion H.
   (** bPossInc case*)
-  simpl in H. remember (evalExpFun e) as v1. remember (evalExpFun e0) as v2.
-  remember (evalExpFun e1) as v3. destruct v1, v2, v3.
-  destruct b0, b1, b2; inversion H. symmetry in Heqv1, Heqv2, Heqv3.
-  apply evalExpFunRel in Heqv1. apply evalExpFunRel in Heqv2.
-  apply evalExpFunRel in Heqv3. constructor; assumption.
-  destruct b0, b1; inversion H. destruct b0; inversion H.
-  destruct b0; inversion H. inversion H. inversion H. inversion H.
-  inversion H. Qed.
+  simpl in H. destruct (evalExpFun e) as [b1 | ] eqn:E1; [ | discriminate].
+  destruct b1; try discriminate. destruct (evalExpFun e0) as [b2 | ] eqn:E2; [ | discriminate].
+  destruct b2; try discriminate. destruct (evalExpFun e1) as [b3 | ] eqn:E3; [ | discriminate].
+  destruct (evalBaseNonnegFun b3) as [d | ] eqn:E4; [ | discriminate].
+  injection H as H. subst b. eapply bevalPossInc; [apply evalExpFunRel; exact E1
+    | apply evalExpFunRel; exact E2 | apply evalExpFunRel; exact E3
+    | apply evalBaseNonneg_fun_rel; exact E4].
+  Qed.
   
 
 
