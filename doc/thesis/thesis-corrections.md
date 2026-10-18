@@ -25,3 +25,9 @@ These results, about an entity that has been in its current mode $m$ since some 
 The proof keeps $\mathit{tfs}(m, 0)$ across a discrete step because **tfsCurr** can't leave its state until time passes. With a zero transition time (p.107) it can. The step still holds under correction 3's $\neg fs(m)$, since an entity whose current mode is not fail-safe stays in the tfs states across a discrete step (Listing 7.43, p.178).
 
 **Where:** the proof of Theorem 6.6 (p.146). **Found in:** [#14](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/14).
+
+## 5. The listener's threat test takes the wrong mode's margin
+
+Definition 5.5 takes the sender's mode first and draws the safety margin from its period and transition time, as the proof of Theorem 6.1 needs. The listener passes its own mode first, so its margin comes from the receiver's mode, which may be smaller. Theorem 6.2 does the same, and its statement names modes $m_1$ and $m_2$ that it never introduces. Passing the sender's mode first in both corrects them, and the proof of Theorem 6.1 already reads them that way (p.142), so its result stands.
+
+**Where:** Definition 5.5 (p.108), the definitions of **currPincCheck** and **nextPincCheck** (p.122), Theorem 6.2 and its proof (p.143). **Found in:** [#14](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/14).
