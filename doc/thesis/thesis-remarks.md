@@ -13,3 +13,9 @@ Notable observations about the [thesis](2014-10-28-phd-thesis.pdf) made while fo
 **Why it matters:** A claim about one component of the protocol, such as which state it must be in after an action, is sound inside an entity but not for the component as an open process. The proofs of chapter 6 respect this by reasoning about entities throughout.
 
 **Made in:** [#8](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/8).
+
+## 2. A fail-safe entity still reacts to threats
+
+The listener reacts to a threat, either a message from an entity close enough to be possibly incompatible or a broadcast of its own that reached too small a range, without checking whether its own mode is fail-safe. Both tests keep a positive safety margin for a fail-safe mode, so an entity already in one still starts a transition to its fail-safe successor, which may be the mode it is in. The reaction is harmless, but it is why the results of [correction 3](thesis-corrections.md#3-reacting-to-a-threat-needs-a-non-fail-safe-mode) need a non-fail-safe mode. The model of Chapter 3 has a fail-safe entity ignore such messages (p.53), and the protocol could do the same.
+
+**Where:** Definitions 5.4 and 5.5 (p.108), the listener (p.122). **Made in:** [#14](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/14).
