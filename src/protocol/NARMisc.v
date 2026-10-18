@@ -226,7 +226,27 @@ Lemma currModeNet_switch_states n n' a m m' i :
   reachableProtNet n -> n -NA- a -NA> n' -> currModeNet m i n ->
   currModeNet m' i n' -> m <> m' ->
   (switchCurrStateNet i n /\ switchListenStateNet i n') \/
-  (tfsCurrStateNet i n /\ tfsBcStateNet i n'). Admitted. (*3*)
+  (tfsCurrStateNet i n /\ tfsBcStateNet i n').
+Proof.
+  intros R S C C' NE.
+  destruct C as [e Ce E]. destruct C' as [e' Ce' E'].
+  destruct (link_net_ent_disc _ _ _ _ _ _ S E E') as [EQ | [b B]].
+  { subst e'. congruence. }
+  destruct e as [p l h k]. destruct e' as [p' l' h' k']. simpl in Ce, Ce'. subst m m'.
+  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ (reachableNet_ent _ _ _ _ R E)).
+  inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+  (* only a write on mCurr changes the current mode *)
+  inversion B; subst; try (contradiction NE; reflexivity);
+    try (match goal with [K : k -ms- _ -ms> k' |- _] => inversion K; subst end;
+         simpl in NE; contradiction NE; reflexivity).
+  match goal with [T : _ $||$ _ $||$ _ -PA- _ -PA> _ |- _] => triple_disc_nonTau T end.
+  - exfalso. eapply bc_mCurr_out_not; eassumption.
+  - match goal with [T2 : p2 -PA- _ -PA> _ |- _] =>
+      destruct (ovlp_mCurr_out _ _ T2 OS) as [[A D] | [A D]] end.
+    + left. split; [net_state_intro E; exact A | net_state_intro E'; exact D].
+    + right. split; [net_state_intro E; exact A | net_state_intro E'; exact D].
+  - exfalso. eapply listen_mCurr_out_not; eassumption.
+Qed.
 (*Proof: First of all use a tactic to generate the entities and the entity level
 predicates, then do brute force elimination on these using a tactic leaving only
 the desirable cases. Finally map the entity level results back up to the network
