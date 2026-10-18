@@ -8,7 +8,7 @@ Notable observations about the [thesis](2014-10-28-phd-thesis.pdf) made while fo
 
 **Observation:** The semantics is defined only over well-typed processes (Remark 4.1), and the transition time $tt(m, m')$ is a partial function, defined exactly when $m \longrightarrow m'$, so the wait time $tw(m, m')$ is partial too. Inside an entity both conditions are guaranteed: the mode state only ever holds a next mode it can reach, and what a process reads on the mode state's channels and on $chanPos$ is what those components hold. A protocol process on its own, as an open system whose inputs come from an arbitrary environment, has neither guarantee, and it can reach states that no entity reaches.
 
-**Example:** From $\mathbf{dormant}$, read $m'$ on $chanMNext$, then a mode $m$ on $chanMCurr$ with no transition $m \longrightarrow m'$. The process is now $\mathbf{ovWait}(m', tw(m, m') + period(m'), 0)$ with an undefined timer. It still answers $chanAbort$ and $chanBad$, and it broadcasts once its zero timer fires, but its pause timer never runs out, so it never reaches $\mathbf{switchBc}$.
+**Example:** From $\mathbf{dormant}$, read $m'$ on $chanNext$, then a mode $m$ on $chanCurr$ with no transition $m \longrightarrow m'$. The process is now $\mathbf{ovWait}(m', tw(m, m') + period(m'), 0)$ with an undefined timer. It still answers $chanAbort$ and $chanBad$, and it broadcasts once its zero timer fires, but its pause timer never runs out, so it never reaches $\mathbf{switchBc}$.
 
 **Why it matters:** A claim about one component of the protocol, such as which state it must be in after an action, is sound inside an entity but not for the component as an open process. The proofs of chapter 6 respect this by reasoning about entities throughout.
 
