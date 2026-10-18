@@ -685,7 +685,7 @@ Lemma init_nextMode_net m i n :
 Lemma nextMode_pres_fwd_net m i n n' a :
   reachableProtNet n -> nextModeNet m i n -> 
   ~(switchCurrStateNet i n \/ ovAbortStateNet i n \/
-  tfsCurrStateNet i n) ->
+  (exists m0, tfsNextStateNet m0 i n) \/ tfsCurrStateNet i n) ->
   n -NA- a -NA> n' -> nextModeNet m i n'. Admitted. (*3*)
 (**Proof: Brute force? Inter-component relationships? Is there any
 machinery that you can use to help you prove this one?*)

@@ -164,6 +164,10 @@ Inductive stepDiscEnt : Entity -> ActDiscEnt -> Entity -> Prop :=
     (i : Interface) (k k' : ModeState),
     p -PA- chanMStableRead *? -PA> p' -> k -ms- chanMStableRead @! -ms> k' ->
     [| p , l , i , k |] -EA- aeTau ->> [| p' , l , i , k' |]
+  | stepDeWriteStbl : forall (p p' : ProcTerm) (l : Position)
+    (i : Interface) (k k' : ModeState),
+    p -PA- chanMStableWrite *! -PA> p' -> k -ms- chanMStableWrite @? -ms> k' ->
+    [| p , l , i , k |] -EA- aeTau ->> [| p' , l , i , k' |]
   | stepDeCurrWrite : forall (p p' : ProcTerm) (l : Position)
     (i : Interface) (k k' : ModeState) (m : Mode),
     p -PA- chanMCurrWrite *! -PA> p' -> k -ms- chanMCurrWrite @? -ms> k' ->
@@ -351,6 +355,7 @@ Lemma link_ent_proc_neq_disc p p' h h' l l' k k' a :
   right. right. left. repeat eexists; eassumption.
   right. right. left. repeat eexists; eassumption.
   do 6 right. left. repeat eexists; eassumption.
+  do 5 right. left. repeat eexists; eassumption.
   do 5 right. left. repeat eexists; eassumption.
   do 4 right. left. repeat eexists; eassumption.
   do 3 right. left. repeat eexists; eassumption.
