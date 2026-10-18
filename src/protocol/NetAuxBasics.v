@@ -327,7 +327,8 @@ Proof.
       decompose [or and] H; clear H;
       try match goal with [X : p2 = p2' |- _] => exact (NB X) end;
       match goal with [T2 : p2 -PA- _ -PA> p2' |- _] =>
-        let X := fresh "X" in lets X : SW T2; first [discriminate X | injection X as X1 X2; subst] end;
+        let X := fresh "X" in lets X : SW T2;
+        first [discriminate X | injection X as X1 X2; subst] end;
       first [eapply broadcast_write_in_not; [eassumption | | eassumption]; solve [auto]
             | eapply listener_write_in_not; [eassumption | | eassumption]; solve [auto]
             | discriminate]. }

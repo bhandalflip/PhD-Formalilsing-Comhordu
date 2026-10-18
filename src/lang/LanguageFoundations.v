@@ -159,8 +159,8 @@ Lemma eqDecExp : eqDec Exp. unfold eqDec. induction x1;
 
 
 
-(** A set of channels. Each mode-state channel comes in two: the software
-  reads from one and writes to the other, so its direction is in its name.*)
+(** A set of channels. Each mode-state channel comes in two: the software reads from one and
+writes to the other, so its direction is in its name.*)
 Inductive Channel : Type :=
   chanAN | chanMStableRead | chanMStableWrite | chanMCurrRead | chanMCurrWrite
   | chanMNextRead | chanMNextWrite
@@ -582,7 +582,10 @@ Inductive evalBoolExp : BoolExp -> bool -> Prop :=
 (** A threat test on a distance evaluates as on the number it holds.*)
 Lemma bevalSufficient_dist (e1 e2 : Exp) (m : Mode) (r : Distance) :
   evalExp e1 m -> evalExp e2 r -> evalBoolExp (bSufficient e1 e2) (suffBool m r).
-Proof. intros E1 E2. destruct r as [r]. eapply bevalSufficient; [exact E1 | exact E2 | constructor]. Qed.
+Proof.
+  intros E1 E2. destruct r as [r].
+  eapply bevalSufficient; [exact E1 | exact E2 | constructor].
+Qed.
 
 Lemma bevalPossInc_dist (e1 e2 e3 : Exp) (m1 m2 : Mode) (d : Distance) :
   evalExp e1 m1 -> evalExp e2 m2 -> evalExp e3 d ->
