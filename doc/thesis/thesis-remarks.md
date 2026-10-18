@@ -1,6 +1,6 @@
 # Thesis remarks
 
-Notable observations about the [thesis](2014-10-28-phd-thesis.pdf) made while formalising it, which are not errors in it. Each gives the printed page and the definition or remark number where there is one, the observation, a minimal example where one helps, and a link to the PR or report that made it. Departures from the thesis are in [`thesis-corrections.md`](thesis-corrections.md) instead.
+Notable observations about the [thesis](2014-10-28-phd-thesis.pdf) made while formalising it, which are not errors in it. Each gives the printed page and the definition or remark number where there is one, the observation, a minimal example where one helps, and a link to the PR or report that made it. Errors in the thesis are in [`thesis-corrections.md`](thesis-corrections.md) instead.
 
 ## 1. A protocol process on its own can get stuck
 

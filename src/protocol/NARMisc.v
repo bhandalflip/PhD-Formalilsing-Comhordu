@@ -590,9 +590,9 @@ Qed.
 
 (** An entity that leaves the tfs states in a discrete step was not currSince in a mode
 that is not fail safe: while its mode is not fail safe, a discrete step keeps it in the tfs
-states (tfs_currMode_disc_pres). A fail-safe mode is its own fail-safe successor, so an
-entity in such a mode can run through the tfs states and out again in one instant, which
-is why the hypothesis is needed.*)
+states (tfs_currMode_disc_pres). A fail-safe mode may be its own fail-safe successor, so an
+entity in such a mode can run through the tfs states and out again without its mode
+changing, which is why the hypothesis is needed.*)
 Lemma tfsState_not_currSince (m : Mode) (t : Time) (i : nat) (n n' : Network)
   (p : reachableProtNet n) (a : ActDiscNet) (w : n -NA- a -NA> n') :
   ~ failSafe m -> tfsStateNet i n -> ~tfsStateNet i n' -> ~currSince m t i n p.
