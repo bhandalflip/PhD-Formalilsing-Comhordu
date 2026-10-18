@@ -746,6 +746,30 @@ Proof.
       injection Ev' as Ev'; subst v'.
       right. simpl. constructor. constructor. exact C.
 Qed.
+
+(** A step of an entity whose listener is in rangeBad: the listener stays, or it read the
+current mode off the mode state and is in currEq with it.*)
+Theorem rangeBad_track_ent (e e' : Entity) (a : ActDiscEnt) (m2 : Mode) :
+  reachableProtEnt e -> rangeBadStateEnt m2 e -> e -EA- a ->> e' ->
+  rangeBadStateEnt m2 e' \/ currEqStateEnt (currModeEnt e) m2 e'.
+Proof.
+  intros R G S. destruct e as [p l h k].
+  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
+  inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+  ent_state_comp G.
+  destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ S) as [p1' [p2' [p3' [l' [h' [k' [E _]]]]]]].
+  subst e'.
+  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [ACT _]]]]].
+  - injection EQ; intros; subst. left. constructor. constructor. exact G.
+  - assert (ACT' : forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurrRead ;? [baseMode v]).
+    { intros b B. destruct (rangeBad_next_act _ _ _ _ B G) as [v [Eb _]]. eauto. }
+    destruct (triple_mCurr_read_li _ _ _ _ _ _ _ PS T ACT') as [EQ | [T3 [v Ec]]].
+    + subst p3'. left. constructor. constructor. exact G.
+    + subst c. destruct (ACT v eq_refl) as [Ev _]. subst v.
+      destruct (rangeBad_next_act _ _ _ _ T3 G) as [v' [Ev' C]].
+      injection Ev' as Ev'; subst v'.
+      right. simpl. constructor. constructor. exact C.
+Qed.
 (*+*)
 Lemma currComp_listening_track_ent m'' r l l' p p' h h' k k' a :
   currCompStateEnt m'' r ([|p, l, h, k|]) ->

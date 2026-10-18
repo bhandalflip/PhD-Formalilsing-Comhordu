@@ -479,7 +479,16 @@ Lemma rangeBad_next_net m m'' i n n' a : reachableProtNet n ->
   (*Proof: If it wasn't for the currModeNet entanglement, you'd just be able
   to do: fwd_track_net_tac rangeBad_next_ent, but something else needs to be
   done to account for this extra little feature of the proof.*)
-  Admitted. (*D- rangeBad_next_ent*)
+Proof.
+  intros R S RB CM. destruct RB as [e RBe Ein].
+  destruct (link_net_ent_disc_fwd n n' e i a S Ein) as [e' [E'in [Eq | [a' Ste]]]].
+  - subst. left. econstructor; eassumption.
+  - destruct (rangeBad_track_ent _ _ _ _ (reachableNet_ent _ _ _ _ R Ein) RBe Ste)
+      as [RB' | CE].
+    + left. econstructor; eassumption.
+    + right. lets CM' : liftEntNet_ent CM Ein. simpl in CM'. rewrite CM' in CE.
+      econstructor; eassumption.
+Qed.
 
 Lemma badOvlp_next_net i n n' a :
   n -NA- a -NA> n' -> badOvlpStateNet i n ->

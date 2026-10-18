@@ -1187,6 +1187,17 @@ Proof.
   currOK_next_unfold_app. apply bisim_refl.
 Qed.
 
+(** The same, with the action: the only step of rangeBad reads a mode on mCurr.*)
+Lemma rangeBad_next_act (p p' : ProcTerm) (a : DiscAct) (m'' : Mode) :
+  p -PA- a -PA> p' -> rangeBadState m'' p ->
+  exists m, a = chanMCurrRead ;? [baseMode m] /\ currEqState m m'' p'.
+Proof.
+  intros TR CS. unfold rangeBadState in CS. unfold rangeBad in CS.
+  currOK_next_fwd_pre.
+  eexists. split; [reflexivity | ]. unfold currEqState.
+  eapply bisim_trans; [eassumption | ]. currOK_next_unfold_app. apply bisim_refl.
+Qed.
+
 Theorem gotMessage_next (p p' : ProcTerm)
   (a : DiscAct) (m'' : Mode) (l : Position) :
   p -PA- a -PA> p' -> gotMsgState m'' l p ->
