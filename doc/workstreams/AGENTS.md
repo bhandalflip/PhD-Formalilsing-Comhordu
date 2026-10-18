@@ -1,6 +1,6 @@
 # doc/workstreams/: rules for living trackers
 
-- A workstream is ephemeral. Delete it when it finishes, that is, when every step is ticked or dropped. Before that, move anything that must outlive it, such as a decision, a convention or a result, to `../adr/`, `../reports/`, a README or the relevant `AGENTS.md`.
+- A workstream is ephemeral. Its last step deletes it, once every other step is ticked or dropped. Before that, move anything that must outlive it, such as a decision, a convention or a result, to `../adr/`, `../reports/`, a README or the relevant `AGENTS.md`.
 - Nothing links to a workstream; see the writing rules in the top-level [`AGENTS.md`](../../AGENTS.md). A workstream links out.
 - Name files `YYYY-MM-DD-{kebab-title}.md`, where the date is the day the workstream started.
 - Mark every step with its owner, **🤖 Agent** or **🧑 Human-in-the-loop**, and give it a status checkbox (`[ ]` / `[x]`).

@@ -93,9 +93,11 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 - [ ] 🤖 **Delete `parStructPres` and `parStructPres2`** in `lang/SoftwareLanguage.v`: pair-shaped, unused since step 16, and instances of `parAll_disc_weak` and `parAll_del_inv`.
 - [ ] 🧑 **Rename `BaseType`** in `lang/LanguageFoundations.v` to say what it is, a base value, now that `ValType` names the type of one. A mechanical rename of 145 uses in 15 files.
 - [ ] 🧑 _Placeholder: anything else the first pass couldn't decide._
+- [ ] 🤖 **Delete this workstream** once every other step is ticked or dropped, after moving anything that must outlive it, as [`AGENTS.md`](AGENTS.md) says.
 
 ## Log
 
+- **2026-10-18:** New last step: delete this workstream when everything else is done. Every workstream now ends with that step; the rule is in `doc/workstreams/AGENTS.md`.
 - **2026-10-18:** Reviewing step 24: thesis corrections now record only what is wrong in the thesis as written, each as short as it can be. That the Rocq proof departs from the thesis's is said once, in the thesis folder's README. The rule is in `doc/thesis/AGENTS.md`.
 - **2026-10-16:** New step 22, from the review of step 21: network reachability and the lifts of a network step back to one component become generic. `reachableNet` takes a seed process, `initialNet` is renamed `initialProtNet`, `reachableProtNet` is the protocol's, and theorems are generalised as far as they go, preferring a condition on the state before a transition, then conditions on the seed process with reachability. Old steps 22–30 are now 23–31.
 - **2026-10-16:** Reviewing step 21: proposed changes are now put to the human one at a time, each in a few sentences, with detail only on request; the rule is in the top-level `AGENTS.md`. Step 25 widens from admitted lemmas to everything outside the cone that only served the safety proof, keeping the general results about the language.
