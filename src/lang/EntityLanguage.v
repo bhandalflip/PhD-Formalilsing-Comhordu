@@ -433,6 +433,30 @@ Proof.
   destruct (parAll_inj _ _ _ _ E) as [E1 E2]; [congruence | ]. subst r rs. exact F.
 Qed.
 
+(** When the software uses its channels correctly, a component that can only have changed by
+acting on one of the entity's channels either stayed as it was, or took the entity's step on
+its own: it met the mode state or the interface, or read the position, and every other
+component stayed as it was.*)
+Lemma ent_disc_comp_chan q qs q' qs' l l' h h' k k' a i x x' :
+  correctChannelUsage (parAll q qs) ->
+  [|parAll q qs, l, h, k|] -EA- a ->> [|parAll q' qs', l', h', k'|] -> length qs = length qs' ->
+  nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
+  (forall b, x -PA- b -PA> x' -> entChanAct b) ->
+  x = x' \/
+  stepAt (fun y y' => [|y, l, h, k|] -EA- a ->> [|y', l', h', k'|]) i (q :: qs) (q' :: qs').
+Proof.
+  intros C S L Nx Nx' ACT. inversion S; subst;
+    first
+    [ (* the software stays *)
+      match goal with [E : parAll _ _ = parAll _ _ |- _] =>
+        destruct (parAll_inj _ _ _ _ E ltac:(congruence)) as [E1 E2]; subst; left; congruence end
+    | (* the software steps, and the component takes the step with the rest of the entity *)
+      match goal with [T : parAll q qs -PA- _ -PA> parAll q' qs' |- _] =>
+        destruct (parAll_disc_chan _ _ _ _ _ _ _ _ C T L Nx Nx' ACT) as [E | St];
+        [left; exact E | right; eapply stepAt_impl; [ | exact St];
+          intros y y' Y; cbv beta in Y; solve [econstructor; eassumption]] end ].
+Qed.
+
 (***************Modes of an entity, and reachable entities*********************)
 
 (** A delay changes neither the current mode nor the next mode of an entity: the mode state

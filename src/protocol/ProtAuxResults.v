@@ -1956,60 +1956,6 @@ Qed.
   cases for pi -tau-> pi' as they come up because none of the protocol components can ever
   do a tau (show this elsewhere). Leaving us our goal.*)
 
-(* begin helpers for triple_pos_read_bc *)
-(** No component of the protocol outputs on chanPos: the position is only ever read.*)
-Lemma broadcast_pos_out_not p p' v : broadcastState p -> p -PA- chanPos ;! v -PA> p' -> False.
-Proof. intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
-
-Lemma overlap_pos_out_not p p' v : overlapState p -> p -PA- chanPos ;! v -PA> p' -> False.
-Proof. intros S T. destruct (overlapState_shape _ S); prot_outProc_in_not_contra. Qed.
-
-Lemma listener_pos_out_not p p' v : listenerState p -> p -PA- chanPos ;! v -PA> p' -> False.
-Proof. intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra. Qed.
-
-(** No component of the protocol writes on a channel it reads the mode state from.*)
-Lemma broadcast_read_out_not p p' c v :
-  broadcastState p -> c = chanMCurrRead \/ c = chanMNextRead \/ c = chanMStableRead ->
-  p -PA- c ;! v -PA> p' -> False.
-Proof.
-  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
-    destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
-Lemma overlap_read_out_not p p' c v :
-  overlapState p -> c = chanMCurrRead \/ c = chanMNextRead \/ c = chanMStableRead ->
-  p -PA- c ;! v -PA> p' -> False.
-Proof.
-  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
-    destruct (overlapState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
-Lemma listener_read_out_not p p' c v :
-  listenerState p -> c = chanMCurrRead \/ c = chanMNextRead \/ c = chanMStableRead ->
-  p -PA- c ;! v -PA> p' -> False.
-Proof.
-  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
-    destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
-(** Neither the broadcaster nor the listener reads a channel the software writes the mode state
-on.*)
-Lemma broadcast_write_in_not p p' c v :
-  broadcastState p -> c = chanMCurrWrite \/ c = chanMNextWrite \/ c = chanMStableWrite ->
-  p -PA- c ;? v -PA> p' -> False.
-Proof.
-  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
-    destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
-Lemma listener_write_in_not p p' c v :
-  listenerState p -> c = chanMCurrWrite \/ c = chanMNextWrite \/ c = chanMStableWrite ->
-  p -PA- c ;? v -PA> p' -> False.
-Proof.
-  intros S C T. destruct C as [ E | [ E | E ] ]; subst c;
-    destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
 (** Only the overlap component switches mode.*)
 Lemma broadcast_mCurr_out_not p p' v :
   broadcastState p -> p -PA- chanMCurrWrite ;! v -PA> p' -> False.
@@ -2029,121 +1975,6 @@ Proof.
   invert_disc_prefixes. reflexivity.
 Qed.
 
-(* end helpers *)
-
-(** A step of a protocol triple whose broadcast component can only have stepped by reading
-a position: either it did not step, or the whole triple read that position, since no other
-component could have supplied it. So for the overlap component below.*)
-Lemma triple_pos_read_bc p1 p2 p3 p1' p2' p3' c v :
-  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
-  (forall b, p1 -PA- b -PA> p1' -> b = chanPos ;? [basePosition v]) ->
-  p1 = p1' \/ c = chanPos ;? [basePosition v].
-Proof.
-  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
-  destruct c as [c0 v0 | c0 v0 | ].
-  - triple_disc_nonTau T; first [left; reflexivity | right; eapply ACT; eassumption].
-  - triple_disc_nonTau T; first [left; reflexivity | right; eapply ACT; eassumption].
-  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
-    decompose [or and] H; clear H;
-    try match goal with [E : p1 = p1' |- _] => left; exact E end;
-    try match goal with [H1 : p1 -PA- _ ;! _ -PA> p1' |- _] =>
-      lets X : ACT H1; discriminate X end;
-    match goal with [H1 : p1 -PA- ?c1 ;? ?v1 -PA> p1', H2 : _ -PA- ?c1 ;! ?v1 -PA> _ |- _] =>
-      lets X : ACT H1; injection X as X1 X2; subst c1 v1; exfalso;
-      first [eapply overlap_pos_out_not; [exact OS | exact H2]
-            | eapply listener_pos_out_not; [exact LS | exact H2]] end.
-Qed.
-
-Lemma triple_pos_read_ov p1 p2 p3 p1' p2' p3' c v :
-  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
-  (forall b, p2 -PA- b -PA> p2' -> b = chanPos ;? [basePosition v]) ->
-  p2 = p2' \/ c = chanPos ;? [basePosition v].
-Proof.
-  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
-  destruct c as [c0 v0 | c0 v0 | ].
-  - triple_disc_nonTau T; first [left; reflexivity | right; eapply ACT; eassumption].
-  - triple_disc_nonTau T; first [left; reflexivity | right; eapply ACT; eassumption].
-  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
-    decompose [or and] H; clear H;
-    try match goal with [E : p2 = p2' |- _] => left; exact E end;
-    try match goal with [H1 : p2 -PA- _ ;! _ -PA> p2' |- _] =>
-      lets X : ACT H1; discriminate X end;
-    match goal with [H1 : p2 -PA- ?c1 ;? ?v1 -PA> p2', H2 : _ -PA- ?c1 ;! ?v1 -PA> _ |- _] =>
-      lets X : ACT H1; injection X as X1 X2; subst c1 v1; exfalso;
-      first [eapply broadcast_pos_out_not; [exact BS | exact H2]
-            | eapply listener_pos_out_not; [exact LS | exact H2]] end.
-Qed.
-
-(** A step of a protocol triple whose listener can only have stepped by reading a mode on
-mCurr: either it did not step, or the whole triple read that mode, since no component
-writes on mCurrRead. So for the overlap component below.*)
-Lemma triple_mCurr_read_li p1 p2 p3 p1' p2' p3' c :
-  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
-  (forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurrRead ;? [baseMode v]) ->
-  p3 = p3' \/ (p3 -PA- c -PA> p3' /\ exists v, c = chanMCurrRead ;? [baseMode v]).
-Proof.
-  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
-  destruct c as [c0 v0 | c0 v0 | ].
-  - triple_disc_nonTau T;
-      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
-  - triple_disc_nonTau T;
-      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
-  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
-    decompose [or and] H; clear H;
-    try match goal with [E : p3 = p3' |- _] => left; exact E end;
-    try match goal with [H1 : p3 -PA- _ ;! _ -PA> p3' |- _] =>
-      destruct (ACT _ H1) as [? X]; discriminate X end;
-    match goal with [H1 : p3 -PA- ?c1 ;? ?v1 -PA> p3', H2 : _ -PA- ?c1 ;! ?v1 -PA> _ |- _] =>
-      destruct (ACT _ H1) as [v X]; injection X as X1 X2; subst c1 v1; exfalso;
-      first [eapply broadcast_read_out_not; [exact BS | left; reflexivity | exact H2]
-            | eapply overlap_read_out_not; [exact OS | left; reflexivity | exact H2]] end.
-Qed.
-
-Lemma triple_mCurr_read_ov p1 p2 p3 p1' p2' p3' c :
-  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
-  (forall b, p2 -PA- b -PA> p2' -> exists v, b = chanMCurrRead ;? [baseMode v]) ->
-  p2 = p2' \/ (p2 -PA- c -PA> p2' /\ exists v, c = chanMCurrRead ;? [baseMode v]).
-Proof.
-  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
-  destruct c as [c0 v0 | c0 v0 | ].
-  - triple_disc_nonTau T;
-      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
-  - triple_disc_nonTau T;
-      first [left; reflexivity | right; split; [assumption | eapply ACT; eassumption]].
-  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
-    decompose [or and] H; clear H;
-    try match goal with [E : p2 = p2' |- _] => left; exact E end;
-    try match goal with [H1 : p2 -PA- _ ;! _ -PA> p2' |- _] =>
-      destruct (ACT _ H1) as [? X]; discriminate X end;
-    match goal with [H1 : p2 -PA- ?c1 ;? ?v1 -PA> p2', H2 : _ -PA- ?c1 ;! ?v1 -PA> _ |- _] =>
-      destruct (ACT _ H1) as [v X]; injection X as X1 X2; subst c1 v1; exfalso;
-      first [eapply broadcast_read_out_not; [exact BS | left; reflexivity | exact H2]
-            | eapply listener_read_out_not; [exact LS | left; reflexivity | exact H2]] end.
-Qed.
-
-(** A step of a protocol triple whose overlap component can only have stepped by writing on
-the mode state: either it did not step, or the whole triple made that write, since no other
-component reads it.*)
-Lemma triple_write_ov p1 p2 p3 p1' p2' p3' c :
-  protocolState (p1 $||$ p2 $||$ p3) -> p1 $||$ p2 $||$ p3 -PA- c -PA> p1' $||$ p2' $||$ p3' ->
-  (forall b, p2 -PA- b -PA> p2' -> exists c0 v, b = c0 ;! v /\
-    (c0 = chanMCurrWrite \/ c0 = chanMNextWrite \/ c0 = chanMStableWrite)) ->
-  p2 = p2' \/ p2 -PA- c -PA> p2'.
-Proof.
-  intros PS T ACT. inversion PS as [? ? ? BS OS LS]; subst.
-  destruct c as [c0 v0 | c0 v0 | ].
-  - triple_disc_nonTau T; first [left; reflexivity | right; assumption].
-  - triple_disc_nonTau T; first [left; reflexivity | right; assumption].
-  - destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
-    decompose [or and] H; clear H;
-    try match goal with [E : p2 = p2' |- _] => left; exact E end;
-    match goal with [H2 : p2 -PA- _ -PA> p2' |- _] =>
-      destruct (ACT _ H2) as [c1 [v1 [X C]]] end;
-    first [discriminate X | injection X as X1 X2; subst]; exfalso;
-    first [eapply broadcast_write_in_not; [eassumption | exact C | eassumption]
-          | eapply listener_write_in_not; [eassumption | exact C | eassumption]].
-Qed.
-  
 Ltac link_partriptau_tac c v U :=
   match goal with
   [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- tauAct -PA> ?p1' $||$ ?p2' $||$ ?p3',
@@ -2201,6 +2032,14 @@ Qed.
 (**Proof: The components of a parallel composition each stay reachable from where they
 started (reachableFrom_parAll), and reachable from the initial component is what each
 component-state predicate says.*)
+
+(** A reachable protocol process uses its entity's channels correctly.*)
+Lemma reachableProt_correctChannelUsage (p : ProcTerm) :
+  reachableProt p -> correctChannelUsage p.
+Proof.
+  intro R. apply reachableProt_reachableFrom in R.
+  exact (correctChannelUsage_reachableFrom _ _ protocol_correctChannelUsage R).
+Qed.
 
 Ltac reachprot U :=
   match goal with

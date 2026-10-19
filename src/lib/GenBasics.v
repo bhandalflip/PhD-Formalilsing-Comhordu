@@ -565,6 +565,25 @@ Proof.
     intro E. apply N. f_equal. assumption.
 Qed.
 
+(** A step under one relation is a step under any larger one.*)
+Lemma stepAt_impl {A : Type} (R R' : A -> A -> Prop) i l l' :
+  (forall x x', R x x' -> R' x x') -> stepAt R i l l' -> stepAt R' i l l'.
+Proof. intros H S. induction S; constructor; auto. Qed.
+
+(** The elements at the step's position are related.*)
+Lemma stepAt_nth_error_eq {A : Type} (R : A -> A -> Prop) i l l' : stepAt R i l l' ->
+  exists x x', nth_error l i = Some x /\ nth_error l' i = Some x' /\ R x x'.
+Proof. intro S. induction S; simpl; eauto. Qed.
+
+(** Every other position is as it was.*)
+Lemma stepAt_nth_error_neq {A : Type} (R : A -> A -> Prop) i j l l' : stepAt R i l l' ->
+  j <> i -> nth_error l j = nth_error l' j.
+Proof.
+  intro S. revert j. induction S as [x x' l H | i x l l' S IH]; intros [ |j] N; simpl;
+    [exfalso; apply N; reflexivity | reflexivity | reflexivity | ].
+  apply IH. intro E. apply N. f_equal. exact E.
+Qed.
+
 (** Inverts every stepAt and Forall2 hypothesis over a list of known shape, splitting a step
 at an unknown position into one case per position, until the lists are explicit.*)
 Ltac positions_inv := repeat match goal with

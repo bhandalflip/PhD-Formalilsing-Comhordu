@@ -335,6 +335,10 @@ Class GuardedDefs {PNames : ProcNames} {PDefs : ProcDefs} := {
 
 Reserved Notation "t %; p" (at level 50).
 
+(** Splits every hypothesis that a property holds along an appended list.*)
+Local Ltac Forall_app_split := repeat match goal with
+  [H : Forall _ (_ ++ _) |- _] => apply Forall_app in H; destruct H end.
+
 Section Results.
 Context {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
 
@@ -2139,6 +2143,10 @@ Proof.
   intros H0 HD HT R. induction R; eauto.
 Qed.
 
+(** What is reachable from a process reachable from p0 is reachable from p0.*)
+Lemma reachableFrom_trans p0 p q : reachableFrom p0 p -> reachableFrom p q -> reachableFrom p0 q.
+Proof. intros R1 R2. induction R2; eauto using reachableFromDisc, reachableFromDel. Qed.
+
 (** What is reachable from a parallel composition is a parallel composition of processes
 reachable from its components.*)
 Lemma reachableFrom_parAll p0 ps0 q : reachableFrom (parAll p0 ps0) q ->
@@ -2190,6 +2198,176 @@ Proof.
   intros S U cd E. induction S; simpl in *; try discriminate;
     try (apply app_eq_nil in U; destruct U as [U1 U2]);
     try (injection E as E; subst; left; reflexivity); auto using in_or_app.
+Qed.
+
+(** The channels of all of a term's prefixes, with their directions, not looking inside
+applications: chansProc's, and those of every prefix after them.*)
+Fixpoint prefixChans (p : ProcTerm) : list (Channel * bool) :=
+  match p with
+  | nilProc => []
+  | outPrefix c _ q => (c, false) :: prefixChans q
+  | inPrefix c _ q => (c, true) :: prefixChans q
+  | ifThen _ q => prefixChans q
+  | sum q1 q2 => prefixChans q1 ++ prefixChans q2
+  | parComp q1 q2 => prefixChans q1 ++ prefixChans q2
+  | app _ _ => []
+  | del _ q => prefixChans q
+  end.
+
+(** Substitution keeps the channels of a term's prefixes.*)
+Lemma prefixChans_sub s p : prefixChans (subProcTerm s p) = prefixChans p.
+Proof.
+  revert s. induction p; intro s; simpl; try rewrite IHp; try rewrite IHp1, IHp2; reflexivity.
+Qed.
+
+(** Helper for prefixChans_reachableFrom: a discrete step acts on a channel and direction that
+P allows, and leads to a term whose prefixes P allows, when P allows the prefixes of the term
+and of every definition.*)
+Local Lemma prefixChans_reachableFrom_aux (P : Channel * bool -> Prop) p a p' :
+  (forall n, Forall P (prefixChans (snd (def n)))) -> Forall P (prefixChans p) ->
+  p -PA- a -PA> p' -> Forall P (prefixChans p') /\ forall cd, actChan a = Some cd -> P cd.
+Proof.
+  intros D F S. revert F.
+  induction S as [c l1 l2 p E | c l1 l2 p E | b p p' d S IH E | p1 p2 p' d S IH
+    | p1 p2 p' d S IH | p p' q d S IH | q q' p d S IH | p p' q q' c l S1 IH1 S2 IH2
+    | p p' q q' c l S1 IH1 S2 IH2 | n l1 l2 p p' d E S IH | p p' d e S IH E];
+    intro F; simpl in F |- *; Forall_app_split.
+  - inversion F; subst. split; [assumption | intros cd X; injection X as X; subst; assumption].
+  - inversion F; subst. rewrite prefixChans_sub.
+    split; [assumption | intros cd X; injection X as X; subst; assumption].
+  - apply IH. exact F.
+  - apply IH. assumption.
+  - apply IH. assumption.
+  - destruct IH as [F' A]; [assumption | ]. split; [apply Forall_app; split | ]; assumption.
+  - destruct IH as [F' A]; [assumption | ]. split; [apply Forall_app; split | ]; assumption.
+  - split; [apply Forall_app; split; [apply IH1 | apply IH2]; assumption | discriminate].
+  - split; [apply Forall_app; split; [apply IH1 | apply IH2]; assumption | discriminate].
+  - apply IH. rewrite prefixChans_sub. specialize (D n). rewrite E in D. exact D.
+  - apply IH. exact F.
+Qed.
+
+(** Helper for prefixChans_reachableFrom: a delay leads to a term whose prefixes P allows, when
+P allows the prefixes of the term and of every definition.*)
+Local Lemma prefixChans_reachableFrom_aux2 (P : Channel * bool -> Prop) p d p' :
+  (forall n, Forall P (prefixChans (snd (def n)))) -> Forall P (prefixChans p) ->
+  p -PD- d -PD> p' -> Forall P (prefixChans p').
+Proof.
+  intros D F S. revert F.
+  induction S as [ | | | p p' d b S IH E | | p1 p2 p1' p2' d S1 IH1 S2 IH2
+    | p q p' q' d S1 IH1 S2 IH2 K | n l1 l2 p p' d E S IH | | | ];
+    intro F; simpl in F |- *; Forall_app_split; try (apply Forall_app; split); auto.
+  apply IH. rewrite prefixChans_sub. specialize (D n). rewrite E in D. exact D.
+Qed.
+
+(** A property of channels and directions that every prefix of p0 has, and every prefix of
+every definition, holds of every action of anything reachable from p0.*)
+Lemma prefixChans_reachableFrom (P : Channel * bool -> Prop) p0 p a p' cd :
+  Forall P (prefixChans p0) -> (forall n, Forall P (prefixChans (snd (def n)))) ->
+  reachableFrom p0 p -> p -PA- a -PA> p' -> actChan a = Some cd -> P cd.
+Proof.
+  intros F0 D R S E.
+  assert (F : Forall P (prefixChans p)).
+  { apply (reachableFrom_invariant (fun q => Forall P (prefixChans q)) p0 p F0); [ | | exact R].
+    - intros q q' b F' T. exact (proj1 (prefixChans_reachableFrom_aux P q b q' D F' T)).
+    - intros q q' d F' T. exact (prefixChans_reachableFrom_aux2 P q d q' D F' T). }
+  exact (proj2 (prefixChans_reachableFrom_aux P p a p' D F S) cd E).
+Qed.
+
+(*********Correct use of an entity's channels*********)
+(** The software meets the rest of its entity on channels that each go one way (chanDir). The
+language lets software use any channel either way, but software that uses one of these the
+wrong way can meet another of its own components on it, by mistake. Software that uses them
+correctly meets only the rest of its entity on them (ent_disc_comp_chan in
+EntityLanguage.v).*)
+
+(** Software uses its entity's channels correctly when nothing reachable from it, by discrete
+steps or delays, can write on a channel it should read or read one it should write.*)
+Definition correctChannelUsage (p : ProcTerm) : Prop :=
+  forall q a q' c d, reachableFrom p q -> q -PA- a -PA> q' -> actChan a = Some (c, d) ->
+  chanDir c <> Some (negb d).
+
+(** What is reachable from software that uses its channels correctly uses them correctly
+too.*)
+Lemma correctChannelUsage_reachableFrom p q :
+  correctChannelUsage p -> reachableFrom p q -> correctChannelUsage q.
+Proof.
+  intros C R r a r' c d Rr. apply (C r a r' c d). eapply reachableFrom_trans; eassumption.
+Qed.
+
+(** No prefix of p goes the wrong way on its channel.*)
+Definition prefixesRightWay (p : ProcTerm) : Prop :=
+  Forall (fun cd => chanDir (fst cd) <> Some (negb (snd cd))) (prefixChans p).
+
+(** A syntactic check that software uses its entity's channels correctly: no prefix goes the
+wrong way, in the software or in any definition.*)
+Lemma correctChannelUsage_prefixes p :
+  prefixesRightWay p -> (forall n, prefixesRightWay (snd (def n))) -> correctChannelUsage p.
+Proof.
+  intros F D q a q' c d R S E. exact (prefixChans_reachableFrom _ _ _ _ _ (c, d) F D R S E).
+Qed.
+
+(** Software that uses its channels correctly cannot both write and read one of the entity's
+channels.*)
+Lemma correctChannelUsage_dir p c v w : correctChannelUsage p ->
+  discActEnabled p (c ;! v) -> discActEnabled p (c ;? w) -> chanDir c = None.
+Proof.
+  intros C [p1 S1] [p2 S2].
+  pose proof (C p _ _ c false (reachableFromBase p) S1 eq_refl) as N1.
+  pose proof (C p _ _ c true (reachableFromBase p) S2 eq_refl) as N2.
+  simpl in N1, N2. destruct (chanDir c) as [[ | ] | ]; congruence.
+Qed.
+
+(** An action on one of the channels the software shares with the rest of its entity.*)
+Definition entChanAct (b : DiscAct) : Prop :=
+  match actChan b with Some (c, _) => chanDir c <> None | None => False end.
+
+(** In a composition that uses its channels correctly, a component that can only have changed
+by acting on one of the entity's channels either stayed as it was, or did the composition's
+action on its own, every other component staying as it was. It cannot have synchronised with
+another component, since one of them would have used the channel the wrong way.*)
+Lemma parAll_disc_chan q qs q' qs' b i x x' :
+  correctChannelUsage (parAll q qs) -> parAll q qs -PA- b -PA> parAll q' qs' ->
+  length qs = length qs' -> nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
+  (forall b', x -PA- b' -PA> x' -> entChanAct b') ->
+  x = x' \/ stepAt (fun y y' => y -PA- b -PA> y') i (q :: qs) (q' :: qs').
+Proof.
+  intros C T L Nx Nx' ACT.
+  destruct (parAll_disc_inv _ _ _ _ T)
+    as [r [rs [E [[j St] | [_ [j [j' [c [v [l0 [N [S1 S2]]]]]]]]]]]].
+  - (* one component steps *)
+    assert (LR : length qs' = length rs).
+    { pose proof (Forall2_length (stepAt_Forall2 _ _ _ _ St)) as L1. simpl in L1. lia. }
+    destruct (parAll_inj _ _ _ _ E LR) as [E1 E2]. subst r rs.
+    destruct (Nat.eq_dec i j) as [Ej | Nj]; [subst j; right; exact St | left].
+    pose proof (stepAt_nth_error_neq _ _ _ _ _ St Nj). congruence.
+  - (* two components synchronise on c, which therefore has no direction *)
+    assert (LR : length qs' = length rs).
+    { pose proof (Forall2_length (stepAt_Forall2 _ _ _ _ S1)) as L1.
+      pose proof (Forall2_length (stepAt_Forall2 _ _ _ _ S2)) as L2. simpl in L1, L2. lia. }
+    destruct (parAll_inj _ _ _ _ E LR) as [E1 E2]. subst r rs.
+    destruct (stepAt_nth_error_eq _ _ _ _ S1) as [x1 [y1 [N1 [N1' T1]]]].
+    destruct (stepAt_nth_error_eq _ _ _ _ S2) as [w1 [z1 [N2 [N2' T2]]]].
+    cbv beta in T1, T2.
+    assert (N2o : nth_error (q :: qs) j' = Some w1)
+      by (rewrite (stepAt_nth_error_neq _ _ _ _ _ S1 (not_eq_sym N)); exact N2).
+    assert (DIR : chanDir c = None).
+    { apply (correctChannelUsage_dir _ c v v C).
+      - apply (parAll_dae_intro _ _ x1); [eapply nth_error_In; exact N1 | econstructor; exact T1].
+      - apply (parAll_dae_intro _ _ w1); [eapply nth_error_In; exact N2o | econstructor; exact T2]. }
+    destruct (Nat.eq_dec i j) as [Ej | Nj]; [ | destruct (Nat.eq_dec i j') as [Ej' | Nj']].
+    + (* the component wrote on c *)
+      subst j. exfalso.
+      assert (Ey : y1 = x').
+      { rewrite (stepAt_nth_error_neq _ _ _ _ _ S2 N) in N1'. congruence. }
+      assert (Ex : x1 = x) by congruence. subst x1 y1.
+      exact (ACT _ T1 DIR).
+    + (* the component read c *)
+      subst j'. exfalso.
+      assert (Ex : w1 = x) by congruence. assert (Ez : z1 = x') by congruence. subst w1 z1.
+      exact (ACT _ T2 DIR).
+    + (* the component did neither *)
+      left. pose proof (stepAt_nth_error_neq _ _ _ _ _ S1 Nj).
+      pose proof (stepAt_nth_error_neq _ _ _ _ _ S2 Nj'). congruence.
 Qed.
 
 End Results.

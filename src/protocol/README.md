@@ -11,7 +11,7 @@ The proof builds up level by level, from processes to entities to networks.
 | File | What it holds |
 |---|---|
 | [`Protocol.v`](Protocol.v) | The protocol's processes and their definitions. |
-| [`ProtocolBridge.v`](ProtocolBridge.v) | Proofs that the protocol meets the language's conditions, such as guarded definitions, and facts true only of this protocol. |
+| [`ProtocolBridge.v`](ProtocolBridge.v) | Proofs that the protocol meets the language's conditions, such as guarded definitions and correct use of its entity's channels, and facts true only of this protocol. |
 | [`ProtAuxDefs.v`](ProtAuxDefs.v), [`ProtAuxResults.v`](ProtAuxResults.v) | State predicates over the protocol's processes, and results about them. |
 | [`EntAuxDefs.v`](EntAuxDefs.v), [`EntAuxResults.v`](EntAuxResults.v) | The state predicates lifted to entities, path predicates for reasoning about reactions to events, and results about them. |
 | [`NetAuxBasics.v`](NetAuxBasics.v) | The protocol's initial and reachable networks, which are the language's at the protocol process; a network step taken to the components of the protocol's triple; and the state predicates lifted to networks. |

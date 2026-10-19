@@ -308,31 +308,20 @@ Proof.
   assert (NB : p2 <> p2').
   { intro EQ; subst p2'. lets D : switchCurr_mCurr_out SC.
     destruct (bisim_dae _ _ _ SL D) as [q T]. unfold switchListen in T. inversion T. }
-  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ (reachableNet_ent _ _ _ _ R E)).
-  inversion PS as [? ? ? BS OS LS]; subst.
   destruct (link_net_ent_disc _ _ _ _ _ _ S E E') as [EQ | [b B]].
   { injection EQ; intros; subst. contradiction NB; reflexivity. }
-  destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ B) as [EQ | [c [T [CW _]]]].
-  { injection EQ; intros; subst. contradiction NB; reflexivity. }
-  (* switchCurr only writes on mCurr, and only the mode state reads it *)
+  (* switchCurr only writes on mCurr, and so the mode state takes the write *)
   assert (SW : forall b2, p2 -PA- b2 -PA> p2' -> b2 = chanMCurrWrite *!).
   { intros b2 T2. destruct (bisim_step_disc _ _ _ _ SC T2) as [q [TQ _]].
     unfold switchCurr in TQ. invert_disc_prefixes.
     match goal with [H : evalExpLists [] _ |- _] => inversion H end. reflexivity. }
-  assert (EC : c = chanMCurrWrite *!).
-  { destruct c as [c0 v0 | c0 v0 | ].
-    - triple_disc_nonTau T; first [contradiction NB; reflexivity | eapply SW; eassumption].
-    - triple_disc_nonTau T; first [contradiction NB; reflexivity | eapply SW; eassumption].
-    - exfalso. destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
-      decompose [or and] H; clear H;
-      try match goal with [X : p2 = p2' |- _] => exact (NB X) end;
-      match goal with [T2 : p2 -PA- _ -PA> p2' |- _] =>
-        let X := fresh "X" in lets X : SW T2;
-        first [discriminate X | injection X as X1 X2; subst] end;
-      first [eapply broadcast_write_in_not; [eassumption | | eassumption]; solve [auto]
-            | eapply listener_write_in_not; [eassumption | | eassumption]; solve [auto]
-            | discriminate]. }
-  specialize (CW EC). inversion CW; subst.
+  assert (ACT : forall b2, p2 -PA- b2 -PA> p2' -> entChanAct b2)
+    by (intros b2 T2; rewrite (SW b2 T2); discriminate).
+  destruct (triple_disc_ent_chan 1 (reachableNet_ent _ _ _ _ R E) B eq_refl eq_refl ACT)
+    as [EQ | B2]; [contradiction | ].
+  destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ B2) as [EQ | [c [T [CW _]]]];
+    [contradiction | ].
+  specialize (CW (SW c T)). inversion CW; subst.
   lets NM' : liftEntNet_ent NM E. simpl in NM'. injection NM' as NM'. subst.
   eapply lenWitness; [ | exact E']. reflexivity.
 Qed.

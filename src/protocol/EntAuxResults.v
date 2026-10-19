@@ -77,6 +77,25 @@ Proof.
   positions_inv. do 6 eexists. split; [reflexivity | ]. repeat split; assumption.
 Qed.
 
+(** In a reachable entity, a component of the triple that can only have changed by acting on
+one of the entity's channels either stayed as it was, or took the entity's step on its own,
+with the mode state, the interface or the position. This is ent_disc_comp_chan, since the
+protocol uses its channels correctly.*)
+Lemma triple_disc_ent_chan {p1 p2 p3 p1' p2' p3' l l' h h' k k' a} i {x x'} :
+  reachableProtEnt ([|p1 $||$ p2 $||$ p3, l, h, k|]) ->
+  [|p1 $||$ p2 $||$ p3, l, h, k|] -EA- a ->> [|p1' $||$ p2' $||$ p3', l', h', k'|] ->
+  nth_error [p1, p2, p3] i = Some x -> nth_error [p1', p2', p3'] i = Some x' ->
+  (forall b, x -PA- b -PA> x' -> entChanAct b) ->
+  x = x' \/ [|x, l, h, k|] -EA- a ->> [|x', l', h', k'|].
+Proof.
+  intros R S Nx Nx' ACT.
+  lets CU : reachableProt_correctChannelUsage (reachable_ent_prot _ _ _ _ R).
+  destruct (ent_disc_comp_chan p1 [p2, p3] p1' [p2', p3'] _ _ _ _ _ _ _ _ _ _
+    CU S eq_refl Nx Nx' ACT) as [E | St]; [left; exact E | right].
+  destruct (stepAt_nth_error_eq _ _ _ _ St) as [y [y' [Ny [Ny' Y]]]].
+  assert (y = x) by congruence. assert (y' = x') by congruence. subst. exact Y.
+Qed.
+
 (** Takes an entity state predicate H apart, for a predicate lifted from one component:
 the entity becomes [|p1 $||$ p2 $||$ p3, l, h, k|] and H the component's predicate.*)
 Ltac ent_state_destr H p1 p2 p3 l h k :=
@@ -227,14 +246,13 @@ Proof.
       destruct TC as [TC | [m TN]].
       * destruct (IC ltac:(constructor; constructor; exact TC)) as [m0 [NM FS]].
         exists m0. split; [ | exact FS]. simpl in NM |- *. rewrite (KS TC). exact NM.
-      * assert (ACT : forall b0, p2 -PA- b0 -PA> p2' -> exists c0 v, b0 = c0 ;! v /\
-          (c0 = chanMCurrWrite \/ c0 = chanMNextWrite \/ c0 = chanMStableWrite)).
+      * assert (ACT : forall b0, p2 -PA- b0 -PA> p2' -> entChanAct b0).
         { intros b0 B0. destruct (tfsNext_next_act _ _ _ _ B0 TN) as [[Eb _] | [Eb _]];
-            subst b0; (do 2 eexists; split; [reflexivity | auto]). }
-        destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [_ CN]]]]].
-        { exfalso. injection EQ; intros; subst. ov_disj TN X. }
-        destruct (triple_write_ov _ _ _ _ _ _ _ PS T ACT) as [EQ | T2].
-        { subst p2'. exfalso. ov_disj TN X. }
+            subst b0; discriminate. }
+        destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT) as [EQ | S2];
+          [subst p2'; exfalso; ov_disj TN X | ].
+        destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T2 [_ [_ CN]]]]];
+          [subst p2'; exfalso; ov_disj TN X | ].
         destruct (tfsNext_next_act _ _ _ _ T2 TN) as [[Ec _] | [_ N']];
           [ | exfalso; ov_disj N' X].
         subst c. pose proof (CN (failSafeSucc m) eq_refl) as K. inversion K; subst.
@@ -246,15 +264,13 @@ Proof.
         apply IB. constructor; constructor; exact X.
       * lets TC : tfsBc_prev B2 OS X.
         destruct (IC ltac:(constructor; constructor; exact TC)) as [m0 [NM FS]].
-        assert (ACT : forall b0, p2 -PA- b0 -PA> p2' -> exists c0 v, b0 = c0 ;! v /\
-          (c0 = chanMCurrWrite \/ c0 = chanMNextWrite \/ c0 = chanMStableWrite)).
+        assert (ACT : forall b0, p2 -PA- b0 -PA> p2' -> entChanAct b0).
         { intros b0 B0. destruct (tfsCurr_next_act _ _ _ B0 TC) as [[Eb _] | Y];
-            [ | exfalso; ov_disj Y X].
-          subst b0. do 2 eexists. split; [reflexivity | auto]. }
-        destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [CC _]]]].
-        { exfalso. injection EQ; intros; subst. ov_disj TC X. }
-        destruct (triple_write_ov _ _ _ _ _ _ _ PS T ACT) as [EQ | T2].
-        { subst p2'. exfalso. ov_disj TC X. }
+            [subst b0; discriminate | exfalso; ov_disj Y X]. }
+        destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT) as [EQ | S2];
+          [subst p2'; exfalso; ov_disj TC X | ].
+        destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T2 [CC _]]]];
+          [subst p2'; exfalso; ov_disj TC X | ].
         destruct (tfsCurr_next_act _ _ _ T2 TC) as [[Ec _] | Y]; [ | exfalso; ov_disj Y X].
         subst c. pose proof (CC eq_refl) as K. inversion K; subst.
         simpl in NM |- *. injection NM as NM. subst. exact FS.
@@ -345,21 +361,20 @@ Proof.
       * eapply listener_mCurr_out_not; eassumption.
     + (* the overlap was tfsStart: it read the current mode *)
       ent_state_comp TSE.
-      destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [ACT _]]]]].
-      * injection EQ; intros; subst. exfalso.
-        pose proof (bisim_trans _ _ _ (bisim_symm _ _ TSE) TN) as BT.
-        prot_outProc_in_not_body. refute_by_chan BT.
-      * assert (ACT' : forall b, p2 -PA- b -PA> p2' -> exists v, b = chanMCurrRead ;? [baseMode v]).
-        { intros b B. destruct (tfsStart_next_act _ _ _ B TSE) as [v [Eb _]]. eauto. }
-        destruct (triple_mCurr_read_ov _ _ _ _ _ _ _ PS T ACT') as [EQ | [T2 [v Ec]]].
-        -- subst p2'. exfalso.
-           pose proof (bisim_trans _ _ _ (bisim_symm _ _ TSE) TN) as BT.
-           prot_outProc_in_not_body. refute_by_chan BT.
-        -- subst c. destruct (ACT v eq_refl) as [Ev Ek]. subst v k'.
-           destruct (tfsStart_next_act _ _ _ T2 TSE) as [v' [Ev' TN']].
-           injection Ev' as Ev'; subst v'.
-           simpl. apply tfsNext_bisim_param.
-           eapply bisim_trans; [apply bisim_symm; exact TN' | exact TN].
+      assert (NE : p2 <> p2').
+      { intro EQ. subst p2'. pose proof (bisim_trans _ _ _ (bisim_symm _ _ TSE) TN) as BT.
+        prot_outProc_in_not_body. refute_by_chan BT. }
+      assert (ACT : forall b, p2 -PA- b -PA> p2' -> entChanAct b).
+      { intros b B. destruct (tfsStart_next_act _ _ _ B TSE) as [v [Eb _]]. subst b.
+        discriminate. }
+      destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT) as [EQ | S2];
+        [contradiction | ].
+      destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T2 [_ [CR _]]]]];
+        [contradiction | ].
+      destruct (tfsStart_next_act _ _ _ T2 TSE) as [v [Ec TN']]. subst c.
+      destruct (CR v eq_refl) as [Ev Ek]. subst v k'.
+      simpl. apply tfsNext_bisim_param.
+      eapply bisim_trans; [apply bisim_symm; exact TN' | exact TN].
   - (* a delay: the overlap was tfsNext m already, and delay keeps the current mode *)
     destruct e as [p l0 h k]. lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
     inversion PS as [p1 p2 p3 BS OS LS]; subst p.
@@ -676,13 +691,15 @@ Proof.
     lets PP : stepEnt_disc_pres_pos S. simpl in PP. subst l'.
     assert (IH' : bcReadyState m l p1 -> l0 = l).
     { intro B. exact (IH m l ltac:(constructor; constructor; exact B)). }
-    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [ACT _]]]].
-    + inversion EQ; subst. simpl. apply IH'. exact BR.
-    + assert (ACT' : forall b, p1 -PA- b -PA> p1' -> b = chanPos ;? [basePosition l]) by
-        (intros b B; eapply bcReady_prev; eassumption).
-      destruct (triple_pos_read_bc _ _ _ _ _ _ _ _ PS T ACT') as [EQ | EQ].
-      * subst p1'. simpl. apply IH'. exact BR.
-      * simpl. symmetry. apply (ACT l). exact EQ.
+    assert (ACT : forall b, p1 -PA- b -PA> p1' -> b = chanPos ;? [basePosition l]) by
+      (intros b B; eapply bcReady_prev; eassumption).
+    assert (ACT' : forall b, p1 -PA- b -PA> p1' -> entChanAct b)
+      by (intros b B; rewrite (ACT b B); discriminate).
+    destruct (triple_disc_ent_chan 0 R S eq_refl eq_refl ACT') as [EQ | S1];
+      [subst p1'; simpl; apply IH'; exact BR | ].
+    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S1) as [EQ | [c [T [POS _]]]];
+      [subst p1'; simpl; apply IH'; exact BR | ].
+    simpl. symmetry. exact (POS l (ACT c T)).
   - (* a delay: sleeping and bcWait never delay into bcReady, and bcReady is urgent *)
     destruct e as [p l0 h k]. lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
     inversion PS as [p1 p2 p3 BS OS LS]; subst p.
@@ -720,13 +737,15 @@ Proof.
     lets PP : stepEnt_disc_pres_pos S. simpl in PP. subst l'.
     assert (IH' : ovReadyStateExp m t l p2 -> l0 = l).
     { intro B. exact (IH m t l ltac:(constructor; constructor; exact B)). }
-    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [ACT _]]]].
-    + inversion EQ; subst. simpl. apply IH'. exact OR.
-    + assert (ACT' : forall b, p2 -PA- b -PA> p2' -> b = chanPos ;? [basePosition l]) by
-        (intros b B; eapply ovReady_prev_act; eassumption).
-      destruct (triple_pos_read_ov _ _ _ _ _ _ _ _ PS T ACT') as [EQ | EQ].
-      * subst p2'. simpl. apply IH'. exact OR.
-      * simpl. symmetry. apply (ACT l). exact EQ.
+    assert (ACT : forall b, p2 -PA- b -PA> p2' -> b = chanPos ;? [basePosition l]) by
+      (intros b B; eapply ovReady_prev_act; eassumption).
+    assert (ACT' : forall b, p2 -PA- b -PA> p2' -> entChanAct b)
+      by (intros b B; rewrite (ACT b B); discriminate).
+    destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT') as [EQ | S2];
+      [subst p2'; simpl; apply IH'; exact OR | ].
+    destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T [POS _]]]];
+      [subst p2'; simpl; apply IH'; exact OR | ].
+    simpl. symmetry. exact (POS l (ACT c T)).
   - (* a delay: only ovWait delays into another state, and ovReady is urgent *)
     destruct e as [p l0 h k]. lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
     inversion PS as [p1 p2 p3 BS OS LS]; subst p.
@@ -842,35 +861,17 @@ Proof.
   ent_state_comp G.
   destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ S) as [p1' [p2' [p3' [l' [h' [k' [E _]]]]]]].
   subst e'.
-  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [_ ACT]]]]].
-  - injection EQ; intros; subst. left. constructor. constructor. exact G.
-  - destruct c as [c0 v0 | c0 v0 | ].
-    + (* an input of the triple is an input of one component *)
-      triple_disc_nonTau T; try (left; constructor; constructor; exact G).
-      match goal with [T3 : _ -PA- c0 ;? v0 -PA> _ |- _] =>
-        destruct (currOK_next_act _ _ _ _ T3 G) as [[Ea L] | [v [Ea N]]] end.
-      * right. left. constructor. constructor. exact L.
-      * injection Ea; intros; subst. destruct (ACT v eq_refl) as [NM _].
-        right. right. exists v. split; [constructor; constructor; exact N | exact NM].
-    + (* currOK does not output *)
-      triple_disc_nonTau T; try (left; constructor; constructor; exact G).
-      match goal with [T3 : _ -PA- c0 ;! v0 -PA> _ |- _] =>
-        destruct (currOK_next_act _ _ _ _ T3 G) as [[Ea L] | [v [Ea N]]] end; discriminate.
-    + (* a tau: no other component writes on the channels the listener reads *)
-      destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 H]].
-      decompose [or and] H; clear H;
-      try match goal with [E : p3 = p3' |- _] =>
-        subst p3'; left; constructor; constructor; exact G end;
-      try match goal with [H1 : p3 -PA- _ ;! _ -PA> p3' |- _] =>
-        destruct (currOK_next_act _ _ _ _ H1 G) as [[X _] | [? [X _]]]; discriminate X end;
-      match goal with [H1 : p3 -PA- ?c1 ;? ?v1 -PA> p3' |- _] =>
-        destruct (currOK_next_act _ _ _ _ H1 G) as [[X L] | [v [X N]]];
-        injection X as X1 X2; subst c1 v1 end; exfalso;
-      first
-        [ match goal with [H2 : p1 -PA- _ ;! _ -PA> _ |- _] =>
-            eapply broadcast_read_out_not; [exact BS | | exact H2]; solve [auto] end
-        | match goal with [H2 : p2 -PA- _ ;! _ -PA> _ |- _] =>
-            eapply overlap_read_out_not; [exact OS | | exact H2]; solve [auto] end ].
+  assert (ACT : forall b, p3 -PA- b -PA> p3' -> entChanAct b).
+  { intros b B. destruct (currOK_next_act _ _ _ _ B G) as [[Eb _] | [v [Eb _]]];
+      subst b; discriminate. }
+  destruct (triple_disc_ent_chan 2 R S eq_refl eq_refl ACT) as [EQ | S3];
+    [subst p3'; left; constructor; constructor; exact G | ].
+  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S3) as [EQ | [c [T3 [_ [_ NX]]]]];
+    [subst p3'; left; constructor; constructor; exact G | ].
+  destruct (currOK_next_act _ _ _ _ T3 G) as [[Ec L] | [v [Ec N]]]; subst c.
+  - right. left. constructor. constructor. exact L.
+  - destruct (NX v eq_refl) as [NM _].
+    right. right. exists v. split; [constructor; constructor; exact N | exact NM].
 Qed.
 
 Lemma nextMode_ent_mState p l h k m :
@@ -909,16 +910,16 @@ Proof.
   ent_state_comp G.
   destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ S) as [p1' [p2' [p3' [l' [h' [k' [E _]]]]]]].
   subst e'.
-  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [ACT _]]]]].
-  - injection EQ; intros; subst. left. constructor. constructor. exact G.
-  - assert (ACT' : forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurrRead ;? [baseMode v]).
-    { intros b B. destruct (gotRange_next_act _ _ _ _ _ B G) as [v [Eb _]]. eauto. }
-    destruct (triple_mCurr_read_li _ _ _ _ _ _ _ PS T ACT') as [EQ | [T3 [v Ec]]].
-    + subst p3'. left. constructor. constructor. exact G.
-    + subst c. destruct (ACT v eq_refl) as [Ev _]. subst v.
-      destruct (gotRange_next_act _ _ _ _ _ T3 G) as [v' [Ev' C]].
-      injection Ev' as Ev'; subst v'.
-      right. simpl. constructor. constructor. exact C.
+  assert (ACT : forall b, p3 -PA- b -PA> p3' -> entChanAct b).
+  { intros b B. destruct (gotRange_next_act _ _ _ _ _ B G) as [v [Eb _]]. subst b.
+    discriminate. }
+  destruct (triple_disc_ent_chan 2 R S eq_refl eq_refl ACT) as [EQ | S3];
+    [subst p3'; left; constructor; constructor; exact G | ].
+  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S3) as [EQ | [c [T3 [_ [CR _]]]]];
+    [subst p3'; left; constructor; constructor; exact G | ].
+  destruct (gotRange_next_act _ _ _ _ _ T3 G) as [v [Ec C]]. subst c.
+  destruct (CR v eq_refl) as [Ev _]. subst v.
+  right. simpl. constructor. constructor. exact C.
 Qed.
 
 (** A step of an entity whose listener is in rangeBad: the listener stays, or it read the
@@ -933,16 +934,16 @@ Proof.
   ent_state_comp G.
   destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ S) as [p1' [p2' [p3' [l' [h' [k' [E _]]]]]]].
   subst e'.
-  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S) as [EQ | [c [T [_ [ACT _]]]]].
-  - injection EQ; intros; subst. left. constructor. constructor. exact G.
-  - assert (ACT' : forall b, p3 -PA- b -PA> p3' -> exists v, b = chanMCurrRead ;? [baseMode v]).
-    { intros b B. destruct (rangeBad_next_act _ _ _ _ B G) as [v [Eb _]]. eauto. }
-    destruct (triple_mCurr_read_li _ _ _ _ _ _ _ PS T ACT') as [EQ | [T3 [v Ec]]].
-    + subst p3'. left. constructor. constructor. exact G.
-    + subst c. destruct (ACT v eq_refl) as [Ev _]. subst v.
-      destruct (rangeBad_next_act _ _ _ _ T3 G) as [v' [Ev' C]].
-      injection Ev' as Ev'; subst v'.
-      right. simpl. constructor. constructor. exact C.
+  assert (ACT : forall b, p3 -PA- b -PA> p3' -> entChanAct b).
+  { intros b B. destruct (rangeBad_next_act _ _ _ _ B G) as [v [Eb _]]. subst b.
+    discriminate. }
+  destruct (triple_disc_ent_chan 2 R S eq_refl eq_refl ACT) as [EQ | S3];
+    [subst p3'; left; constructor; constructor; exact G | ].
+  destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S3) as [EQ | [c [T3 [_ [CR _]]]]];
+    [subst p3'; left; constructor; constructor; exact G | ].
+  destruct (rangeBad_next_act _ _ _ _ T3 G) as [v [Ec C]]. subst c.
+  destruct (CR v eq_refl) as [Ev _]. subst v.
+  right. simpl. constructor. constructor. exact C.
 Qed.
 (*+*)
 Lemma currComp_listening_track_ent m'' r l l' p p' h h' k k' a :

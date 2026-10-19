@@ -80,3 +80,13 @@ Theorem delApp : forall (h : Name) (l : list Exp),
   invertClear H; invertClear H0; rename x0 into l'; rewrite H1;
   inversion Heqe; rewrite <- H2 in H; listGen H l'; simpl);
   taeAuto. Qed.
+
+(******************Channels*******************)
+
+(** The protocol uses its entity's channels correctly: computing the channels of every prefix
+of its processes and of their definitions shows that none goes the wrong way.*)
+Lemma protocol_correctChannelUsage : correctChannelUsage procProtocol.
+Proof.
+  apply correctChannelUsage_prefixes; [ | intro n; destruct n];
+    unfold prefixesRightWay; cbn; repeat constructor; cbn; discriminate.
+Qed.
