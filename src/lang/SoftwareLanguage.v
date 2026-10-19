@@ -2200,8 +2200,8 @@ Proof.
     try (injection E as E; subst; left; reflexivity); auto using in_or_app.
 Qed.
 
-(** The channels of all of a term's prefixes, with their directions, not looking inside
-applications: chansProc's, and those of every prefix after them.*)
+(** The channels that appear in p as written, each with the direction it is used in. The body
+of a name that p applies is not part of p.*)
 Fixpoint prefixChans (p : ProcTerm) : list (Channel * bool) :=
   match p with
   | nilProc => []
