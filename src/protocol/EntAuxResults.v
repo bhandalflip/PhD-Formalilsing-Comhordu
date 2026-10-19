@@ -90,7 +90,7 @@ Lemma triple_disc_ent_chan {p1 p2 p3 p1' p2' p3' l l' h h' k k' a} i {x x'} :
 Proof.
   intros R S Nx Nx' ACT.
   lets CU : reachableProt_correctChannelUsage (reachable_ent_prot _ _ _ _ R).
-  destruct (ent_disc_comp_chan p1 [p2, p3] p1' [p2', p3'] _ _ _ _ _ _ _ _ _ _
+  destruct (ent_disc_comp_chan _ _ p1 [p2, p3] p1' [p2', p3'] _ _ _ _ _ _ _ _ _ _
     CU S eq_refl Nx Nx' ACT) as [E | St]; [left; exact E | right].
   destruct (stepAt_nth_error_eq _ _ _ _ St) as [y [y' [Ny [Ny' Y]]]].
   assert (y = x) by congruence. assert (y' = x') by congruence. subst. exact Y.
@@ -248,7 +248,7 @@ Proof.
         exists m0. split; [ | exact FS]. simpl in NM |- *. rewrite (KS TC). exact NM.
       * assert (ACT : forall b0, p2 -PA- b0 -PA> p2' -> entChanAct b0).
         { intros b0 B0. destruct (tfsNext_next_act _ _ _ _ B0 TN) as [[Eb _] | [Eb _]];
-            subst b0; discriminate. }
+            subst b0; right; reflexivity. }
         destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT) as [EQ | S2];
           [subst p2'; exfalso; ov_disj TN X | ].
         destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T2 [_ [_ CN]]]]];
@@ -266,7 +266,7 @@ Proof.
         destruct (IC ltac:(constructor; constructor; exact TC)) as [m0 [NM FS]].
         assert (ACT : forall b0, p2 -PA- b0 -PA> p2' -> entChanAct b0).
         { intros b0 B0. destruct (tfsCurr_next_act _ _ _ B0 TC) as [[Eb _] | Y];
-            [subst b0; discriminate | exfalso; ov_disj Y X]. }
+            [subst b0; right; reflexivity | exfalso; ov_disj Y X]. }
         destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT) as [EQ | S2];
           [subst p2'; exfalso; ov_disj TC X | ].
         destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T2 [CC _]]]];
@@ -366,7 +366,7 @@ Proof.
         prot_outProc_in_not_body. refute_by_chan BT. }
       assert (ACT : forall b, p2 -PA- b -PA> p2' -> entChanAct b).
       { intros b B. destruct (tfsStart_next_act _ _ _ B TSE) as [v [Eb _]]. subst b.
-        discriminate. }
+        left. reflexivity. }
       destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT) as [EQ | S2];
         [contradiction | ].
       destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T2 [_ [CR _]]]]];
@@ -694,7 +694,7 @@ Proof.
     assert (ACT : forall b, p1 -PA- b -PA> p1' -> b = chanPos ;? [basePosition l]) by
       (intros b B; eapply bcReady_prev; eassumption).
     assert (ACT' : forall b, p1 -PA- b -PA> p1' -> entChanAct b)
-      by (intros b B; rewrite (ACT b B); discriminate).
+      by (intros b B; rewrite (ACT b B); left; reflexivity).
     destruct (triple_disc_ent_chan 0 R S eq_refl eq_refl ACT') as [EQ | S1];
       [subst p1'; simpl; apply IH'; exact BR | ].
     destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S1) as [EQ | [c [T [POS _]]]];
@@ -740,7 +740,7 @@ Proof.
     assert (ACT : forall b, p2 -PA- b -PA> p2' -> b = chanPos ;? [basePosition l]) by
       (intros b B; eapply ovReady_prev_act; eassumption).
     assert (ACT' : forall b, p2 -PA- b -PA> p2' -> entChanAct b)
-      by (intros b B; rewrite (ACT b B); discriminate).
+      by (intros b B; rewrite (ACT b B); left; reflexivity).
     destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT') as [EQ | S2];
       [subst p2'; simpl; apply IH'; exact OR | ].
     destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S2) as [EQ | [c [T [POS _]]]];
@@ -863,7 +863,7 @@ Proof.
   subst e'.
   assert (ACT : forall b, p3 -PA- b -PA> p3' -> entChanAct b).
   { intros b B. destruct (currOK_next_act _ _ _ _ B G) as [[Eb _] | [v [Eb _]]];
-      subst b; discriminate. }
+      subst b; left; reflexivity. }
   destruct (triple_disc_ent_chan 2 R S eq_refl eq_refl ACT) as [EQ | S3];
     [subst p3'; left; constructor; constructor; exact G | ].
   destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S3) as [EQ | [c [T3 [_ [_ NX]]]]];
@@ -912,7 +912,7 @@ Proof.
   subst e'.
   assert (ACT : forall b, p3 -PA- b -PA> p3' -> entChanAct b).
   { intros b B. destruct (gotRange_next_act _ _ _ _ _ B G) as [v [Eb _]]. subst b.
-    discriminate. }
+    left. reflexivity. }
   destruct (triple_disc_ent_chan 2 R S eq_refl eq_refl ACT) as [EQ | S3];
     [subst p3'; left; constructor; constructor; exact G | ].
   destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S3) as [EQ | [c [T3 [_ [CR _]]]]];
@@ -936,7 +936,7 @@ Proof.
   subst e'.
   assert (ACT : forall b, p3 -PA- b -PA> p3' -> entChanAct b).
   { intros b B. destruct (rangeBad_next_act _ _ _ _ B G) as [v [Eb _]]. subst b.
-    discriminate. }
+    left. reflexivity. }
   destruct (triple_disc_ent_chan 2 R S eq_refl eq_refl ACT) as [EQ | S3];
     [subst p3'; left; constructor; constructor; exact G | ].
   destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S3) as [EQ | [c [T3 [_ [CR _]]]]];

@@ -2038,7 +2038,7 @@ Lemma reachableProt_correctChannelUsage (p : ProcTerm) :
   reachableProt p -> correctChannelUsage p.
 Proof.
   intro R. apply reachableProt_reachableFrom in R.
-  exact (correctChannelUsage_reachableFrom _ _ protocol_correctChannelUsage R).
+  exact (oneWayUsage_reachableFrom _ _ _ _ protocol_correctChannelUsage R).
 Qed.
 
 Ltac reachprot U :=

@@ -433,28 +433,29 @@ Proof.
   destruct (parAll_inj _ _ _ _ E) as [E1 E2]; [congruence | ]. subst r rs. exact F.
 Qed.
 
-(** Take software that uses its channels correctly, and a component of it that can only have
-changed by acting on one of the entity's channels. Either the component stayed as it was, or
-the entity's step was the component meeting the rest of the entity. That is, put alone in the
-entity, the component makes the same step, to the same position, interface and mode state,
-and every other component stayed as it was. Since the component acts on one of the entity's
-channels, that step meets the mode state or the interface, or reads the position.*)
-Lemma ent_disc_comp_chan q qs q' qs' l l' h h' k k' a i x x' :
-  correctChannelUsage (parAll q qs) ->
+(** Take software that only ever inputs on the channels in cis and outputs on those in cos, and
+a component of it that can only have changed by acting on one of these channels. Either the
+component stayed as it was, or the entity's step was the component meeting the rest of the
+entity. That is, put alone in the entity, the component makes the same step, to the same
+position, interface and mode state, and every other component stayed as it was. That step is
+not silent, since the component acts on a channel, so it meets the mode state or the interface,
+or reads the position.*)
+Lemma ent_disc_comp_chan cis cos q qs q' qs' l l' h h' k k' a i x x' :
+  oneWayUsage cis cos (parAll q qs) ->
   [|parAll q qs, l, h, k|] -EA- a ->> [|parAll q' qs', l', h', k'|] -> length qs = length qs' ->
   nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
-  (forall b, x -PA- b -PA> x' -> entChanAct b) ->
+  (forall b, x -PA- b -PA> x' -> oneWayAct cis cos b) ->
   x = x' \/
   stepAt (fun y y' => [|y, l, h, k|] -EA- a ->> [|y', l', h', k'|]) i (q :: qs) (q' :: qs').
 Proof.
-  intros C S L Nx Nx' ACT. inversion S; subst;
+  intros U S L Nx Nx' ACT. inversion S; subst;
     first
     [ (* the software stays *)
       match goal with [E : parAll _ _ = parAll _ _ |- _] =>
         destruct (parAll_inj _ _ _ _ E ltac:(congruence)) as [E1 E2]; subst; left; congruence end
     | (* the software steps, and the component takes the step with the rest of the entity *)
       match goal with [T : parAll q qs -PA- _ -PA> parAll q' qs' |- _] =>
-        destruct (parAll_disc_chan _ _ _ _ _ _ _ _ C T L Nx Nx' ACT) as [E | St];
+        destruct (parAll_disc_chan _ _ _ _ _ _ _ _ _ _ U T L Nx Nx' ACT) as [E | St];
         [left; exact E | right; eapply stepAt_impl; [ | exact St];
           intros y y' Y; cbv beta in Y; solve [econstructor; eassumption]] end ].
 Qed.

@@ -2273,67 +2273,64 @@ Proof.
   exact (proj2 (prefixChans_reachableFrom_aux P p a p' D F S) cd E).
 Qed.
 
-(*********Correct use of an entity's channels*********)
-(** The software meets the rest of its entity on channels that each go one way (chanDir). The
-language lets software use any channel either way, but software that uses one of these the
-wrong way can meet another of its own components on it, by mistake. Software that uses them
-correctly meets only the rest of its entity on them (ent_disc_comp_chan in
-EntityLanguage.v).*)
+(*********Channels used one way*********)
+(** Software can keep some channels for input only and others for output only. It should do so
+with the channels it shares with the rest of its entity (chanDir). Two of its components then
+never meet on such a channel, since one of them would have to use it the wrong way
+(parAll_disc_chan). Within an entity, a component's step on one is then a step with the rest of
+the entity (ent_disc_comp_chan in EntityLanguage.v).*)
 
-(** Software uses its entity's channels correctly when nothing reachable from it, by discrete
-steps or delays, can write on a channel it should read or read one it should write: every
-channel it acts on has no direction, or the direction of the action.*)
-Definition correctChannelUsage (p : ProcTerm) : Prop :=
+(** Anything reachable from p, by discrete steps or delays, only ever inputs on the channels in
+cis and only ever outputs on those in cos.*)
+Definition oneWayUsage (cis cos : Channel -> Prop) (p : ProcTerm) : Prop :=
   forall q a q' c d, reachableFrom p q -> q -PA- a -PA> q' -> actChan a = Some (c, d) ->
-  chanDir c = None \/ chanDir c = Some d.
+  (cis c -> d = read) /\ (cos c -> d = write).
 
-(** What is reachable from software that uses its channels correctly uses them correctly
-too.*)
-Lemma correctChannelUsage_reachableFrom p q :
-  correctChannelUsage p -> reachableFrom p q -> correctChannelUsage q.
+(** What is reachable from p uses the channels one way too.*)
+Lemma oneWayUsage_reachableFrom cis cos p q :
+  oneWayUsage cis cos p -> reachableFrom p q -> oneWayUsage cis cos q.
 Proof.
-  intros C R r a r' c d Rr. apply (C r a r' c d). eapply reachableFrom_trans; eassumption.
+  intros U R r a r' c d Rr. apply (U r a r' c d). eapply reachableFrom_trans; eassumption.
 Qed.
 
-(** No prefix of p goes the wrong way on its channel.*)
-Definition prefixesRightWay (p : ProcTerm) : Prop :=
-  Forall (fun '(c, d) => chanDir c = None \/ chanDir c = Some d) (prefixChans p).
+(** No prefix of p outputs on a channel in cis or inputs on one in cos.*)
+Definition prefixesOneWay (cis cos : Channel -> Prop) (p : ProcTerm) : Prop :=
+  Forall (fun '(c, d) => (cis c -> d = read) /\ (cos c -> d = write)) (prefixChans p).
 
-(** A syntactic check that software uses its entity's channels correctly: no prefix goes the
-wrong way, in the software or in any definition.*)
-Lemma correctChannelUsage_prefixes p :
-  prefixesRightWay p -> (forall n, prefixesRightWay (snd (def n))) -> correctChannelUsage p.
+(** A syntactic check of one-way use: no prefix uses a channel the wrong way, in p or in any
+definition.*)
+Lemma oneWayUsage_prefixes cis cos p : prefixesOneWay cis cos p ->
+  (forall n, prefixesOneWay cis cos (snd (def n))) -> oneWayUsage cis cos p.
 Proof.
   intros F D q a q' c d R S E. exact (prefixChans_reachableFrom _ _ _ _ _ (c, d) F D R S E).
 Qed.
 
-(** Software that uses its channels correctly cannot both write and read one of the entity's
-channels.*)
-Lemma correctChannelUsage_dir p c v w : correctChannelUsage p ->
-  discActEnabled p (c ;! v) -> discActEnabled p (c ;? w) -> chanDir c = None.
+(** A channel that p can both output and input on is in neither set.*)
+Lemma oneWayUsage_out_in cis cos p c v w : oneWayUsage cis cos p ->
+  discActEnabled p (c ;! v) -> discActEnabled p (c ;? w) -> ~ cis c /\ ~ cos c.
 Proof.
-  intros C [p1 S1] [p2 S2].
-  destruct (C p _ _ c write (reachableFromBase p) S1 eq_refl) as [N1 | N1]; [exact N1 | ].
-  destruct (C p _ _ c read (reachableFromBase p) S2 eq_refl) as [N2 | N2]; [exact N2 | ].
-  congruence.
+  intros U [p1 S1] [p2 S2].
+  destruct (U p _ _ c write (reachableFromBase p) S1 eq_refl) as [Hcis _].
+  destruct (U p _ _ c read (reachableFromBase p) S2 eq_refl) as [_ Hcos].
+  split; intro X; [specialize (Hcis X) | specialize (Hcos X)]; discriminate.
 Qed.
 
-(** An action on one of the channels the software shares with the rest of its entity.*)
-Definition entChanAct (b : DiscAct) : Prop :=
-  match actChan b with Some (c, _) => chanDir c <> None | None => False end.
+(** An action on a channel in cis or cos.*)
+Definition oneWayAct (cis cos : Channel -> Prop) (b : DiscAct) : Prop :=
+  match actChan b with Some (c, _) => cis c \/ cos c | None => False end.
 
-(** In a composition that uses its channels correctly, a component that can only have changed
-by acting on one of the entity's channels either stayed as it was, or the composition's step
-was that component's step, with the same action, every other component staying as it was. It
-cannot have synchronised with another component, since one of them would have used the
-channel the wrong way.*)
-Lemma parAll_disc_chan q qs q' qs' b i x x' :
-  correctChannelUsage (parAll q qs) -> parAll q qs -PA- b -PA> parAll q' qs' ->
+(** In a composition that only ever inputs on the channels in cis and outputs on those in cos,
+a component that can only have changed by acting on one of these channels either stayed as it
+was, or the composition's step was that component's step, with the same action, every other
+component staying as it was. It cannot have synchronised with another component, since one of
+them would have used the channel the wrong way.*)
+Lemma parAll_disc_chan cis cos q qs q' qs' b i x x' :
+  oneWayUsage cis cos (parAll q qs) -> parAll q qs -PA- b -PA> parAll q' qs' ->
   length qs = length qs' -> nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
-  (forall b', x -PA- b' -PA> x' -> entChanAct b') ->
+  (forall b', x -PA- b' -PA> x' -> oneWayAct cis cos b') ->
   x = x' \/ stepAt (fun y y' => y -PA- b -PA> y') i (q :: qs) (q' :: qs').
 Proof.
-  intros C T L Nx Nx' ACT.
+  intros U T L Nx Nx' ACT.
   destruct (parAll_disc_inv _ _ _ _ T)
     as [r [rs [E [[j St] | [_ [j [j' [c [v [l0 [N [S1 S2]]]]]]]]]]]].
   - (* one component steps *)
@@ -2342,7 +2339,7 @@ Proof.
     destruct (parAll_inj _ _ _ _ E LR) as [E1 E2]. subst r rs.
     destruct (Nat.eq_dec i j) as [Ej | Nj]; [subst j; right; exact St | left].
     pose proof (stepAt_nth_error_neq _ _ _ _ _ St Nj). congruence.
-  - (* two components synchronise on c, which therefore has no direction *)
+  - (* two components synchronise on c, which is therefore in neither set *)
     assert (LR : length qs' = length rs).
     { pose proof (Forall2_length (stepAt_Forall2 _ _ _ _ S1)) as L1.
       pose proof (Forall2_length (stepAt_Forall2 _ _ _ _ S2)) as L2. simpl in L1, L2. lia. }
@@ -2352,25 +2349,37 @@ Proof.
     cbv beta in T1, T2.
     assert (N2o : nth_error (q :: qs) j' = Some w1)
       by (rewrite (stepAt_nth_error_neq _ _ _ _ _ S1 (not_eq_sym N)); exact N2).
-    assert (DIR : chanDir c = None).
-    { apply (correctChannelUsage_dir _ c v v C).
+    assert (NS : ~ cis c /\ ~ cos c).
+    { apply (oneWayUsage_out_in _ _ _ c v v U).
       - apply (parAll_dae_intro _ _ x1); [eapply nth_error_In; exact N1 | econstructor; exact T1].
       - apply (parAll_dae_intro _ _ w1); [eapply nth_error_In; exact N2o | econstructor; exact T2]. }
+    destruct NS as [NI NO].
     destruct (Nat.eq_dec i j) as [Ej | Nj]; [ | destruct (Nat.eq_dec i j') as [Ej' | Nj']].
     + (* the component wrote on c *)
       subst j. exfalso.
       assert (Ey : y1 = x').
       { rewrite (stepAt_nth_error_neq _ _ _ _ _ S2 N) in N1'. congruence. }
       assert (Ex : x1 = x) by congruence. subst x1 y1.
-      exact (ACT _ T1 DIR).
+      destruct (ACT _ T1) as [X | X]; contradiction.
     + (* the component read c *)
       subst j'. exfalso.
       assert (Ex : w1 = x) by congruence. assert (Ez : z1 = x') by congruence. subst w1 z1.
-      exact (ACT _ T2 DIR).
+      destruct (ACT _ T2) as [X | X]; contradiction.
     + (* the component did neither *)
       left. pose proof (stepAt_nth_error_neq _ _ _ _ _ S1 Nj).
       pose proof (stepAt_nth_error_neq _ _ _ _ _ S2 Nj'). congruence.
 Qed.
+
+(*********Correct use of an entity's channels*********)
+
+(** Software uses its entity's channels correctly when anything reachable from it only ever
+reads the channels it should read and only ever writes those it should write (chanDir).*)
+Definition correctChannelUsage (p : ProcTerm) : Prop :=
+  oneWayUsage (fun c => chanDir c = Some read) (fun c => chanDir c = Some write) p.
+
+(** An action on one of the channels the software shares with the rest of its entity.*)
+Definition entChanAct (b : DiscAct) : Prop :=
+  oneWayAct (fun c => chanDir c = Some read) (fun c => chanDir c = Some write) b.
 
 End Results.
 

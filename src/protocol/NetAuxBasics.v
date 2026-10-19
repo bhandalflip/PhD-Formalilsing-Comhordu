@@ -316,7 +316,7 @@ Proof.
     unfold switchCurr in TQ. invert_disc_prefixes.
     match goal with [H : evalExpLists [] _ |- _] => inversion H end. reflexivity. }
   assert (ACT : forall b2, p2 -PA- b2 -PA> p2' -> entChanAct b2)
-    by (intros b2 T2; rewrite (SW b2 T2); discriminate).
+    by (intros b2 T2; rewrite (SW b2 T2); right; reflexivity).
   destruct (triple_disc_ent_chan 1 (reachableNet_ent _ _ _ _ R E) B eq_refl eq_refl ACT)
     as [EQ | B2]; [contradiction | ].
   destruct (ent_disc_proc_write _ _ _ _ _ _ _ _ _ B2) as [EQ | [c [T [CW _]]]];
