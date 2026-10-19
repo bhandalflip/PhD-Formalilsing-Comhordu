@@ -31,7 +31,7 @@ Add a premise to the two synchronisation rules saying that the channel is not a 
 
 ### Give the channels types
 
-Type each channel as the software's, the interface's or the mode state's. A process may still use any channel, but two software components synchronise only on a software channel, and the delay rule looks only at those. Types are less ugly than lists of exceptions, and a general-purpose language could well have them. But the objection to reserving the channels holds here too: the language, not the protocol, would keep the software off the mode state's channels, rendering any such protocol arguably less robust.
+Type each channel as the software's, the interface's or the mode state's. A process may still use any channel, but two software components synchronise only on a software channel, and the delay rule looks only at those. Types are less ugly than lists of exceptions, and a general-purpose language could well have them. But the objection to reserving the channels holds here too: the language, not the protocol, would keep the software off the mode state's channels, rendering any such protocol arguably less robust in the real world.
 
 ### Leave the channels as they are
 
