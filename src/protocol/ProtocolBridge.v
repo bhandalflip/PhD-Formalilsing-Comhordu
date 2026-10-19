@@ -88,5 +88,6 @@ of its processes and of their definitions shows that none goes the wrong way.*)
 Lemma protocol_correctChannelUsage : correctChannelUsage procProtocol.
 Proof.
   apply correctChannelUsage_prefixes; [ | intro n; destruct n];
-    unfold prefixesRightWay; cbn; repeat constructor; cbn; discriminate.
+    unfold prefixesRightWay; cbn; repeat apply Forall_cons; try apply Forall_nil;
+    first [left; reflexivity | right; reflexivity].
 Qed.

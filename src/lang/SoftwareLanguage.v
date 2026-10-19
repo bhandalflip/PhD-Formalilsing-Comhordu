@@ -2167,21 +2167,21 @@ Qed.
 
 (*********Channels*********)
 
-(** The channel of a discrete action, with true for an input.*)
-Definition actChan (a : DiscAct) : option (Channel * bool) :=
+(** The channel of a discrete action, and the direction the action uses it in.*)
+Definition actChan (a : DiscAct) : option (Channel * Direction) :=
   match a with
-  | c ;? _ => Some (c, true)
-  | c ;! _ => Some (c, false)
+  | c ;? _ => Some (c, read)
+  | c ;! _ => Some (c, write)
   | tauAct => None
   end.
 
 (** The channels of a term's prefixes, with their directions, not looking inside
 applications.*)
-Fixpoint chansProc (p : ProcTerm) : list (Channel * bool) :=
+Fixpoint chansProc (p : ProcTerm) : list (Channel * Direction) :=
   match p with
   | nilProc => []
-  | outPrefix c _ _ => [(c, false)]
-  | inPrefix c _ _ => [(c, true)]
+  | outPrefix c _ _ => [(c, write)]
+  | inPrefix c _ _ => [(c, read)]
   | ifThen _ q => chansProc q
   | sum q1 q2 => chansProc q1 ++ chansProc q2
   | parComp q1 q2 => chansProc q1 ++ chansProc q2
@@ -2202,11 +2202,11 @@ Qed.
 
 (** The channels that appear in p as written, each with the direction it is used in. The body
 of a name that p applies is not part of p.*)
-Fixpoint prefixChans (p : ProcTerm) : list (Channel * bool) :=
+Fixpoint prefixChans (p : ProcTerm) : list (Channel * Direction) :=
   match p with
   | nilProc => []
-  | outPrefix c _ q => (c, false) :: prefixChans q
-  | inPrefix c _ q => (c, true) :: prefixChans q
+  | outPrefix c _ q => (c, write) :: prefixChans q
+  | inPrefix c _ q => (c, read) :: prefixChans q
   | ifThen _ q => prefixChans q
   | sum q1 q2 => prefixChans q1 ++ prefixChans q2
   | parComp q1 q2 => prefixChans q1 ++ prefixChans q2
@@ -2223,7 +2223,7 @@ Qed.
 (** Helper for prefixChans_reachableFrom: a discrete step acts on a channel and direction that
 P allows, and leads to a term whose prefixes P allows, when P allows the prefixes of the term
 and of every definition.*)
-Local Lemma prefixChans_reachableFrom_aux (P : Channel * bool -> Prop) p a p' :
+Local Lemma prefixChans_reachableFrom_aux (P : Channel * Direction -> Prop) p a p' :
   (forall n, Forall P (prefixChans (snd (def n)))) -> Forall P (prefixChans p) ->
   p -PA- a -PA> p' -> Forall P (prefixChans p') /\ forall cd, actChan a = Some cd -> P cd.
 Proof.
@@ -2248,7 +2248,7 @@ Qed.
 
 (** Helper for prefixChans_reachableFrom: a delay leads to a term whose prefixes P allows, when
 P allows the prefixes of the term and of every definition.*)
-Local Lemma prefixChans_reachableFrom_aux2 (P : Channel * bool -> Prop) p d p' :
+Local Lemma prefixChans_reachableFrom_aux2 (P : Channel * Direction -> Prop) p d p' :
   (forall n, Forall P (prefixChans (snd (def n)))) -> Forall P (prefixChans p) ->
   p -PD- d -PD> p' -> Forall P (prefixChans p').
 Proof.
@@ -2261,7 +2261,7 @@ Qed.
 
 (** A property of channels and directions that every prefix of p0 has, and every prefix of
 every definition, holds of every action of anything reachable from p0.*)
-Lemma prefixChans_reachableFrom (P : Channel * bool -> Prop) p0 p a p' cd :
+Lemma prefixChans_reachableFrom (P : Channel * Direction -> Prop) p0 p a p' cd :
   Forall P (prefixChans p0) -> (forall n, Forall P (prefixChans (snd (def n)))) ->
   reachableFrom p0 p -> p -PA- a -PA> p' -> actChan a = Some cd -> P cd.
 Proof.
@@ -2281,10 +2281,11 @@ correctly meets only the rest of its entity on them (ent_disc_comp_chan in
 EntityLanguage.v).*)
 
 (** Software uses its entity's channels correctly when nothing reachable from it, by discrete
-steps or delays, can write on a channel it should read or read one it should write.*)
+steps or delays, can write on a channel it should read or read one it should write: every
+channel it acts on has no direction, or the direction of the action.*)
 Definition correctChannelUsage (p : ProcTerm) : Prop :=
   forall q a q' c d, reachableFrom p q -> q -PA- a -PA> q' -> actChan a = Some (c, d) ->
-  chanDir c <> Some (negb d).
+  chanDir c = None \/ chanDir c = Some d.
 
 (** What is reachable from software that uses its channels correctly uses them correctly
 too.*)
@@ -2296,7 +2297,7 @@ Qed.
 
 (** No prefix of p goes the wrong way on its channel.*)
 Definition prefixesRightWay (p : ProcTerm) : Prop :=
-  Forall (fun cd => chanDir (fst cd) <> Some (negb (snd cd))) (prefixChans p).
+  Forall (fun '(c, d) => chanDir c = None \/ chanDir c = Some d) (prefixChans p).
 
 (** A syntactic check that software uses its entity's channels correctly: no prefix goes the
 wrong way, in the software or in any definition.*)
@@ -2312,9 +2313,9 @@ Lemma correctChannelUsage_dir p c v w : correctChannelUsage p ->
   discActEnabled p (c ;! v) -> discActEnabled p (c ;? w) -> chanDir c = None.
 Proof.
   intros C [p1 S1] [p2 S2].
-  pose proof (C p _ _ c false (reachableFromBase p) S1 eq_refl) as N1.
-  pose proof (C p _ _ c true (reachableFromBase p) S2 eq_refl) as N2.
-  simpl in N1, N2. destruct (chanDir c) as [[ | ] | ]; congruence.
+  destruct (C p _ _ c write (reachableFromBase p) S1 eq_refl) as [N1 | N1]; [exact N1 | ].
+  destruct (C p _ _ c read (reachableFromBase p) S2 eq_refl) as [N2 | N2]; [exact N2 | ].
+  congruence.
 Qed.
 
 (** An action on one of the channels the software shares with the rest of its entity.*)
