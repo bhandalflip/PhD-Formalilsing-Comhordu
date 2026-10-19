@@ -78,9 +78,9 @@ Proof.
 Qed.
 
 (** In a reachable entity, a component of the triple that can only have changed by acting on
-one of the entity's channels either stayed as it was, or took the entity's step on its own,
-with the mode state, the interface or the position. This is ent_disc_comp_chan, since the
-protocol uses its channels correctly.*)
+one of the entity's channels either stayed as it was, or met the rest of the entity: put alone
+in the entity, it makes the same step. This is ent_disc_comp_chan, since the protocol uses its
+channels correctly.*)
 Lemma triple_disc_ent_chan {p1 p2 p3 p1' p2' p3' l l' h h' k k' a} i {x x'} :
   reachableProtEnt ([|p1 $||$ p2 $||$ p3, l, h, k|]) ->
   [|p1 $||$ p2 $||$ p3, l, h, k|] -EA- a ->> [|p1' $||$ p2' $||$ p3', l', h', k'|] ->

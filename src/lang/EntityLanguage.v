@@ -433,10 +433,12 @@ Proof.
   destruct (parAll_inj _ _ _ _ E) as [E1 E2]; [congruence | ]. subst r rs. exact F.
 Qed.
 
-(** When the software uses its channels correctly, a component that can only have changed by
-acting on one of the entity's channels either stayed as it was, or took the entity's step on
-its own: it met the mode state or the interface, or read the position, and every other
-component stayed as it was.*)
+(** Take software that uses its channels correctly, and a component of it that can only have
+changed by acting on one of the entity's channels. Either the component stayed as it was, or
+the entity's step was the component meeting the rest of the entity. That is, put alone in the
+entity, the component makes the same step, to the same position, interface and mode state,
+and every other component stayed as it was. Since the component acts on one of the entity's
+channels, that step meets the mode state or the interface, or reads the position.*)
 Lemma ent_disc_comp_chan q qs q' qs' l l' h h' k k' a i x x' :
   correctChannelUsage (parAll q qs) ->
   [|parAll q qs, l, h, k|] -EA- a ->> [|parAll q' qs', l', h', k'|] -> length qs = length qs' ->

@@ -2323,9 +2323,10 @@ Definition entChanAct (b : DiscAct) : Prop :=
   match actChan b with Some (c, _) => chanDir c <> None | None => False end.
 
 (** In a composition that uses its channels correctly, a component that can only have changed
-by acting on one of the entity's channels either stayed as it was, or did the composition's
-action on its own, every other component staying as it was. It cannot have synchronised with
-another component, since one of them would have used the channel the wrong way.*)
+by acting on one of the entity's channels either stayed as it was, or the composition's step
+was that component's step, with the same action, every other component staying as it was. It
+cannot have synchronised with another component, since one of them would have used the
+channel the wrong way.*)
 Lemma parAll_disc_chan q qs q' qs' b i x x' :
   correctChannelUsage (parAll q qs) -> parAll q qs -PA- b -PA> parAll q' qs' ->
   length qs = length qs' -> nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
