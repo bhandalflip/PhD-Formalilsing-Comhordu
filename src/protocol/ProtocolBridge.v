@@ -87,7 +87,7 @@ Theorem delApp : forall (h : Name) (l : list Exp),
 of its processes and of their definitions shows that none goes the wrong way.*)
 Lemma protocol_correctChannelUsage : correctChannelUsage procProtocol.
 Proof.
-  apply oneWayUsage_prefixes; [ | intro n; destruct n];
+  apply oneWayUsage_prefixes; [ | intros n _; destruct n];
     unfold prefixesOneWay; cbn; repeat apply Forall_cons; try apply Forall_nil;
     split; intro E; cbn in E; first [reflexivity | discriminate E].
 Qed.
