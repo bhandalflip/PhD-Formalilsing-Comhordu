@@ -2211,8 +2211,7 @@ Proof.
   apply Forall_forall. intros n I. exists p0. split; [apply rt_refl | exact I].
 Qed.
 
-(** Every name that the definition of a name call-reachable from p0 applies is call-reachable
-from p0 too.*)
+(** If n is call-reachable from p0, so is every name applied in its definition.*)
 Lemma nameCallReachable_def p0 n : nameCallReachable p0 n ->
   Forall (nameCallReachable p0) (namesProc (defBody n)).
 Proof.
@@ -2254,8 +2253,7 @@ Proof.
 Qed.
 
 (** Every name applied in a process that p0 reaches by discrete steps and delays is
-call-reachable from p0. A step only keeps parts of a term, unfolds its applications and
-substitutes into it, and substitution changes no name.*)
+call-reachable from p0.*)
 Lemma reachableFrom_nameCallReachable p0 p : reachableFrom p0 p ->
   Forall (nameCallReachable p0) (namesProc p).
 Proof.
