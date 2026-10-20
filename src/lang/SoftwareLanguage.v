@@ -298,6 +298,9 @@ Inductive stepProc (t : ProcTerm) : Act -> ProcTerm -> Prop :=
   | stepPTimed : forall (d : Delay) (t' : ProcTerm),
     stepTimedProc t d t' -> stepProc t d t'.
 
+(** The body of the definition of n.*)
+Definition defBody (n : Name) : ProcTerm := snd (def n).
+
 (** Returns p [x -> l] where def h = x, p.*)
 Definition unfoldApp (h : Name) (l : list Exp) :=
   let (x, p) := def h in (subProcTerm (listsToSub x l) p).
@@ -330,7 +333,7 @@ calls lower-ranked names outside a prefix. This generalises the guardedness of R
 in the thesis, which asks that every name in a definition sit under a prefix.*)
 Class GuardedDefs {PNames : ProcNames} {PDefs : ProcDefs} := {
   rank : Name -> nat;
-  rank_unguarded : forall h h', In h' (unguardedNames (snd (def h))) ->
+  rank_unguarded : forall h h', In h' (unguardedNames (defBody h)) ->
     (rank h' < rank h)%nat }.
 
 Reserved Notation "t %; p" (at level 50).
@@ -2212,7 +2215,7 @@ Qed.
 (** Every name that the definition of a name call-reachable from p0 applies is call-reachable
 from p0 too.*)
 Lemma nameCallReachable_def p0 n : nameCallReachable p0 n ->
-  Forall (nameCallReachable p0) (namesProc (snd (def n))).
+  Forall (nameCallReachable p0) (namesProc (defBody n)).
 Proof.
   intros [p [R I]]. unfold namesProc in I. apply in_map_iff in I.
   destruct I as [[n' l] [E I]]. simpl in E. subst n'.
@@ -2233,7 +2236,7 @@ Proof.
     rewrite ?map_app in F; rewrite ?map_app; Forall_app_split;
     try (apply Forall_app; split); auto.
   apply IH. rewrite namesProc_sub. pose proof (nameCallReachable_def p0 n (Forall_inv F)) as D.
-  rewrite E in D. exact D.
+  unfold defBody in D. rewrite E in D. exact D.
 Qed.
 
 (** Helper for reachableFrom_nameCallReachable: a delay leads from a term whose names are
@@ -2248,7 +2251,7 @@ Proof.
     rewrite ?map_app in F; rewrite ?map_app; Forall_app_split;
     try (apply Forall_app; split); auto.
   apply IH. rewrite namesProc_sub. pose proof (nameCallReachable_def p0 n (Forall_inv F)) as D.
-  rewrite E in D. exact D.
+  unfold defBody in D. rewrite E in D. exact D.
 Qed.
 
 (** Every name applied in a process that p0 reaches by discrete steps and delays is
@@ -2323,7 +2326,7 @@ P allows, and leads to a term whose prefixes P allows, when P allows the prefixe
 the term's names are call-reachable from p0, and P allows the prefixes of the definition of
 every such name.*)
 Local Lemma prefixChans_reachableFrom_aux (P : Channel * Direction -> Prop) p0 p a p' :
-  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
+  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (defBody n))) ->
   Forall (nameCallReachable p0) (namesProc p) -> Forall P (prefixChans p) ->
   p -PA- a -PA> p' -> Forall P (prefixChans p') /\ forall cd, actChan a = Some cd -> P cd.
 Proof.
@@ -2346,7 +2349,7 @@ Proof.
   - split; [apply Forall_app; split; [apply IH1 | apply IH2]; assumption | discriminate].
   - split; [apply Forall_app; split; [apply IH1 | apply IH2]; assumption | discriminate].
   - pose proof (Forall_inv N) as Nn. pose proof (nameCallReachable_def p0 n Nn) as Nd.
-    specialize (D n Nn). rewrite E in D, Nd.
+    specialize (D n Nn). unfold defBody in D, Nd. rewrite E in D, Nd.
     apply IH; [rewrite namesProc_sub | rewrite prefixChans_sub]; assumption.
   - apply IH; assumption.
 Qed.
@@ -2355,7 +2358,7 @@ Qed.
 P allows the prefixes of the term, the term's names are call-reachable from p0, and P allows the
 prefixes of the definition of every such name.*)
 Local Lemma prefixChans_reachableFrom_aux2 (P : Channel * Direction -> Prop) p0 p d p' :
-  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
+  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (defBody n))) ->
   Forall (nameCallReachable p0) (namesProc p) -> Forall P (prefixChans p) ->
   p -PD- d -PD> p' -> Forall P (prefixChans p').
 Proof.
@@ -2365,7 +2368,7 @@ Proof.
     intros N F; unfold namesProc in N; simpl in N, F |- *; rewrite ?map_app in N;
     Forall_app_split; try (apply Forall_app; split); auto.
   pose proof (Forall_inv N) as Nn. pose proof (nameCallReachable_def p0 n Nn) as Nd.
-  specialize (D n Nn). rewrite E in D, Nd.
+  specialize (D n Nn). unfold defBody in D, Nd. rewrite E in D, Nd.
   apply IH; [rewrite namesProc_sub | rewrite prefixChans_sub]; assumption.
 Qed.
 
@@ -2374,7 +2377,7 @@ definition of every name call-reachable from p0, holds of every action of anythi
 from p0.*)
 Lemma prefixChans_reachableFrom (P : Channel * Direction -> Prop) p0 p a p' cd :
   Forall P (prefixChans p0) ->
-  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
+  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (defBody n))) ->
   reachableFrom p0 p -> p -PA- a -PA> p' -> actChan a = Some cd -> P cd.
 Proof.
   intros F0 D R S E.
@@ -2415,7 +2418,7 @@ Definition prefixesOneWay (ics ocs : Channel -> Prop) (p : ProcTerm) : Prop :=
 (** A syntactic check of one-way use: no prefix uses a channel the wrong way, in p or in the
 definition of any name call-reachable from p.*)
 Lemma oneWayUsage_prefixes ics ocs p : prefixesOneWay ics ocs p ->
-  (forall n, nameCallReachable p n -> prefixesOneWay ics ocs (snd (def n))) ->
+  (forall n, nameCallReachable p n -> prefixesOneWay ics ocs (defBody n)) ->
   oneWayUsage ics ocs p.
 Proof.
   intros F D q a q' c d R S E. exact (prefixChans_reachableFrom _ _ _ _ _ (c, d) F D R S E).

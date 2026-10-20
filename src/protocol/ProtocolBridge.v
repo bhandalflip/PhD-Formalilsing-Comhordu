@@ -28,7 +28,7 @@ Definition protocolRank (n : ProtocolName) : nat :=
 
 (** Each definition only calls lower-ranked processes outside a prefix.*)
 Lemma protocolRank_unguarded (h h' : Name) :
-  In h' (unguardedNames (snd (def h))) -> (protocolRank h' < protocolRank h)%nat.
+  In h' (unguardedNames (defBody h)) -> (protocolRank h' < protocolRank h)%nat.
 Proof.
   intro I. destruct h; simpl in I;
     repeat (destruct I as [I | I]; [subst; simpl; lia | ]); contradiction.
