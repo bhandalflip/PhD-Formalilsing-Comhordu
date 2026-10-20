@@ -433,8 +433,8 @@ Proof.
   destruct (parAll_inj _ _ _ _ E) as [E1 E2]; [congruence | ]. subst r rs. exact F.
 Qed.
 
-(** Take software that only ever inputs on the channels in ics and outputs on those in ocs, and
-a component of it that can only have changed by acting on one of these channels. Either the
+(** Take software that uses the channels in ics only for input and those in ocs only for output,
+and a component of it that can only have changed by acting on one of these channels. Either the
 component stayed as it was, or the entity's step was the component meeting the rest of the
 entity. That is, put alone in the entity, the component makes the same step, to the same
 position, interface and mode state, and every other component stayed as it was. That step is

@@ -2280,8 +2280,8 @@ never meet on such a channel, since one of them would have to use it the wrong w
 (parAll_disc_chan). Within an entity, a component's step on one is then a step with the rest of
 the entity (ent_disc_comp_chan in EntityLanguage.v).*)
 
-(** Anything reachable from p, by discrete steps or delays, only ever inputs on the channels in
-ics and only ever outputs on those in ocs.*)
+(** Anything reachable from p, by discrete steps or delays, uses the channels in ics only for
+input and those in ocs only for output.*)
 Definition oneWayUsage (ics ocs : Channel -> Prop) (p : ProcTerm) : Prop :=
   forall q a q' c d, reachableFrom p q -> q -PA- a -PA> q' -> actChan a = Some (c, d) ->
   (ics c -> d = read) /\ (ocs c -> d = write).
@@ -2319,11 +2319,11 @@ Qed.
 Definition oneWayAct (ics ocs : Channel -> Prop) (b : DiscAct) : Prop :=
   match actChan b with Some (c, _) => ics c \/ ocs c | None => False end.
 
-(** In a composition that only ever inputs on the channels in ics and outputs on those in ocs,
-a component that can only have changed by acting on one of these channels either stayed as it
-was, or the composition's step was that component's step, with the same action, every other
-component staying as it was. It cannot have synchronised with another component, since one of
-them would have used the channel the wrong way.*)
+(** In a composition that uses the channels in ics only for input and those in ocs only for
+output, a component that can only have changed by acting on one of these channels either stayed
+as it was, or the composition's step was that component's step, with the same action, every
+other component staying as it was. It cannot have synchronised with another component, since
+one of them would have used the channel the wrong way.*)
 Lemma parAll_disc_chan ics ocs q qs q' qs' b i x x' :
   oneWayUsage ics ocs (parAll q qs) -> parAll q qs -PA- b -PA> parAll q' qs' ->
   length qs = length qs' -> nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
@@ -2372,8 +2372,8 @@ Qed.
 
 (*********Correct use of an entity's channels*********)
 
-(** Software uses its entity's channels correctly when anything reachable from it only ever
-reads the channels it should read and only ever writes those it should write (chanDir).*)
+(** Software uses its entity's channels correctly when anything reachable from it uses the
+channels it should read only for input and those it should write only for output (chanDir).*)
 Definition correctChannelUsage (p : ProcTerm) : Prop :=
   oneWayUsage (fun c => chanDir c = Some read) (fun c => chanDir c = Some write) p.
 
