@@ -94,12 +94,14 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 - [ ] 🧑 **33. Protocol-only channels.** Decide whether the 5 channels that only the protocol uses (`chanTrans`, `chanWake`, `chanPause`, `chanUnpause` and `chanBad`) should be supplied by the protocol instead of built into the language. The expression operators stay: they wrap the model's functions, so they belong with the model.
 - [ ] 🤖 **Delete `parStructPres` and `parStructPres2`** in `lang/SoftwareLanguage.v`: pair-shaped, unused since step 16, and instances of `parAll_disc_weak` and `parAll_del_inv`.
 - [ ] 🧑 **Rename `BaseType`** in `lang/LanguageFoundations.v` to say what it is, a base value, now that `ValType` names the type of one. A mechanical rename of 145 uses in 15 files.
+- [ ] 🧑 **Restate unfoldings as `unfoldApp`.** Seven lemmas in `lang/SoftwareLanguage.v`, `stepDpApp_alt` and the six `…AppAuto…` ones, spell out `subProcTerm (listsToSub (fst (def h)) l) (snd (def h))`, which is `unfoldApp h l`. Restate them with `unfoldApp h l`, and update the two tactics in `ProtAuxResults.v` that match the long form.
 - [ ] 🧑 **Calls and steps.** Decide whether to study when reachability by calls and reachability by steps and delays agree. Step 27 proves that every name a process reaches by steps and delays it also reaches by calls. The converse fails, since a process can get stuck before it unfolds an application.
 - [ ] 🧑 _Placeholder: anything else the first pass couldn't decide._
 - [ ] 🤖 **Delete this workstream** once every other step is ticked or dropped, after moving anything that must outlive it, as [`AGENTS.md`](AGENTS.md) says.
 
 ## Log
 
+- **2026-10-20:** From the review of step 27: restating with `unfoldApp h l` the seven language lemmas that spell out an unfolding in full joins the final phase.
 - **2026-10-20:** New step 27, from the review of step 26: unfolding reachability, a syntactic notion of the processes and names a process can get to by unfolding applications, so that the channel check covers only the definitions a process can reach. When it agrees with reachability by steps and delays is deferred to the final phase. Old steps 27–32 are now 28–33.
 - **2026-10-19:** New step 26, from the review of step 25: a general result that software which uses an entity's channels correctly meets only the mode state, the interface or the position on them, then its use for the protocol. Old steps 26–31 are now 27–32.
 - **2026-10-18:** New last step: delete this workstream when everything else is done. Every workstream now ends with that step; the rule is in `doc/workstreams/AGENTS.md`.
