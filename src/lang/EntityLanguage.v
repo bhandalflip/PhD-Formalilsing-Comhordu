@@ -433,18 +433,18 @@ Proof.
   destruct (parAll_inj _ _ _ _ E) as [E1 E2]; [congruence | ]. subst r rs. exact F.
 Qed.
 
-(** Take software that only ever inputs on the channels in cis and outputs on those in cos, and
+(** Take software that only ever inputs on the channels in ics and outputs on those in ocs, and
 a component of it that can only have changed by acting on one of these channels. Either the
 component stayed as it was, or the entity's step was the component meeting the rest of the
 entity. That is, put alone in the entity, the component makes the same step, to the same
 position, interface and mode state, and every other component stayed as it was. That step is
 not silent, since the component acts on a channel, so it meets the mode state or the interface,
 or reads the position.*)
-Lemma ent_disc_comp_chan cis cos q qs q' qs' l l' h h' k k' a i x x' :
-  oneWayUsage cis cos (parAll q qs) ->
+Lemma ent_disc_comp_chan ics ocs q qs q' qs' l l' h h' k k' a i x x' :
+  oneWayUsage ics ocs (parAll q qs) ->
   [|parAll q qs, l, h, k|] -EA- a ->> [|parAll q' qs', l', h', k'|] -> length qs = length qs' ->
   nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
-  (forall b, x -PA- b -PA> x' -> oneWayAct cis cos b) ->
+  (forall b, x -PA- b -PA> x' -> oneWayAct ics ocs b) ->
   x = x' \/
   stepAt (fun y y' => [|y, l, h, k|] -EA- a ->> [|y', l', h', k'|]) i (q :: qs) (q' :: qs').
 Proof.

@@ -2281,53 +2281,53 @@ never meet on such a channel, since one of them would have to use it the wrong w
 the entity (ent_disc_comp_chan in EntityLanguage.v).*)
 
 (** Anything reachable from p, by discrete steps or delays, only ever inputs on the channels in
-cis and only ever outputs on those in cos.*)
-Definition oneWayUsage (cis cos : Channel -> Prop) (p : ProcTerm) : Prop :=
+ics and only ever outputs on those in ocs.*)
+Definition oneWayUsage (ics ocs : Channel -> Prop) (p : ProcTerm) : Prop :=
   forall q a q' c d, reachableFrom p q -> q -PA- a -PA> q' -> actChan a = Some (c, d) ->
-  (cis c -> d = read) /\ (cos c -> d = write).
+  (ics c -> d = read) /\ (ocs c -> d = write).
 
 (** What is reachable from p uses the channels one way too.*)
-Lemma oneWayUsage_reachableFrom cis cos p q :
-  oneWayUsage cis cos p -> reachableFrom p q -> oneWayUsage cis cos q.
+Lemma oneWayUsage_reachableFrom ics ocs p q :
+  oneWayUsage ics ocs p -> reachableFrom p q -> oneWayUsage ics ocs q.
 Proof.
   intros U R r a r' c d Rr. apply (U r a r' c d). eapply reachableFrom_trans; eassumption.
 Qed.
 
-(** No prefix of p outputs on a channel in cis or inputs on one in cos.*)
-Definition prefixesOneWay (cis cos : Channel -> Prop) (p : ProcTerm) : Prop :=
-  Forall (fun '(c, d) => (cis c -> d = read) /\ (cos c -> d = write)) (prefixChans p).
+(** No prefix of p outputs on a channel in ics or inputs on one in ocs.*)
+Definition prefixesOneWay (ics ocs : Channel -> Prop) (p : ProcTerm) : Prop :=
+  Forall (fun '(c, d) => (ics c -> d = read) /\ (ocs c -> d = write)) (prefixChans p).
 
 (** A syntactic check of one-way use: no prefix uses a channel the wrong way, in p or in any
 definition.*)
-Lemma oneWayUsage_prefixes cis cos p : prefixesOneWay cis cos p ->
-  (forall n, prefixesOneWay cis cos (snd (def n))) -> oneWayUsage cis cos p.
+Lemma oneWayUsage_prefixes ics ocs p : prefixesOneWay ics ocs p ->
+  (forall n, prefixesOneWay ics ocs (snd (def n))) -> oneWayUsage ics ocs p.
 Proof.
   intros F D q a q' c d R S E. exact (prefixChans_reachableFrom _ _ _ _ _ (c, d) F D R S E).
 Qed.
 
 (** A channel that p can both output and input on is in neither set.*)
-Lemma oneWayUsage_out_in cis cos p c v w : oneWayUsage cis cos p ->
-  discActEnabled p (c ;! v) -> discActEnabled p (c ;? w) -> ~ cis c /\ ~ cos c.
+Lemma oneWayUsage_out_in ics ocs p c v w : oneWayUsage ics ocs p ->
+  discActEnabled p (c ;! v) -> discActEnabled p (c ;? w) -> ~ ics c /\ ~ ocs c.
 Proof.
   intros U [p1 S1] [p2 S2].
-  destruct (U p _ _ c write (reachableFromBase p) S1 eq_refl) as [Hcis _].
-  destruct (U p _ _ c read (reachableFromBase p) S2 eq_refl) as [_ Hcos].
-  split; intro X; [specialize (Hcis X) | specialize (Hcos X)]; discriminate.
+  destruct (U p _ _ c write (reachableFromBase p) S1 eq_refl) as [Hics _].
+  destruct (U p _ _ c read (reachableFromBase p) S2 eq_refl) as [_ Hocs].
+  split; intro X; [specialize (Hics X) | specialize (Hocs X)]; discriminate.
 Qed.
 
-(** An action on a channel in cis or cos.*)
-Definition oneWayAct (cis cos : Channel -> Prop) (b : DiscAct) : Prop :=
-  match actChan b with Some (c, _) => cis c \/ cos c | None => False end.
+(** An action on a channel in ics or ocs.*)
+Definition oneWayAct (ics ocs : Channel -> Prop) (b : DiscAct) : Prop :=
+  match actChan b with Some (c, _) => ics c \/ ocs c | None => False end.
 
-(** In a composition that only ever inputs on the channels in cis and outputs on those in cos,
+(** In a composition that only ever inputs on the channels in ics and outputs on those in ocs,
 a component that can only have changed by acting on one of these channels either stayed as it
 was, or the composition's step was that component's step, with the same action, every other
 component staying as it was. It cannot have synchronised with another component, since one of
 them would have used the channel the wrong way.*)
-Lemma parAll_disc_chan cis cos q qs q' qs' b i x x' :
-  oneWayUsage cis cos (parAll q qs) -> parAll q qs -PA- b -PA> parAll q' qs' ->
+Lemma parAll_disc_chan ics ocs q qs q' qs' b i x x' :
+  oneWayUsage ics ocs (parAll q qs) -> parAll q qs -PA- b -PA> parAll q' qs' ->
   length qs = length qs' -> nth_error (q :: qs) i = Some x -> nth_error (q' :: qs') i = Some x' ->
-  (forall b', x -PA- b' -PA> x' -> oneWayAct cis cos b') ->
+  (forall b', x -PA- b' -PA> x' -> oneWayAct ics ocs b') ->
   x = x' \/ stepAt (fun y y' => y -PA- b -PA> y') i (q :: qs) (q' :: qs').
 Proof.
   intros U T L Nx Nx' ACT.
@@ -2349,7 +2349,7 @@ Proof.
     cbv beta in T1, T2.
     assert (N2o : nth_error (q :: qs) j' = Some w1)
       by (rewrite (stepAt_nth_error_neq _ _ _ _ _ S1 (not_eq_sym N)); exact N2).
-    assert (NS : ~ cis c /\ ~ cos c).
+    assert (NS : ~ ics c /\ ~ ocs c).
     { apply (oneWayUsage_out_in _ _ _ c v v U).
       - apply (parAll_dae_intro _ _ x1); [eapply nth_error_In; exact N1 | econstructor; exact T1].
       - apply (parAll_dae_intro _ _ w1); [eapply nth_error_In; exact N2o | econstructor; exact T2]. }
