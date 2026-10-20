@@ -2165,7 +2165,7 @@ Proof.
     simpl. intros x z [y [Rxy T]]. eauto using reachableFromDel.
 Qed.
 
-(*********Reachability by unfolding*********)
+(*********Reachability by calls*********)
 
 (** The applications that appear in p as written, each a name with its arguments. The body of a
 name that p applies is not part of p.*)
@@ -2181,81 +2181,86 @@ Fixpoint appsProc (p : ProcTerm) : list (Name * list Exp) :=
   | del _ q => appsProc q
   end.
 
+(** The names that p applies as written.*)
+Definition namesProc (p : ProcTerm) : list Name := map fst (appsProc p).
+
 (** Substitution doesn't change which names a term applies.*)
-Lemma appsProc_sub s p : map fst (appsProc (subProcTerm s p)) = map fst (appsProc p).
+Lemma namesProc_sub s p : namesProc (subProcTerm s p) = namesProc p.
 Proof.
-  revert s. induction p; intro s; simpl; rewrite ?map_app; try rewrite IHp;
+  unfold namesProc. revert s. induction p; intro s; simpl; rewrite ?map_app; try rewrite IHp;
     try rewrite IHp1, IHp2; reflexivity.
 Qed.
 
-(** The processes reachable from p0 by unfolding: p0, and the unfolding of any application
-written in one of them, which is the body of the name's definition with the arguments put in.*)
-Inductive unfoldReachable (p0 : ProcTerm) : ProcTerm -> Prop :=
-  | unfoldReachableBase : unfoldReachable p0 p0
-  | unfoldReachableApp p n l : unfoldReachable p0 p -> In (n, l) (appsProc p) ->
-    unfoldReachable p0 (unfoldApp n l).
+(** p calls p' when p' is the unfolding of an application written in p, which is the body of the
+name's definition with the arguments put in, as stepDpApp unfolds it. p itself doesn't change.*)
+Inductive calls (p : ProcTerm) : ProcTerm -> Prop :=
+  | callsApp n l : In (n, l) (appsProc p) -> calls p (unfoldApp n l).
 
-(** A name is reachable from p0 by unfolding when an application of it is written in a process
-reachable from p0 by unfolding.*)
-Definition nameUnfoldReachable (p0 : ProcTerm) (n : Name) : Prop :=
-  exists p l, unfoldReachable p0 p /\ In (n, l) (appsProc p).
+(** The processes that p0 reaches by calls: p0 itself, and anything a process it reaches calls.*)
+Definition callReachable (p0 : ProcTerm) : ProcTerm -> Prop := clos_refl_trans ProcTerm calls p0.
 
-(** Every name that p0 applies is reachable from p0 by unfolding.*)
-Lemma nameUnfoldReachable_base p0 : Forall (nameUnfoldReachable p0) (map fst (appsProc p0)).
+(** A name is call-reachable from p0 when it is applied in a process that p0 reaches by calls.*)
+Definition nameCallReachable (p0 : ProcTerm) (n : Name) : Prop :=
+  exists p, callReachable p0 p /\ In n (namesProc p).
+
+(** Every name that p0 applies is call-reachable from p0.*)
+Lemma nameCallReachable_base p0 : Forall (nameCallReachable p0) (namesProc p0).
 Proof.
-  apply Forall_forall. intros n I. apply in_map_iff in I. destruct I as [[n' l] [E I]].
-  simpl in E. subst n'. exists p0; exists l. split; [apply unfoldReachableBase | exact I].
+  apply Forall_forall. intros n I. exists p0. split; [apply rt_refl | exact I].
 Qed.
 
-(** Every name that the definition of a name reachable from p0 by unfolding applies is reachable
-from p0 by unfolding too.*)
-Lemma nameUnfoldReachable_def p0 n : nameUnfoldReachable p0 n ->
-  Forall (nameUnfoldReachable p0) (map fst (appsProc (snd (def n)))).
+(** Every name that the definition of a name call-reachable from p0 applies is call-reachable
+from p0 too.*)
+Lemma nameCallReachable_def p0 n : nameCallReachable p0 n ->
+  Forall (nameCallReachable p0) (namesProc (snd (def n))).
 Proof.
-  intros [p [l [U I]]]. apply Forall_forall. intros m M.
-  rewrite <- (appsProc_sub (listsToSub (fst (def n)) l)), <- unfoldApp_body in M.
-  apply in_map_iff in M. destruct M as [[m' l'] [E M]]. simpl in E. subst m'.
-  exists (unfoldApp n l); exists l'. split; [exact (unfoldReachableApp _ _ _ _ U I) | exact M].
+  intros [p [R I]]. unfold namesProc in I. apply in_map_iff in I.
+  destruct I as [[n' l] [E I]]. simpl in E. subst n'.
+  apply Forall_forall. intros m M. exists (unfoldApp n l). split.
+  - apply (rt_trans _ _ _ p); [exact R | exact (rt_step _ _ _ _ (callsApp p n l I))].
+  - rewrite unfoldApp_body, namesProc_sub. exact M.
 Qed.
 
-(** Helper for reachableFrom_nameUnfoldReachable: a discrete step leads from a term whose names
-are reachable from p0 by unfolding to another.*)
-Local Lemma reachableFrom_nameUnfoldReachable_aux p0 p a p' :
-  Forall (nameUnfoldReachable p0) (map fst (appsProc p)) -> p -PA- a -PA> p' ->
-  Forall (nameUnfoldReachable p0) (map fst (appsProc p')).
+(** Helper for reachableFrom_nameCallReachable: a discrete step leads from a term whose names are
+call-reachable from p0 to another.*)
+Local Lemma reachableFrom_nameCallReachable_aux p0 p a p' :
+  Forall (nameCallReachable p0) (namesProc p) -> p -PA- a -PA> p' ->
+  Forall (nameCallReachable p0) (namesProc p').
 Proof.
   intros F S. revert F.
   induction S as [ | | | | | | | | | n l1 l2 p p' d E S IH | ];
-    intro F; simpl in F |- *; rewrite ?map_app in F; rewrite ?map_app; Forall_app_split;
-    rewrite ?appsProc_sub; try (apply Forall_app; split); auto.
-  apply IH. rewrite appsProc_sub. pose proof (nameUnfoldReachable_def p0 n (Forall_inv F)) as D.
+    intro F; rewrite ?namesProc_sub; unfold namesProc in F |- *; simpl in F |- *;
+    rewrite ?map_app in F; rewrite ?map_app; Forall_app_split;
+    try (apply Forall_app; split); auto.
+  apply IH. rewrite namesProc_sub. pose proof (nameCallReachable_def p0 n (Forall_inv F)) as D.
   rewrite E in D. exact D.
 Qed.
 
-(** Helper for reachableFrom_nameUnfoldReachable: a delay leads from a term whose names are
-reachable from p0 by unfolding to another.*)
-Local Lemma reachableFrom_nameUnfoldReachable_aux2 p0 p d p' :
-  Forall (nameUnfoldReachable p0) (map fst (appsProc p)) -> p -PD- d -PD> p' ->
-  Forall (nameUnfoldReachable p0) (map fst (appsProc p')).
+(** Helper for reachableFrom_nameCallReachable: a delay leads from a term whose names are
+call-reachable from p0 to another.*)
+Local Lemma reachableFrom_nameCallReachable_aux2 p0 p d p' :
+  Forall (nameCallReachable p0) (namesProc p) -> p -PD- d -PD> p' ->
+  Forall (nameCallReachable p0) (namesProc p').
 Proof.
   intros F S. revert F.
   induction S as [ | | | | | | | n l1 l2 p p' d E S IH | | | ];
-    intro F; simpl in F |- *; rewrite ?map_app in F; rewrite ?map_app; Forall_app_split;
+    intro F; unfold namesProc in F |- *; simpl in F |- *;
+    rewrite ?map_app in F; rewrite ?map_app; Forall_app_split;
     try (apply Forall_app; split); auto.
-  apply IH. rewrite appsProc_sub. pose proof (nameUnfoldReachable_def p0 n (Forall_inv F)) as D.
+  apply IH. rewrite namesProc_sub. pose proof (nameCallReachable_def p0 n (Forall_inv F)) as D.
   rewrite E in D. exact D.
 Qed.
 
-(** Every name written in a process reachable from p0, by discrete steps and delays, is
-reachable from p0 by unfolding. A step only keeps parts of a term, unfolds its applications and
+(** Every name applied in a process that p0 reaches by discrete steps and delays is
+call-reachable from p0. A step only keeps parts of a term, unfolds its applications and
 substitutes into it, and substitution changes no name.*)
-Lemma reachableFrom_nameUnfoldReachable p0 p : reachableFrom p0 p ->
-  Forall (nameUnfoldReachable p0) (map fst (appsProc p)).
+Lemma reachableFrom_nameCallReachable p0 p : reachableFrom p0 p ->
+  Forall (nameCallReachable p0) (namesProc p).
 Proof.
-  apply (reachableFrom_invariant (fun q => Forall (nameUnfoldReachable p0) (map fst (appsProc q))));
-    [apply nameUnfoldReachable_base | | ].
-  - intros q q' a F S. exact (reachableFrom_nameUnfoldReachable_aux p0 q a q' F S).
-  - intros q q' d F S. exact (reachableFrom_nameUnfoldReachable_aux2 p0 q d q' F S).
+  apply (reachableFrom_invariant (fun q => Forall (nameCallReachable p0) (namesProc q)));
+    [apply nameCallReachable_base | | ].
+  - intros q q' a F S. exact (reachableFrom_nameCallReachable_aux p0 q a q' F S).
+  - intros q q' d F S. exact (reachableFrom_nameCallReachable_aux2 p0 q d q' F S).
 Qed.
 
 (*********Channels*********)
@@ -2315,18 +2320,19 @@ Qed.
 
 (** Helper for prefixChans_reachableFrom: a discrete step acts on a channel and direction that
 P allows, and leads to a term whose prefixes P allows, when P allows the prefixes of the term,
-the term's names are reachable from p0 by unfolding, and P allows the prefixes of the
-definition of every such name.*)
+the term's names are call-reachable from p0, and P allows the prefixes of the definition of
+every such name.*)
 Local Lemma prefixChans_reachableFrom_aux (P : Channel * Direction -> Prop) p0 p a p' :
-  (forall n, nameUnfoldReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
-  Forall (nameUnfoldReachable p0) (map fst (appsProc p)) -> Forall P (prefixChans p) ->
+  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
+  Forall (nameCallReachable p0) (namesProc p) -> Forall P (prefixChans p) ->
   p -PA- a -PA> p' -> Forall P (prefixChans p') /\ forall cd, actChan a = Some cd -> P cd.
 Proof.
   intros D N F S. revert N F.
   induction S as [c l1 l2 p E | c l1 l2 p E | b p p' d S IH E | p1 p2 p' d S IH
     | p1 p2 p' d S IH | p p' q d S IH | q q' p d S IH | p p' q q' c l S1 IH1 S2 IH2
     | p p' q q' c l S1 IH1 S2 IH2 | n l1 l2 p p' d E S IH | p p' d e S IH E];
-    intros N F; simpl in N, F |- *; rewrite ?map_app in N; Forall_app_split.
+    intros N F; unfold namesProc in N; simpl in N, F |- *; rewrite ?map_app in N;
+    Forall_app_split.
   - inversion F; subst. split; [assumption | intros cd X; injection X as X; subst; assumption].
   - inversion F; subst. rewrite prefixChans_sub.
     split; [assumption | intros cd X; injection X as X; subst; assumption].
@@ -2339,47 +2345,47 @@ Proof.
     split; [apply Forall_app; split | ]; assumption.
   - split; [apply Forall_app; split; [apply IH1 | apply IH2]; assumption | discriminate].
   - split; [apply Forall_app; split; [apply IH1 | apply IH2]; assumption | discriminate].
-  - pose proof (Forall_inv N) as Nn. pose proof (nameUnfoldReachable_def p0 n Nn) as Nd.
+  - pose proof (Forall_inv N) as Nn. pose proof (nameCallReachable_def p0 n Nn) as Nd.
     specialize (D n Nn). rewrite E in D, Nd.
-    apply IH; [rewrite appsProc_sub | rewrite prefixChans_sub]; assumption.
+    apply IH; [rewrite namesProc_sub | rewrite prefixChans_sub]; assumption.
   - apply IH; assumption.
 Qed.
 
 (** Helper for prefixChans_reachableFrom: a delay leads to a term whose prefixes P allows, when
-P allows the prefixes of the term, the term's names are reachable from p0 by unfolding, and P
-allows the prefixes of the definition of every such name.*)
+P allows the prefixes of the term, the term's names are call-reachable from p0, and P allows the
+prefixes of the definition of every such name.*)
 Local Lemma prefixChans_reachableFrom_aux2 (P : Channel * Direction -> Prop) p0 p d p' :
-  (forall n, nameUnfoldReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
-  Forall (nameUnfoldReachable p0) (map fst (appsProc p)) -> Forall P (prefixChans p) ->
+  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
+  Forall (nameCallReachable p0) (namesProc p) -> Forall P (prefixChans p) ->
   p -PD- d -PD> p' -> Forall P (prefixChans p').
 Proof.
   intros D N F S. revert N F.
   induction S as [ | | | p p' d b S IH E | | p1 p2 p1' p2' d S1 IH1 S2 IH2
     | p q p' q' d S1 IH1 S2 IH2 K | n l1 l2 p p' d E S IH | | | ];
-    intros N F; simpl in N, F |- *; rewrite ?map_app in N; Forall_app_split;
-    try (apply Forall_app; split); auto.
-  pose proof (Forall_inv N) as Nn. pose proof (nameUnfoldReachable_def p0 n Nn) as Nd.
+    intros N F; unfold namesProc in N; simpl in N, F |- *; rewrite ?map_app in N;
+    Forall_app_split; try (apply Forall_app; split); auto.
+  pose proof (Forall_inv N) as Nn. pose proof (nameCallReachable_def p0 n Nn) as Nd.
   specialize (D n Nn). rewrite E in D, Nd.
-  apply IH; [rewrite appsProc_sub | rewrite prefixChans_sub]; assumption.
+  apply IH; [rewrite namesProc_sub | rewrite prefixChans_sub]; assumption.
 Qed.
 
 (** A property of channels and directions that every prefix of p0 has, and every prefix of the
-definition of every name reachable from p0 by unfolding, holds of every action of anything
-reachable from p0.*)
+definition of every name call-reachable from p0, holds of every action of anything reachable
+from p0.*)
 Lemma prefixChans_reachableFrom (P : Channel * Direction -> Prop) p0 p a p' cd :
   Forall P (prefixChans p0) ->
-  (forall n, nameUnfoldReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
+  (forall n, nameCallReachable p0 n -> Forall P (prefixChans (snd (def n)))) ->
   reachableFrom p0 p -> p -PA- a -PA> p' -> actChan a = Some cd -> P cd.
 Proof.
   intros F0 D R S E.
   assert (F : forall q, reachableFrom p0 q -> Forall P (prefixChans q)).
   { intros q Rq. induction Rq as [ | q q' b Rq IH T | q q' d Rq IH T]; [exact F0 | | ].
     - exact (proj1 (prefixChans_reachableFrom_aux P p0 q b q' D
-        (reachableFrom_nameUnfoldReachable _ _ Rq) IH T)).
+        (reachableFrom_nameCallReachable _ _ Rq) IH T)).
     - exact (prefixChans_reachableFrom_aux2 P p0 q d q' D
-        (reachableFrom_nameUnfoldReachable _ _ Rq) IH T). }
+        (reachableFrom_nameCallReachable _ _ Rq) IH T). }
   exact (proj2 (prefixChans_reachableFrom_aux P p0 p a p' D
-    (reachableFrom_nameUnfoldReachable _ _ R) (F p R) S) cd E).
+    (reachableFrom_nameCallReachable _ _ R) (F p R) S) cd E).
 Qed.
 
 (*********Channels used one way*********)
@@ -2407,9 +2413,9 @@ Definition prefixesOneWay (ics ocs : Channel -> Prop) (p : ProcTerm) : Prop :=
   Forall (fun '(c, d) => (ics c -> d = read) /\ (ocs c -> d = write)) (prefixChans p).
 
 (** A syntactic check of one-way use: no prefix uses a channel the wrong way, in p or in the
-definition of any name reachable from p by unfolding.*)
+definition of any name call-reachable from p.*)
 Lemma oneWayUsage_prefixes ics ocs p : prefixesOneWay ics ocs p ->
-  (forall n, nameUnfoldReachable p n -> prefixesOneWay ics ocs (snd (def n))) ->
+  (forall n, nameCallReachable p n -> prefixesOneWay ics ocs (snd (def n))) ->
   oneWayUsage ics ocs p.
 Proof.
   intros F D q a q' c d R S E. exact (prefixChans_reachableFrom _ _ _ _ _ (c, d) F D R S E).

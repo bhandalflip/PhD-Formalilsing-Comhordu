@@ -5,7 +5,7 @@ The multi-tiered language of the thesis (chapter 4, p.58), built on the [model](
 | File | What it holds |
 |---|---|
 | [`LanguageFoundations.v`](LanguageFoundations.v) | The typed variables and the values they range over, expressions and their evaluation, and the other low-level parts the tiers share. |
-| [`SoftwareLanguage.v`](SoftwareLanguage.v) | The software tier (§4.1, p.61): a CCS-style language with value passing and time. Also the processes and names a process reaches by unfolding, which cover every name it reaches by steps and delays, and software that uses some channels only for input and others only for output, as it should its entity's channels, with a syntactic check for it. |
+| [`SoftwareLanguage.v`](SoftwareLanguage.v) | The software tier (§4.1, p.61): a CCS-style language with value passing and time. Also the processes a process reaches by calls, whose names cover every name it reaches by steps and delays, and software that uses some channels only for input and others only for output, as it should its entity's channels, with a syntactic check for it. |
 | [`ProcEquiv.v`](ProcEquiv.v) | Bisimulation of software processes. |
 | [`InterfaceLanguage.v`](InterfaceLanguage.v) | The interface tier (§4.2, p.81), which models an entity's environment with timed lists. |
 | [`ModeStateLanguage.v`](ModeStateLanguage.v) | The mode state tier (§4.3, p.90): an entity's current mode, and the next one while it changes. |
