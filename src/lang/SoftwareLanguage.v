@@ -2194,8 +2194,7 @@ Proof.
     try rewrite IHp1, IHp2; reflexivity.
 Qed.
 
-(** p calls p' when p' is the unfolding of an application written in p, which is the body of the
-name's definition with the arguments put in, as stepDpApp unfolds it. p itself doesn't change.*)
+(** p calls p' when p' is the unfolding of an application written in p.*)
 Inductive calls (p : ProcTerm) : ProcTerm -> Prop :=
   | callsApp n l : In (n, l) (appsProc p) -> calls p (unfoldApp n l).
 
