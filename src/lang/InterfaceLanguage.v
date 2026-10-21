@@ -530,18 +530,18 @@ Qed.
 (*LOCAL TIDY*)
 
 (** An output step of a timed list keeps every element but the one it outputs.*)
-Local Lemma inList_pres_input_aux : forall l a l', l -tl- a -tl> l' ->
-  forall u x, a = atlOut u -> x _: l -> x _: l' \/ x = <(u, zeroTime)>.
+Local Lemma timedList_out_pres l l' u x :
+  l -tl- u!! -tl> l' -> x _: l -> x _: l' \/ x = <(u, zeroTime)>.
 Proof.
-  intros l a l' H.
+  intros H. remember (atlOut u) as a eqn:Ea. revert Ea.
   induction H as [v1 l1 | l1 l1' v1 e Hs IH | d1 | l1 l1' d1 v1 t1 t1' Hs IH Ht];
-    intros u x Ea Hin; try discriminate.
+    intros Ea Hin; try discriminate.
   - injection Ea as Eu. subst. destruct Hin as [Hx | Hx].
     + right. subst. reflexivity.
     + left. assumption.
   - destruct Hin as [Hx | Hx].
     + left. left. assumption.
-    + destruct (IH u x Ea Hx) as [Hy | Hy].
+    + destruct (IH Ea Hx) as [Hy | Hy].
       * left. right. assumption.
       * right. assumption.
 Qed.
@@ -560,7 +560,7 @@ Proof.
     + exfalso. eapply Hnd. reflexivity.
     + match goal with [Htl : stepTimedList _ _ _ |- _] => inversion Htl end.
     + match goal with [Htl : stepTimedList _ _ _ |- _] =>
-        destruct (inList_pres_input_aux _ _ _ Htl _ _ eq_refl Hin) as [Hy | Hy] end.
+        destruct (timedList_out_pres _ _ _ _ Htl Hin) as [Hy | Hy] end.
       * left. assumption.
       * right. injection Hy as Hv. subst. reflexivity.
 Qed.

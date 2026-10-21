@@ -19,7 +19,8 @@
 - Trailing labels such as `Admitted (*4*)`, `(*R*)`, `(*D- foo*)` and `(*#tag*)` are the 2015 triage labels; see [`doc/archive/README.md`](../doc/archive/README.md). Remove a label together with its `Admitted` when the proof lands.
 - Read the `(*Proof: …*)` sketch comments before proving. Keep them.
 - Write an intro pattern with a space after its bracket, as `[ | x]`: `[|` is a token of the entity notation `[| p, l, h, k |]`, so `[|x]` fails to parse once `EntityLanguage` is imported.
-- **Helper lemmas** go immediately before the lemma that first needs them. Name them after it (`<lemma>_aux`, `<lemma>_aux2`, …). Make them `Local` if nothing else uses them.
+- **Helper lemmas** go immediately before the lemma that first needs them. Mark them `Local`: that, not the name, is what says a result is auxiliary.
+- **Name every result by what it states**, helpers included. Only a helper that states nearly what the result it supports states takes that result's name with `_aux`, `_aux2`, …
 
 ## Libraries and tactics
 
