@@ -373,6 +373,21 @@ Proof.
   first [left; reflexivity | right; eexists; eassumption].
 Qed.
 
+(** In a discrete entity step the software stays, or takes a silent step or one on the entity's
+channels.*)
+Lemma ent_disc_proc_tau_or_chan p l h k p' l' h' k' a :
+  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
+  p = p' \/ exists b, p -PA- b -PA> p' /\ (b = tauAct \/ entChanAct b).
+Proof.
+  intro S. inversion S; subst; try (left; reflexivity); right; eexists; split; try eassumption;
+    first [left; reflexivity | right; cbn; first [left; reflexivity | right; reflexivity]].
+Qed.
+
+(** A discrete entity step leaves the mode state unchanged or takes it a step.*)
+Lemma ent_disc_mState p l h k p' l' h' k' a : [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
+  k' = k \/ exists am, k -ms- am -ms> k'.
+Proof. intro S. inversion S; subst; first [left; reflexivity | right; eexists; eassumption]. Qed.
+
 (***************Components of the software*********************)
 (** When an entity's software is a parallel composition, a step of the entity is taken down
 to the components, for any number of them: forward, from the components before the step,

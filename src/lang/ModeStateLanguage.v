@@ -4,6 +4,7 @@ School of Computer Science and Statistics, Trinity College, Dublin, Ireland.*)
 
 (***************************** Standard Imports *****************************)
   
+From Stdlib Require Import Lra.
 Require Import ComhCoq.lib.Extras.LibTactics.
 
 (***************************** Specialised Imports *****************************)
@@ -280,3 +281,22 @@ Lemma nextMode_unstable k m : nextModeMState k = Some m ->
   constructor. Qed.
  
 (*-LOCAL TIDY*)
+
+(** A step of the mode state keeps a transition's timer within the time the change of mode
+takes.*)
+Lemma mState_trans_bound_step k am k' : k -ms- am -ms> k' ->
+  (forall m0 m1 tau, k = <| m0, m1, tau |> ->
+    exists (P : m0 -mtr-> m1), (tau <= modeTransTime m0 m1 P)%R) ->
+  (forall m0 m1 tau, k' = <| m0, m1, tau |> ->
+    exists (P : m0 -mtr-> m1), (tau <= modeTransTime m0 m1 P)%R).
+Proof.
+  intros K IH m0 m1 tau E. inversion K; subst; try discriminate;
+    match goal with [H : <| _, _, _ |> = <| m0, m1, tau |> |- _] =>
+      first [ exact (IH _ _ _ H)
+            | injection H as E1 E2 E3; subst;
+              first [ eexists; apply Rle_refl
+                    | destruct (IH _ _ _ eq_refl) as [P HP]; exists P; simpl in *;
+                      first [ apply cond_nonneg
+                            | match goal with [d0 : Delay |- _] =>
+                                pose proof (cond_pos (delay d0)) end; lra ] ] ] end.
+Qed.

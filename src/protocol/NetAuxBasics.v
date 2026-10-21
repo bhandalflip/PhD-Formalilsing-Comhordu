@@ -645,7 +645,11 @@ Lemma tfs_currMode_disc_pres (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mo
   Qed. 
 
 Lemma paused_switch_net (n : Network) (i : nat) :
-  reachableProtNet n -> (pausedStateNet i n <-> switchStateNet i n). Admitted. (*4*)
+  reachableProtNet n -> (pausedStateNet i n <-> switchStateNet i n).
+Proof.
+  intro R. split; intro H; destruct H as [e He Ein]; (eapply lenWitness; [ | exact Ein]);
+    apply (paused_switch_ent e (reachableNet_ent _ _ _ _ R Ein)); exact He.
+Qed.
 (**Proof: Lift result from entity level ultimately- analogous theorems except with
 reachableProt and prot level state predicates.*)
 
@@ -883,130 +887,6 @@ Proof.
     exfalso. eapply switchCurr_not_switchListen; eassumption.
 Qed.
 
-(** A wait with a well-formed position timer delays into a wait for the same mode, with a time as
-its position timer.*)
-Local Lemma ovWait_del_posTimer (m : Mode) (u x y : Exp) (t : Time) (d : Delay) q :
-  evalExpFunTime y = Some t -> ovWait m u x y -PD- d -PD> q ->
-  exists (x' : Exp) (t' : Time), q ~p~ ovWait m u x' t'.
-Proof.
-  unfold ovWait. intros E D. invert_del_prefixes; try congruence;
-    do 2 eexists; del_timers_bisim.
-Qed.
-
-(** init shows its mode: after reading the current mode it waits with its position timer run
-out, so ovWait_bisim_mode_zero applies.*)
-Local Lemma init_bisim_mode (m1 m2 : Mode) : init m1 ~p~ init m2 -> m1 = m2.
-Proof.
-  intro B.
-  eassert (S1 : init m1 -PA- chanMCurrRead ;? [baseMode m1] -PA> _)
-    by (unfold init; step_search).
-  destruct (bisim_step_disc _ _ _ _ B S1) as [q2 [S2 BQ]].
-  unfold init in S1, S2. invert_disc_prefixes. clean_proc_hyp BQ.
-  bt_step BQ (chanPos ;? [basePosition origin]) S3.
-  destruct (bisim_step_disc _ _ _ _ BQ S3) as [r [R BR]].
-  invert_app_trans. invert_disc_prefixes. clean_proc_hyp BR.
-  match type of BR with app _ (eBase ?b :: _) ~p~ _ =>
-    bt_step BR (chanOutProc ;! [b, basePosition origin]) S4 end.
-  destruct (bisim_step_disc _ _ _ _ BR S4) as [r4 [R4 _]].
-  invert_app_trans. invert_disc_prefixes. output_values. reflexivity.
-Qed.
-
-(** tfsStart and init both read the current mode first, and then differ.*)
-Local Lemma tfsStart_not_init (m : Mode) : tfsStart ~p~ init m -> False.
-Proof.
-  intro B.
-  eassert (S1 : tfsStart -PA- chanMCurrRead ;? [baseMode m] -PA> _)
-    by (unfold tfsStart; step_search).
-  destruct (bisim_step_disc _ _ _ _ B S1) as [q2 [S2 BQ]].
-  unfold tfsStart, init in S1, S2. invert_disc_prefixes. clean_proc_hyp BQ.
-  unfold_app_hyp BQ. unfold_app_hyp_l BQ. refute_by_chan BQ.
-Qed.
-
-(** After a step into init m, the overlap component was dormant and read m on mNext.*)
-Local Lemma init_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) :
-  p -PA- a -PA> p' -> overlapState p -> p' ~p~ init m ->
-  p ~p~ dormant /\ a = chanMNextRead ;? [baseMode m].
-Proof.
-  intros TR O SP. backtrack_shape SP.
-  - (* dormant read a mode m0 on mNext, into init m0 *)
-    change (init m0 ~p~ init m) in BT. apply init_bisim_mode in BT. subst m0.
-    split; [exact B | reflexivity].
-  - exfalso. apply (tfsStart_not_init m). exact BT.
-  - exfalso. apply (tfsStart_not_init m). exact BT.
-Qed.
-
-(** After a step into ovWait, whatever its timers, the overlap component was init or ovReady for
-the same mode, and the position timer is well formed: init sets it to zero and ovReady to the
-period.*)
-Local Lemma ovWaitExp_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) (e2 e3 e4 : Exp) :
-  p -PA- a -PA> p' -> overlapState p -> p' ~p~ ovWait m e2 e3 e4 ->
-  (exists t, evalExpFunTime e4 = Some t) /\
-  (p ~p~ init m \/ exists (u : Exp) (l : Position), p ~p~ ovReady m u l).
-Proof.
-  intros TR O SP. backtrack_shape SP.
-  - (* init m0: its derivative's position timer is zero *)
-    apply ovWait_bisim_mode with (t1 := zeroTime) in BT; [ | reflexivity].
-    destruct BT as [EQ E4]. subst m0. split; [exact E4 | left; exact B].
-  - (* ovReady m0 u l: its derivative's position timer is the period *)
-    apply ovWait_bisim_mode with (t1 := period m0) in BT; [ | apply evalExpFunTime_period].
-    destruct BT as [EQ E4]. subst m0. split; [exact E4 | right; do 2 eexists; exact B].
-Qed.
-
-(** After a step into ovReady, whatever its timer, the overlap component was ovWait for the same
-mode.*)
-Local Lemma ovReadyExp_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) (u : Exp) (l : Position) :
-  p -PA- a -PA> p' -> overlapState p -> p' ~p~ ovReady m u l ->
-  exists e2 e3 e4, p ~p~ ovWait m e2 e3 e4.
-Proof.
-  intros TR O SP. backtrack_shape SP.
-  match type of BT with outPrefix _ (eBase ?b1 :: eBase ?b :: nil) _ ~p~ _ =>
-    bt_step BT (chanOutProc ;! [b1, b]) S2 end.
-  destruct (bisim_step_disc _ _ _ _ BT S2) as [r2 [R2 _]].
-  invert_disc_prefixes. output_values.
-  do 3 eexists. exact B.
-Qed.
-
-(** Before a delay into ovWait m, the overlap component was an ovWait, which was for m if its
-position timer was well formed: every other overlap state delays only to itself.*)
-Local Lemma ovWait_del_bkwd (p p' : ProcTerm) (d : Delay) (m : Mode) (e2 e3 e4 : Exp) :
-  overlapState p -> p -PD- d -PD> p' -> p' ~p~ ovWait m e2 e3 e4 ->
-  exists (m0 : Mode) (f2 f3 f4 : Exp), p ~p~ ovWait m0 f2 f3 f4 /\
-    ((exists t, evalExpFunTime f4 = Some t) -> m0 = m /\ exists t, evalExpFunTime e4 = Some t).
-Proof.
-  intros OS D BZ.
-  destruct (overlapState_shape _ OS)
-    as [B | m0 B | m0 f2 f3 f4 B | m0 f2 l B | m0 B | B | B | B | B | m0 B | B | B | B];
-    try solve [exfalso; match type of B with p ~p~ ?X =>
-      assert (B' : p' ~p~ X) by (eapply bisim_del_pres; [del_self_body | exact B | exact D]);
-      pose proof (bisim_trans _ _ _ (bisim_symm _ _ BZ) B') as BT;
-      unfold dormant, init, tfsStart in BT; try unfold liftVarList in BT;
-      ovWait_bisim_contra BT end].
-  exists m0 f2 f3 f4. split; [exact B | ]. intros [t4 E4].
-  destruct (bisim_step_del _ _ _ _ B D) as [q [TQ BQ]].
-  destruct (ovWait_del_posTimer _ _ _ _ _ _ _ E4 TQ) as [x' [t' B']].
-  eapply ovWait_bisim_mode with (t1 := t'); [apply evalExpFunTime_time | ].
-  eapply bisim_trans; [apply bisim_symm; exact B' | ].
-  eapply bisim_trans; [apply bisim_symm; exact BQ | exact BZ].
-Qed.
-
-(** The mode state stays across a step of a reachable entity while it is unstable, unless the
-overlap component writes on it, from tfsCurr, switchCurr, ovAbort or tfsNext.*)
-Local Lemma mState_stays_ent p1 p2 p3 l h k p1' p2' p3' l' h' k' a :
-  reachableProtEnt ([|p1 $||$ p2 $||$ p3, l, h, k|]) -> unstable k ->
-  [|p1 $||$ p2 $||$ p3, l, h, k|] -EA- a ->> [|p1' $||$ p2' $||$ p3', l', h', k'|] ->
-  ~ tfsCurrState p2 -> ~ switchCurrState p2 -> ~ ovAbortState p2 ->
-  (forall m, ~ tfsNextState m p2) -> k' = k.
-Proof.
-  intros R U S N1 N2 N3 N4.
-  destruct (eqDecModeState k k') as [EQ | NE]; [symmetry; exact EQ | exfalso].
-  destruct (mState_switch_states_ent _ _ _ _ _ _ _ _ _ R U NE S)
-    as [[Y _] | [[Y _] | [[Y _] | [m1 [Y _]]]]]; ent_state_comp Y.
-  - exact (N1 Y).
-  - exact (N2 Y).
-  - exact (N3 Y).
-  - exact (N4 m1 Y).
-Qed.
-
 (** In a reachable entity, an overlap component in init m, ovWait m, ovReady m or switchBc m is
 changing to mode m: m is the mode state's next mode. Whatever ovWait's timers, its position
 timer is well formed. Dormant reads the next mode on mNext into init, and from there to
@@ -1232,7 +1112,12 @@ Lemma ovWaitState_nextMode_net (n : Network) (m : Mode) (t x y : Time) (i : nat)
 (*If a delay is possible, then every entity is in the listening state.*)
 Theorem del_listening_net (n n' : Network) (d : Delay) (e : Entity) (i : nat) :
   reachableProtNet n -> n -ND- d -ND> n' -> e @ i .: n -> listeningStateNet i n.
-  Admitted. (*7*)
+Proof.
+  intros RN D E.
+  destruct (link_net_ent_del_fwd _ _ _ _ _ D E) as [e' [_ DEL]].
+  eapply lenWitness; [ | exact E].
+  exact (del_listening _ _ _ (reachableNet_ent _ _ _ _ RN E) DEL).
+Qed.
 (**Proof: Well if the network delays, then any member entity must also be able
 to delay [del link theorem- salvaged?]. And then we can lift the result
 (EA::del-listening-ent) to get that e is in the listening state, and we're done.*)

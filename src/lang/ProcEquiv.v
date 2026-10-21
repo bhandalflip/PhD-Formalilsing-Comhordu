@@ -300,6 +300,25 @@ Proof.
   - congruence.
 Qed.
 
+(** The timer left after such a delay by d is at least what the guard held less d.*)
+Lemma del_del_bisim_bound (e : Exp) (x : Time) (p q : ProcTerm) (d : Delay) :
+  evalExpFunTime e = Some x -> (forall d' q', p -PD- d' -PD> q' -> q' = p) ->
+  $< e >$ p -PD- d -PD> q -> exists (x' : Time), q ~p~ $< x' >$ p /\ (x - d <= x')%R.
+Proof.
+  intros E S D. inversion D; subst.
+  - match goal with [H : p -PD- _ -PD> q |- _] => apply S in H; subst q end.
+    exists zeroTime. split.
+    + apply bisim_symm. apply del_zero_bisim. apply evalExpFunTime_time.
+    + match goal with [E2 : evalExpFunTime e = Some ?t0 |- _] =>
+        rewrite E in E2; injection E2 as E2; subst t0 end.
+      match goal with [ |- (_ - pos (delay (_ +dt+ ?d0)) <= _)%R ] =>
+        pose proof (cond_pos (delay d0)) end. simpl. lra.
+  - match goal with [E2 : evalExpFunTime e = Some ?t0 |- _] =>
+      rewrite E in E2; injection E2 as E2; subst t0 end.
+    eexists. split; [apply bisim_refl | ]. simpl. lra.
+  - congruence.
+Qed.
+
 (*** Slightly more Specific ***)
 
 (*TIDY*)

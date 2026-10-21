@@ -286,6 +286,10 @@ Lemma sleep_trans_in p : sleepingState p -> discActEnabled p (chanTrans *?).
 Lemma paused_unpause_in p : pausedState p -> discActEnabled p (chanUnpause *?).
   activation_tac. Qed.
 
+(** The listener offers an unpause while listening.*)
+Lemma listening_unpause_in p : listeningState p -> discActEnabled p (chanUnpause *?).
+Proof. activation_tac. Qed.
+
 (*** Versions of activation using sort ***)
 
 Lemma paused_unpause_in_sort d p : pausedState p -> sort (chanUnpause *?) d p.
@@ -557,6 +561,109 @@ Proof.
   apply reachableFrom_invariant; [apply shListening, bisim_refl | | ].
   - intros q q' a. apply listenerShape_disc.
   - intros q q' d. apply listenerShape_del.
+Qed.
+
+(** The listener's conditions evaluate when their values do: a sufficiency test on a mode and a
+distance, an equality test, and a threat test whose range evaluates to a number.*)
+Local Lemma suff_eval_some (m : Mode) (r : Distance) :
+  evalBoolExpFun (bSufficient (eBase (baseMode m)) (eBase (baseDistance r))) <> None.
+Proof. destruct r as [r]. simpl. discriminate. Qed.
+
+Local Lemma equal_eval_some (b1 b2 : BaseType) :
+  evalBoolExpFun (bEqual (eBase b1) (eBase b2)) <> None.
+Proof. simpl. destruct (eqDecBase b1 b2); discriminate. Qed.
+
+Local Lemma possInc_eval_some (m1 m2 : Mode) (e : Exp) (b : BaseType) (r : nonnegreal) :
+  evalExpFun e = Some b -> evalBaseNonnegFun b = Some r ->
+  evalBoolExpFun (bPossInc (eBase (baseMode m1)) (eBase (baseMode m2)) e) <> None.
+Proof. intros Ee Eb. simpl. rewrite Ee, Eb. discriminate. Qed.
+
+(** The range gotMsg computes from two positions evaluates to a number.*)
+Local Lemma msg_range_eval (l l' : Position) : exists b r,
+  evalExpFun ((| eBase (basePosition l), eBase (basePosition l') |) (-) speedMax (.) msgLatency)
+    = Some b /\ evalBaseNonnegFun b = Some r.
+Proof.
+  simpl. destruct msgLatency as [ml]. simpl. do 2 eexists. split; reflexivity.
+Qed.
+
+(** From [B : p ~p~ (b $> P) $+$ (!~ b $> Q)], in either order, the branch b selects, for b
+one of the listener's conditions, which evaluate.*)
+Local Ltac resolve_cond_ranged B :=
+  let E := fresh "E" in let B2 := fresh B in
+  match type of B with
+  | _ ~p~ (!~ ?b $> ?Q) $+$ (?b $> ?P) =>
+    lets B2 : bisim_trans B (choice_bisim_symm (!~ b $> Q) (b $> P)); clear B; rename B2 into B
+  | _ => idtac end;
+  match type of B with _ ~p~ (?b $> ?P) $+$ (!~ ?b $> ?Q) =>
+    destruct (evalBoolExpFun b) as [ [ | ] | ] eqn:E;
+    [ lets B2 : bisim_trans B (if_then_bisim_true b P Q (evalBoolExpFunRel _ _ E));
+      clear B E; rename B2 into B
+    | lets B2 : bisim_trans B (if_then_bisim_false b P Q (evalBoolExpFunRel _ _ E));
+      clear B E; rename B2 into B
+    | exfalso; first [ exact (suff_eval_some _ _ E) | exact (equal_eval_some _ _ E)
+                     | eapply possInc_eval_some; [eassumption | eassumption | exact E] ] ]
+  end.
+
+(** Closes [q ~p~ X] from [B : q ~p~ Y], where Y is X or an application that unfolds to X.*)
+Local Ltac ranged_body B := solve [eapply bisim_trans; [exact B | ];
+  first [apply bisim_refl | unfold_app_bisim; apply bisim_refl]].
+
+(** Closes the refined listener shape of q from B : q ~p~ X, for X a derivative of a listener
+state.*)
+Local Ltac ranged_of B := first [
+    left; ranged_body B
+  | right; left; eexists; ranged_body B
+  | right; right; left; ranged_body B
+  | right; right; right; left; eexists; ranged_body B
+  | right; right; right; right; left; ranged_body B
+  | right; right; right; right; right; left; do 2 eexists; ranged_body B
+  | right; right; right; right; right; right; left;
+    match type of B with _ ~p~ _ $( [_, ?e] )$ =>
+      first [ match e with
+              | eSubtract (eDist (eBase (basePosition ?l0)) (eBase (basePosition ?l1))) _ =>
+                destruct (msg_range_eval l0 l1) as [rb [rr [Ee Eb]]];
+                eexists; exists e rb rr; split; [ranged_body B | split; [exact Ee | exact Eb]] end
+            | do 4 eexists; split; [ranged_body B | split; eassumption] ] end
+  | right; right; right; right; right; right; right; left;
+    do 4 eexists; split; [ranged_body B | split; eassumption]
+  | right; right; right; right; right; right; right; right; ranged_body B
+  | unfold_app_hyp B; resolve_cond_ranged B; ranged_of B ].
+
+(** Up to bisimilarity, a listener state is one of the named states, and the ranges gotRange and
+currComp hold evaluate to numbers. So, unlike listenerShape allows, it is never stuck.*)
+Lemma listenerState_shape_ranged p : listenerState p ->
+  p ~p~ listening \/ (exists (m : Mode), p ~p~ rangeBad m) \/ p ~p~ badOvlp \/
+  (exists (m : Mode), p ~p~ currOK m) \/ p ~p~ abortOvlp \/
+  (exists (m : Mode) (l : Position), p ~p~ gotMsg m l) \/
+  (exists (m : Mode) (e : Exp) (b : BaseType) (r : nonnegreal),
+     p ~p~ gotRange m e /\ evalExpFun e = Some b /\ evalBaseNonnegFun b = Some r) \/
+  (exists (m : Mode) (e : Exp) (b : BaseType) (r : nonnegreal),
+     p ~p~ currComp m e /\ evalExpFun e = Some b /\ evalBaseNonnegFun b = Some r) \/
+  p ~p~ paused.
+Proof.
+  intro LS. pattern p. apply (reachableFrom_invariant _ listening);
+    [left; apply bisim_refl | | | exact LS].
+  - intros q q' a J T.
+    destruct J as [H | [[m H] | [H | [[m H] | [H | [[m [l H]] |
+      [[m [e [b [r [H [Ee Eb]]]]]] | [[m [e [b [r [H [Ee Eb]]]]]] | H]]]]]]]];
+      shape_step_pre B;
+      try (match goal with [Ee : evalExpFun ?e = Some _ |- _] =>
+             rewrite (eval_pres_sub _ _ _ (evalExpFunRel _ _ Ee)) in B end);
+      ranged_of B.
+  - intros q q' d J D.
+    destruct J as [H | [[m H] | [H | [[m H] | [H | [[m [l H]] |
+      [[m [e [b [r [H [Ee Eb]]]]]] | [[m [e [b [r [H [Ee Eb]]]]]] | H]]]]]]]].
+    + left. eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + right; left. exists m. eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + right; right; left. eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + do 3 right; left. exists m. eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + do 4 right; left. eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + do 5 right; left. exists m l. eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + do 6 right; left. exists m e b r. split; [ | split; assumption].
+      eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + do 7 right; left. exists m e b r. split; [ | split; assumption].
+      eapply bisim_del_pres; [del_self_body | exact H | exact D].
+    + do 8 right. eapply bisim_del_pres; [del_self_body | exact H | exact D].
 Qed.
 
 Theorem listener_outProc_out_not (p p' : ProcTerm) (v : list BaseType) : 
@@ -2173,6 +2280,112 @@ Proof.
     { apply timer_shift; [exact HX | ]. intro C. apply NSX.
       apply (bisim_sort_iff _ _ _ _ B (PD _)). apply ovWait_sort_pause. exact C. }
     rewrite E3 in E3'. injection E3' as E3'. exact E3'.
+Qed.
+
+(** A wait with a well-formed position timer delays into a wait for the same mode, with a time as
+its position timer.*)
+Lemma ovWait_del_posTimer (m : Mode) (u x y : Exp) (t : Time) (d : Delay) q :
+  evalExpFunTime y = Some t -> ovWait m u x y -PD- d -PD> q ->
+  exists (x' : Exp) (t' : Time), q ~p~ ovWait m u x' t'.
+Proof.
+  unfold ovWait. intros E D. invert_del_prefixes; try congruence;
+    do 2 eexists; del_timers_bisim.
+Qed.
+
+(** init shows its mode: after reading the current mode it waits with its position timer run
+out, so ovWait_bisim_mode_zero applies.*)
+Lemma init_bisim_mode (m1 m2 : Mode) : init m1 ~p~ init m2 -> m1 = m2.
+Proof.
+  intro B.
+  eassert (S1 : init m1 -PA- chanMCurrRead ;? [baseMode m1] -PA> _)
+    by (unfold init; step_search).
+  destruct (bisim_step_disc _ _ _ _ B S1) as [q2 [S2 BQ]].
+  unfold init in S1, S2. invert_disc_prefixes. clean_proc_hyp BQ.
+  bt_step BQ (chanPos ;? [basePosition origin]) S3.
+  destruct (bisim_step_disc _ _ _ _ BQ S3) as [r [R BR]].
+  invert_app_trans. invert_disc_prefixes. clean_proc_hyp BR.
+  match type of BR with app _ (eBase ?b :: _) ~p~ _ =>
+    bt_step BR (chanOutProc ;! [b, basePosition origin]) S4 end.
+  destruct (bisim_step_disc _ _ _ _ BR S4) as [r4 [R4 _]].
+  invert_app_trans. invert_disc_prefixes. output_values. reflexivity.
+Qed.
+
+(** tfsStart and init both read the current mode first, and then differ.*)
+Lemma tfsStart_not_init (m : Mode) : tfsStart ~p~ init m -> False.
+Proof.
+  intro B.
+  eassert (S1 : tfsStart -PA- chanMCurrRead ;? [baseMode m] -PA> _)
+    by (unfold tfsStart; step_search).
+  destruct (bisim_step_disc _ _ _ _ B S1) as [q2 [S2 BQ]].
+  unfold tfsStart, init in S1, S2. invert_disc_prefixes. clean_proc_hyp BQ.
+  unfold_app_hyp BQ. unfold_app_hyp_l BQ. refute_by_chan BQ.
+Qed.
+
+(** After a step into init m, the overlap component was dormant and read m on mNext.*)
+Lemma init_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) :
+  p -PA- a -PA> p' -> overlapState p -> p' ~p~ init m ->
+  p ~p~ dormant /\ a = chanMNextRead ;? [baseMode m].
+Proof.
+  intros TR O SP. backtrack_shape SP.
+  - (* dormant read a mode m0 on mNext, into init m0 *)
+    change (init m0 ~p~ init m) in BT. apply init_bisim_mode in BT. subst m0.
+    split; [exact B | reflexivity].
+  - exfalso. apply (tfsStart_not_init m). exact BT.
+  - exfalso. apply (tfsStart_not_init m). exact BT.
+Qed.
+
+(** After a step into ovWait, whatever its timers, the overlap component was init or ovReady for
+the same mode, and the position timer is well formed: init sets it to zero and ovReady to the
+period.*)
+Lemma ovWaitExp_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) (e2 e3 e4 : Exp) :
+  p -PA- a -PA> p' -> overlapState p -> p' ~p~ ovWait m e2 e3 e4 ->
+  (exists t, evalExpFunTime e4 = Some t) /\
+  (p ~p~ init m \/ exists (u : Exp) (l : Position), p ~p~ ovReady m u l).
+Proof.
+  intros TR O SP. backtrack_shape SP.
+  - (* init m0: its derivative's position timer is zero *)
+    apply ovWait_bisim_mode with (t1 := zeroTime) in BT; [ | reflexivity].
+    destruct BT as [EQ E4]. subst m0. split; [exact E4 | left; exact B].
+  - (* ovReady m0 u l: its derivative's position timer is the period *)
+    apply ovWait_bisim_mode with (t1 := period m0) in BT; [ | apply evalExpFunTime_period].
+    destruct BT as [EQ E4]. subst m0. split; [exact E4 | right; do 2 eexists; exact B].
+Qed.
+
+(** After a step into ovReady, whatever its timer, the overlap component was ovWait for the same
+mode.*)
+Lemma ovReadyExp_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) (u : Exp) (l : Position) :
+  p -PA- a -PA> p' -> overlapState p -> p' ~p~ ovReady m u l ->
+  exists e2 e3 e4, p ~p~ ovWait m e2 e3 e4.
+Proof.
+  intros TR O SP. backtrack_shape SP.
+  match type of BT with outPrefix _ (eBase ?b1 :: eBase ?b :: nil) _ ~p~ _ =>
+    bt_step BT (chanOutProc ;! [b1, b]) S2 end.
+  destruct (bisim_step_disc _ _ _ _ BT S2) as [r2 [R2 _]].
+  invert_disc_prefixes. output_values.
+  do 3 eexists. exact B.
+Qed.
+
+(** Before a delay into ovWait m, the overlap component was an ovWait, which was for m if its
+position timer was well formed: every other overlap state delays only to itself.*)
+Lemma ovWait_del_bkwd (p p' : ProcTerm) (d : Delay) (m : Mode) (e2 e3 e4 : Exp) :
+  overlapState p -> p -PD- d -PD> p' -> p' ~p~ ovWait m e2 e3 e4 ->
+  exists (m0 : Mode) (f2 f3 f4 : Exp), p ~p~ ovWait m0 f2 f3 f4 /\
+    ((exists t, evalExpFunTime f4 = Some t) -> m0 = m /\ exists t, evalExpFunTime e4 = Some t).
+Proof.
+  intros OS D BZ.
+  destruct (overlapState_shape _ OS)
+    as [B | m0 B | m0 f2 f3 f4 B | m0 f2 l B | m0 B | B | B | B | B | m0 B | B | B | B];
+    try solve [exfalso; match type of B with p ~p~ ?X =>
+      assert (B' : p' ~p~ X) by (eapply bisim_del_pres; [del_self_body | exact B | exact D]);
+      pose proof (bisim_trans _ _ _ (bisim_symm _ _ BZ) B') as BT;
+      unfold dormant, init, tfsStart in BT; try unfold liftVarList in BT;
+      ovWait_bisim_contra BT end].
+  exists m0 f2 f3 f4. split; [exact B | ]. intros [t4 E4].
+  destruct (bisim_step_del _ _ _ _ B D) as [q [TQ BQ]].
+  destruct (ovWait_del_posTimer _ _ _ _ _ _ _ E4 TQ) as [x' [t' B']].
+  eapply ovWait_bisim_mode with (t1 := t'); [apply evalExpFunTime_time | ].
+  eapply bisim_trans; [apply bisim_symm; exact B' | ].
+  eapply bisim_trans; [apply bisim_symm; exact BQ | exact BZ].
 Qed.
 
 (****************** Linking ******************)
