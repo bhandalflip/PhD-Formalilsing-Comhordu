@@ -1013,8 +1013,13 @@ Lemma notifBadPathNet_cases m i n :
   constructor. assumption. Qed.
 
 Lemma rangeBad_notifBad_net m i n :
-  rangeBadStateNet m i n -> notifBadPathNet i n.
-  Admitted. (*#notifBadNetLift #complexNetLift*)
+  rangeBadStateNet m i n -> currModeNet m i n -> notifBadPathNet i n.
+Proof.
+  intros R C. destruct R as [e E1 E2].
+  lets CM : liftEntNet_ent C E2.
+  destruct E1 as [p l h k P]. simpl in CM.
+  econstructor; [ | exact E2]. eapply nbpRng; [exact P | exact CM].
+Qed.
 
 Lemma badOvlp_notifBad_net i n :
   badOvlpStateNet i n -> notifBadPathNet i n.
