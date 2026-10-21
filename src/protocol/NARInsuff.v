@@ -623,7 +623,7 @@ Qed.
 
 (** If the badOvlp state holds at a particular reachable state,
 and in the next state listening holds, then the next state is tfs for some
-time t, with the mode parameter equal to the current mode.*)
+time t, with the mode parameter equal to the current mode, if that is not fail safe.*)
 (* begin helpers for badOvlp_listening_tfs *)
 Ltac badOvlp_listening_tfs_close :=
   unfold bcWaitState, sleepingState, bcReadyState, dormantState, ovWaitState,
@@ -649,14 +649,14 @@ Ltac badOvlp_listening_tfs_close :=
 Theorem badOvlp_listening_tfs n n' a i m 
   (rn : reachableProtNet n) (w : n -NA- a -NA> n') :
   badOvlpStateNet i n -> listeningStateNet i n' ->
-  currModeNet m i n ->
+  currModeNet m i n -> ~ failSafe m ->
   exists t, tfs m t i n' (reachNetDisc n n' a rn w).
 Proof.
-  intros BO LS CM.
+  intros BO LS CM NFS.
   assert (msgBadPathNet i n) as MB.
   { destruct BO as [e E I]. econstructor; [ | exact I].
     inversion E as [q l h k P]; subst. apply mbpBad. exact P. }
-  destruct (msgBad_disc_net n n' a i m rn w MB CM) as [MB' | TF].
+  destruct (msgBad_disc_net n n' a i m rn w MB CM) as [MB' | TS].
   - exfalso. destruct MB' as [e E I]. destruct LS as [e' E' I'].
     pose proof (entInNetUnique _ _ _ _ I I') as EQ. subst e'.
     inversion E' as [q l h k LP]; subst.
@@ -667,7 +667,22 @@ Proof.
     | H : gotRangeStateProt _ _ _ |- _ => inversion H; subst
     | H : badOvlpStateProt _ |- _ => inversion H; subst
     end; badOvlp_listening_tfs_close.
-  - exists zeroTime. exact TF.
+  - (* a tfs state, in mode m still: the listener moved, by its output on bad, which leaves
+       the mode state *)
+    apply tfsState_tfs_exists; [exact TS | | exact NFS].
+    destruct BO as [e E I]. destruct LS as [e' E' I'].
+    inversion E as [q l h k P]; subst. inversion P as [p1 p2 p3 B3]; subst.
+    inversion E' as [q' l' h' k' LP]; subst. inversion LP as [p1' p2' p3' L3]; subst.
+    lets CMe : liftEntNet_ent CM I.
+    econstructor; [ | exact I']. simpl in CMe |- *.
+    destruct (eqDecProcTerm p3 p3') as [EQ | NE].
+    + exfalso. subst p3'. badOvlp_listening_tfs_close.
+    + destruct (link_net_ent_disc _ _ _ _ _ _ w I I') as [EQ | [b B]].
+      * exfalso. apply NE. congruence.
+      * destruct (listener_internal_out_sync_ent _ _ _ _ _ _ _ _ _ _ _ _ _ chanBad
+          (reachableProtNet_triple _ _ _ _ _ _ rn I) B eq_refl
+          (fun b T => badOvlp_step_act _ _ _ B3 T) NE) as [_ KE].
+        subst k'. exact CMe.
 Qed.
 
 (*If an entity is on the notification bad path, and a discrete transition

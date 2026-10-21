@@ -882,6 +882,30 @@ Proof.
     clear - TR. unfold abortOvlp in TR. msgAbort_paused_disj_net_inv.
 Qed.
 
+(** No entity of a network is both on the message bad path and paused.*)
+Lemma msgBad_paused_disj_net (i : nat) (n : Network) :
+  msgBadPathNet i n -> pausedStateNet i n -> False.
+Proof.
+  intros U V. destruct U as [e E1 E2]. destruct V as [e' E1' E2'].
+  assert (e' = e) by (eapply entInNetUnique; eassumption). subst e'.
+  inversion E1' as [p l h k P]; subst.
+  inversion P as [p1 p2 p3 P3]; subst.
+  destruct (msgAbort_paused_disj_net_unp _ P3) as [q' TQ].
+  inversion E1; subst.
+  - match goal with H : gotMsgStateProt _ _ _ |- _ => inversion H; subst end.
+    match goal with H : gotMsgState _ _ _ |- _ =>
+      let X := fresh "X" in lets X : bisim_disc_match H TQ; destruct X as [qq TR] end.
+    clear - TR. unfold gotMsg in TR. msgAbort_paused_disj_net_inv.
+  - match goal with H : gotRangeStateProt _ _ _ |- _ => inversion H; subst end.
+    match goal with H : gotRangeState _ _ _ |- _ =>
+      let X := fresh "X" in lets X : bisim_disc_match H TQ; destruct X as [qq TR] end.
+    clear - TR. unfold gotRange in TR. msgAbort_paused_disj_net_inv.
+  - match goal with H : badOvlpStateProt _ |- _ => inversion H; subst end.
+    match goal with H : badOvlpState _ |- _ =>
+      let X := fresh "X" in lets X : bisim_disc_match H TQ; destruct X as [qq TR] end.
+    clear - TR. unfold badOvlp in TR. msgAbort_paused_disj_net_inv.
+Qed.
+
 (** An entity that leaves the tfs states in a discrete step was not currSince in a mode
 that is not fail safe: while its mode is not fail safe, a discrete step keeps it in the tfs
 states (tfs_currMode_disc_pres). A fail-safe mode may be its own fail-safe successor, so an
@@ -896,11 +920,217 @@ Proof.
   eapply currSince_curr. exact CS.
 Qed.
 
+(** badOvlp only outputs on bad.*)
+Lemma badOvlp_step_act p p' b : badOvlpState p -> p -PA- b -PA> p' -> b = chanBad ;! [].
+Proof.
+  intros A T. destruct (bisim_step_disc _ _ _ _ A T) as [q [TQ _]]. unfold badOvlp in TQ.
+  inversion TQ; subst. match goal with [E : evalExpLists [] _ |- _] => inversion E end.
+  reflexivity.
+Qed.
+
+(** The broadcast component never inputs on bad.*)
+Local Lemma bc_bad_in_not p p' : p -PA- chanBad *? -PA> p' -> broadcastState p -> False.
+Proof. intros TR S. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
+
+(** The overlap component enters a tfs state when it inputs on bad.*)
+Local Lemma ovlp_bad_in_tfsState p p' :
+  p -PA- chanBad *? -PA> p' -> overlapState p -> tfsState p'.
+Proof.
+  intros TR OS. destruct (overlapState_shape _ OS)
+    as [B | v B | v e2 e3 e4 B | v1 e2 v3 B | m0 B | B | B | B | B | v B | B | B | B];
+    try solve [exfalso; prot_outProc_in_not_contra];
+    destruct (bisim_step_disc _ _ _ _ B TR) as [q' [TQ BQ]];
+    prot_outProc_in_not_body; invert_disc_prefixes;
+    let close := (red; (eapply bisim_trans; [exact BQ | ]); apply app_bisim_nil; reflexivity) in
+    first [solve [apply tfsStaSt; close] | solve [apply tfsCurSt; close]
+      | solve [apply tfsLisSt; close]].
+Qed.
+
+(** In a step of a reachable entity in which the listener moves by an output on a channel
+the entity does not offer, the broadcast or the overlap component inputs on that channel, and
+the mode state stays.*)
+Lemma listener_internal_out_sync_ent p1 p2 p3 p1' p2' p3' l l' h h' k k' a c :
+  protocolState (p1 $||$ p2 $||$ p3) ->
+  [|p1 $||$ p2 $||$ p3, l, h, k|] -EA- a ->> [|p1' $||$ p2' $||$ p3', l', h', k'|] ->
+  chanDir c = None -> (forall b, p3 -PA- b -PA> p3' -> b = c ;! []) -> p3 <> p3' ->
+  (p1 -PA- c ;? [] -PA> p1' \/ p2 -PA- c ;? [] -PA> p2') /\ k' = k.
+Proof.
+  intros PS S CD ACT NE.
+  inversion S; subst; try (exfalso; apply NE; reflexivity).
+  (* a silent step of the software: a synchronisation *)
+  1: split; [ | reflexivity];
+     match goal with [T : _ $||$ _ $||$ _ -PA- tauAct -PA> _ |- _] =>
+       destruct (link_reach_triple_tau _ _ _ _ _ _ T PS) as [c0 [v0 Q]] end;
+     decompose [or and] Q; clear Q; subst;
+     try (exfalso; apply NE; reflexivity);
+     match goal with [N : ?x <> ?x', T3 : ?x -PA- _ -PA> ?x' |- _] =>
+       pose proof (ACT _ T3) as X; first [discriminate X | inversion X; subst] end;
+     first [left; assumption | right; assumption].
+  (* a step of the software on one of the entity's channels: one component moves *)
+  all: exfalso;
+    match goal with [T : _ $||$ _ $||$ _ -PA- _ -PA> _ |- _] => triple_disc_nonTau T end;
+    try (apply NE; reflexivity);
+    match goal with [N : ?x <> ?x', T3 : ?x -PA- _ -PA> ?x' |- _] =>
+      pose proof (ACT _ T3) as X; first [discriminate X | inversion X; subst;
+        discriminate CD] end.
+Qed.
+
 Lemma msgBad_disc_net (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mode)
   (p : reachableProtNet n) (w : n -NA- a -NA> n') :
   msgBadPathNet i n -> currModeNet m i n ->
-  msgBadPathNet i n' \/ tfs m zeroTime i n' (reachNetDisc n n' a p w). Admitted. (*3*)
+  msgBadPathNet i n' \/ tfsStateNet i n'.
+Proof.
+  intros U _.
+  destruct U as [e E I].
+  destruct (link_net_ent_disc_fwd n n' e i a w I) as [e' [I' [EQ | [b ST]]]].
+  { subst e'. left. econstructor; eassumption. }
+  assert (R : reachableProtEnt e) by (eapply reachable_net_ent; eassumption).
+  destruct e as [p0 l h k].
+  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
+  inversion PS as [p1 p2 p3 BS OS LS]; subst p0.
+  destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ ST)
+    as [p1' [p2' [p3' [l' [h' [k' [EQ' [W1 [W2 W3]]]]]]]]].
+  subst e'.
+  pose proof (stepEnt_disc_pres_pos _ _ _ ST) as LE. simpl in LE. subst l'.
+  destruct (eqDecProcTerm p3 p3') as [E3 | N3].
+  - (* the listener stays: the path holds again unless the current mode changed, which only
+       the overlap component's switch does, from switchCurr, where the listener is paused, or
+       from tfsCurr into tfsBc *)
+    subst p3'.
+    destruct (eqDecMode (currModeMState k) (currModeMState k')) as [KE | KN].
+    + left. econstructor; [ | exact I']. inversion E; subst.
+      * match goal with [H : gotMsgStateProt _ _ _ |- _] =>
+          inversion H as [? ? ? G]; subst end.
+        eapply mbpMsg; [constructor; exact G | symmetry; exact KE | eassumption].
+      * match goal with [H : gotRangeStateProt _ _ _ |- _] =>
+          inversion H as [? ? ? G]; subst end.
+        eapply mbpRng; [constructor; exact G | symmetry; exact KE | eassumption].
+      * match goal with [H : badOvlpStateProt _ |- _] => inversion H as [? ? ? BO]; subst end.
+        apply mbpBad. constructor. exact BO.
+    + destruct (currMode_switch_states_ent _ _ _ R ST KN) as [[SC _] | [_ TB]].
+      * exfalso. eapply msgBad_paused_disj_net; [econstructor; [exact E | exact I] | ].
+        apply (proj2 (paused_switch_net n i p)). econstructor; [ | exact I].
+        apply switchCurr_switch_ent. exact SC.
+      * right. econstructor; [ | exact I']. ent_state_comp TB.
+        constructor. constructor. apply tfsBcSt. exact TB.
+  - (* the listener steps *)
+    destruct W3 as [E3 | [b3 T3]]; [contradiction | ].
+    inversion E; subst.
+    + (* gotMsg: it reads the entity's position, into gotRange with the range the path
+         tests *)
+      match goal with [H : gotMsgStateProt _ _ _ |- _] => inversion H as [? ? ? G]; subst end.
+      assert (ACT : forall c, p3 -PA- c -PA> p3' -> entChanAct c).
+      { intros c T. destruct (gotMsg_next_act _ _ _ _ _ T G) as [v [EC _]].
+        subst c. left. reflexivity. }
+      destruct (triple_disc_ent_chan 2 R ST eq_refl eq_refl ACT) as [E3 | ST3];
+        [contradiction | ].
+      destruct (ent_disc_proc_read _ _ _ _ _ _ _ _ _ ST3) as [E3 | [c [T [RP _]]]];
+        [contradiction | ].
+      destruct (gotMsg_next_act _ _ _ _ _ T G) as [v [EC GR]].
+      destruct (RP v EC) as [EV KE]. subst v k'.
+      left. econstructor; [ | exact I'].
+      eapply mbpRng; [constructor; exact GR | reflexivity | eassumption].
+    + (* gotRange: it reads the current mode, which the message threatens, into badOvlp *)
+      match goal with [H : gotRangeStateProt _ _ _ |- _] => inversion H as [? ? ? G]; subst end.
+      assert (ACT : forall c, p3 -PA- c -PA> p3' -> entChanAct c).
+      { intros c T. destruct (gotRange_next_act _ _ _ _ _ T G) as [v [EC _]].
+        subst c. left. reflexivity. }
+      destruct (triple_disc_ent_chan 2 R ST eq_refl eq_refl ACT) as [E3 | ST3];
+        [contradiction | ].
+      destruct (ent_disc_proc_read _ _ _ _ _ _ _ _ _ ST3) as [E3 | [c [T [_ [RC _]]]]];
+        [contradiction | ].
+      destruct (gotRange_next_act _ _ _ _ _ T G) as [v [EC CP]].
+      destruct (RC v EC) as [EV KE]. subst v k'.
+      left. econstructor; [ | exact I'].
+      apply mbpBad. constructor. eapply currPincCheck_cond_true; [eassumption | exact CP].
+    + (* badOvlp: it outputs on bad, which only the overlap component takes, into a tfs
+         state *)
+      match goal with [H : badOvlpStateProt _ |- _] => inversion H as [? ? ? BO]; subst end.
+      right. econstructor; [ | exact I']. constructor. constructor.
+      destruct (listener_internal_out_sync_ent _ _ _ _ _ _ _ _ _ _ _ _ _ chanBad PS ST
+        eq_refl (fun b B => badOvlp_step_act _ _ _ BO B) N3) as [[T1 | T2] _].
+      * exfalso. eapply bc_bad_in_not; eassumption.
+      * eapply ovlp_bad_in_tfsState; eassumption.
+Qed.
 (**Proof: Decompose msgBadPath. For all cases but one, fwd-tracking gives that either the state is preserved or the next state is also on the bad path, which is the LHS. The only exception is the badOvlp state, in which case the future may be the listening state. In this case though, fwd-tracking gives that the transition was an output on bad. Now, this must be matched in order for a synch to occur, and the only possible match is from the overlap component. There are 3 states in which this listens on bad. We can eliminate tfsListen and tfsCurr because they would imply that the entity is alredy tfs, which contradicts the assumption that it was on the msgBadPath: the definition of msgBadPath dictates that an entity is not tfs. Thus the remaining case is the transition from ovWait to tfsStart, giving the base case for tfs, which is the RHS exactly.*)
+
+(** switchListen is no tfs state.*)
+Local Lemma switchListen_tfsState_disj p : switchListenState p -> tfsState p -> False.
+Proof.
+  intros A T. destruct T as [B | m B | B | B | B];
+    unfold switchListenState, tfsStartState, tfsNextState, tfsCurrState, tfsBcState,
+      tfsListenState in *;
+    pose proof (bisim_trans _ _ _ (bisim_symm _ _ A) B) as BT;
+    prot_outProc_in_not_body; clean_proc_hyp BT; refute_by_chan BT.
+Qed.
+
+(** An entity in a tfs state other than tfsStart after a discrete step was in a tfs state
+before it.*)
+Local Lemma tfsState_disc_bkwd n n' a i : reachableProtNet n -> n -NA- a -NA> n' ->
+  tfsStateNet i n' -> ~ tfsStartStateNet i n' -> tfsStateNet i n.
+Proof.
+  intros RN S TS NT. destruct TS as [e' TE E'].
+  destruct (link_net_ent_disc_bkwd _ _ _ _ _ S E') as [e [E [EQ | [b B]]]].
+  - subst e. econstructor; [exact TE | exact E].
+  - destruct e as [p l h k]. lets PS : reachableProtNet_triple RN E.
+    inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+    destruct e' as [p' l' h' k'].
+    inversion TE as [q l0 h0 k0 TP]; subst. inversion TP as [q1 q2 q3 T2]; subst.
+    lets T : triple_disc_ent B. destruct T as [_ [[EQ2 | [c C]] _]].
+    + subst q2. econstructor; [ | exact E]. constructor. constructor. exact T2.
+    + econstructor; [ | exact E]. constructor. constructor.
+      destruct T2 as [A | mt A | A | A | A].
+      * exfalso. apply NT. econstructor; [ | exact E']. constructor. constructor. exact A.
+      * destruct (tfsNext_prev _ _ _ _ C OS A) as [X | X];
+          [apply tfsStaSt | eapply tfsNexSt]; exact X.
+      * destruct (tfsCurr_prev _ _ _ C OS A) as [X | [m1 X]];
+          [apply tfsCurSt | eapply tfsNexSt]; exact X.
+      * apply tfsCurSt. exact (tfsBc_prev _ _ _ C OS A).
+      * destruct (tfsListen_prev _ _ _ C OS A) as [X | X];
+          [apply tfsLisSt | apply tfsBcSt]; exact X.
+Qed.
+
+(** An entity in a tfs state, in a current mode m that is not fail safe, is tfs m for some
+time.*)
+Lemma tfsState_tfs_exists (n : Network) (p : reachableProtNet n) (m : Mode) (i : nat) :
+  tfsStateNet i n -> currModeNet m i n -> ~ failSafe m -> exists t, tfs m t i n p.
+Proof.
+  induction p as [n I | n n' a p IH w | n n' d p IH w]; intros TS CM NFS.
+  - (* no tfs state is initial *)
+    exfalso. destruct TS as [e TE E]. lets IE : initialNet_ent I E. inversion IE; subst.
+    inversion TE as [q l0 h0 k0 TP]; subst. unfold procProtocol in TP.
+    inversion TP as [q1 q2 q3 T2]; subst.
+    destruct T2 as [B | mt B | B | B | B];
+      unfold tfsStartState, tfsNextState, tfsCurrState, tfsBcState, tfsListenState in *;
+      pose proof (bisim_symm _ _ B) as BT; prot_outProc_in_not_body; clean_proc_hyp BT;
+      refute_by_chan BT.
+  - (* tfsStart is the base of tfs; any other tfs state was a tfs state before the step, in
+       the same mode, since only tfsCurr into tfsBc changes it, into a fail-safe mode *)
+    destruct (Classical_Prop.classic (tfsStartStateNet i n')) as [TSt | NT].
+    + exists zeroTime. apply tfsBase; assumption.
+    + lets TSn : tfsState_disc_bkwd p w TS NT.
+      destruct (currMode_pres_bkwd _ _ _ _ _ w CM) as [m1 CM1].
+      destruct (eqDecMode m1 m) as [EM | NE].
+      * subst m1. destruct (IH TSn CM1 NFS) as [t T]. exists t. apply tfsDisc; assumption.
+      * exfalso.
+        destruct (currModeNet_switch_states _ _ _ _ _ _ p w CM1 CM NE) as [[_ SL] | [_ TB]].
+        -- destruct SL as [e SE E]. destruct TS as [e' TE E'].
+           pose proof (entInNetUnique _ _ _ _ E E') as EQ. subst e'.
+           inversion SE as [q l0 h0 k0 SP]; subst. inversion SP as [q1 q2 q3 S2]; subst.
+           inversion TE as [q l1 h1 k1 TP]; subst. inversion TP as [r1 r2 r3 T2]; subst.
+           eapply switchListen_tfsState_disj; eassumption.
+        -- apply NFS. destruct TB as [e TBe E]. lets CMe : liftEntNet_ent CM E.
+           simpl in CMe. rewrite <- CMe.
+           eapply tfsBc_failSafe; [ | exact TBe].
+           exact (reachable_net_ent _ _ _ (reachNetDisc n n' a p w) E).
+  - (* a delay keeps the tfs state and the mode *)
+    pose proof TS as TS0. destruct TS0 as [e' TE E'].
+    destruct (link_net_ent_del_bkwd _ _ _ _ _ w E') as [e [E _]].
+    destruct (reachableProtNet_states _ _ _ p E) as [_ [OS _]].
+    pose proof (proj2 (tfsState_del_pres_net n n' i d OS w) TS) as TSn.
+    pose proof (proj2 (currModeNet_del_pres n n' d m i w) CM) as CMn.
+    destruct (IH TSn CMn NFS) as [t T]. exists (t +dt+ d). apply tfsDel. exact T.
+Qed.
 
 (** With a time parameter of 0, the tfs relation is preserved by a discrete step, as long
 as the entity's mode is not fail safe. The mode is tfs's own mode m, which the caller knows

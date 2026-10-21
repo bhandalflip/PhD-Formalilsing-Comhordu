@@ -129,8 +129,8 @@ Local Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
   rewrite minDistCompSymmetric in H34.
   fold (possIncDist m2 m1) in H34. rewrite Heqq0 in H34.
   (*Now, 5 (a) states that t is in Ipd, and therefore 0 < t. Applying the result
-  (incomp_tfs) to this and to (2) (7) (5-c) (8) we can show that e2 is tfs m t.
-  And so by (tfs-bound), t <= trans m <= trans. But by 5 (a) we have that t is
+  (incomp_tfs) to this and to (2) (7) (5-c) (8) we can show that e2 is tfs m t'', t <= t''.
+  And so by (tfs-bound), t <= t'' <= trans m <= trans. But by 5 (a) we have that t is
   in the Ipd of m1 and so max AN trans < t, so trans < t. But t <= trans. Hence we have
   a contradiction and can reject the hypothesis, namely that there was an unsafe reachable
   state, concluding that all such states are, to the contrary, safe.*)
@@ -147,10 +147,10 @@ Local Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
   language, and hence our little computing entities, deals with.*)
   lets RPL : Rminus_plus_lt_subNonnegTot H36.
   rewrite <- multNonneg_Rmult_eq in H34. apply RPL in H34. clear H36.
-  addHyp (incomp_tfs n t2 t l2 l' j m2 m1 X H4 H8 H27 H25 H35 H15 H34).
-  apply tfs_bound in H36. simpl in H18. assert (transMax < t).
+  destruct (incomp_tfs n t2 t l2 l' j m2 m1 X H4 H8 H27 H25 H35 H15 H34) as [t'' [LE TF]].
+  apply tfs_bound in TF. simpl in H18. assert (transMax < t).
   eapply Rle_lt_trans;[ |apply H18]. apply Rmax_r.
-  eapply Rlt_not_le. apply H37. eapply Rle_trans. apply H36.
+  eapply Rlt_not_le. apply H36. eapply Rle_trans. apply LE. eapply Rle_trans. apply TF.
   apply transMaxBound. Qed.
 
 (**This is the main result stating the correctness of the protocol. It says that if a network

@@ -2830,11 +2830,20 @@ Proof.
     unfold_app_bisim. apply bisim_refl.
 Qed.
 
-(*NEEDS TO BE EDITED! PROTOCOL PROCESS HYPOTHESIS DOESN'T LOOK LIKE IT'S THERE.
-NAME COULD BE CHANGED TO SOMETHING A BIT MORE NORMAL TOO.*)
-Lemma gotMsg_state p p' m l :
+(*NAME COULD BE CHANGED TO SOMETHING A BIT MORE NORMAL.*)
+Lemma gotMsg_state p p' m l : protocolState p ->
   p -PA- chanInProc;? [baseMode m, basePosition l] -PA> p' -> gotMsgStateProt m l p'.
-  Admitted. (*6*)
+Proof.
+  intros PS TR. inversion PS as [p1 p2 p3 BS OS LS]; subst; clear PS.
+  inversion TR; subst; clear TR.
+  - exfalso. destruct (broadcastState_shape _ BS); prot_outProc_in_not_contra.
+  - match goal with [V : p2 $||$ p3 -PA- _ -PA> _ |- _] => inversion V; subst; clear V end.
+    + exfalso. destruct (overlapState_shape _ OS); prot_outProc_in_not_contra.
+    + constructor.
+      destruct (listenerState_shape _ LS) as [H | m0 H | H | m0 H | H | m0 l0 H | m0 e H
+        | m0 e H | H | H]; try solve [exfalso; prot_outProc_in_not_contra].
+      shape_step_pre B. unfold gotMsgState. shape_body B.
+Qed.
 (**Proof: p is a protocol process, so can be decomposed into p1 | p2 | p3. Brute force on p1, p2 shows that these don't match. Brute force analysis on listener states shows that the only state that fits for p3 is gotMsgState.*)
 
 (*LOCAL TIDY*)
