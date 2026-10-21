@@ -529,9 +529,41 @@ Qed.
 
 (*LOCAL TIDY*)
 
+(** An output step of a timed list keeps every element but the one it outputs.*)
+Local Lemma inList_pres_input_aux : forall l a l', l -tl- a -tl> l' ->
+  forall u x, a = atlOut u -> x _: l -> x _: l' \/ x = <(u, zeroTime)>.
+Proof.
+  intros l a l' H.
+  induction H as [v1 l1 | l1 l1' v1 e Hs IH | d1 | l1 l1' d1 v1 t1 t1' Hs IH Ht];
+    intros u x Ea Hin; try discriminate.
+  - injection Ea as Eu. subst. destruct Hin as [Hx | Hx].
+    + right. subst. reflexivity.
+    + left. assumption.
+  - destruct Hin as [Hx | Hx].
+    + left. left. assumption.
+    + destruct (IH u x Ea Hx) as [Hy | Hy].
+      * left. right. assumption.
+      * right. assumption.
+Qed.
+
+(** A timed-out message in an input list stays there through any step but a delay, unless
+the step outputs it.*)
 Lemma inList_pres_input v l l' a :
+  (forall d, a <> atlDel d) ->
   <( v, zeroTime )> _: inList l -> l -il- a -il> l' ->
-  <( v, zeroTime )> _: inList l' \/ a = v !!. Admitted. (*5*)
+  <( v, zeroTime )> _: inList l' \/ a = v !!.
+Proof.
+  intros Hnd Hin H. inversion H; subst.
+  - left. simpl. right. exact Hin.
+  - exfalso. eapply Hnd. reflexivity.
+  - simpl in Hin. destruct a.
+    + exfalso. eapply Hnd. reflexivity.
+    + match goal with [Htl : stepTimedList _ _ _ |- _] => inversion Htl end.
+    + match goal with [Htl : stepTimedList _ _ _ |- _] =>
+        destruct (inList_pres_input_aux _ _ _ Htl _ _ eq_refl Hin) as [Hy | Hy] end.
+      * left. assumption.
+      * right. injection Hy as Hv. subst. reflexivity.
+Qed.
 
 (*-LOCAL TIDY*)
 
@@ -552,10 +584,12 @@ Lemma inList_inter_pres_input v lix lox lnx lix' lox' lnx' a :
   (*Delay contradicts one of our hypotheses.*)
   false.
   (*Finally we just use an auxiliary result on inList to prove the remaining
-  cases.*)
-  lets IPI : inList_pres_input H0 H6. elim_intro IPI IL VEQ;
+  cases, neither of which delays the input list.*)
+  all: match goal with [Hs : _ -il- ?b -il> _ |- _] =>
+    assert (ND : forall d, b <> atlDel d) by (intros dd EE; discriminate EE) end.
+  lets IPI : inList_pres_input ND H0 H6. elim_intro IPI IL VEQ;
   [left | right; inversion VEQ]; assumption.
-  lets IPI : inList_pres_input H0 H6. elim_intro IPI IL VEQ;
+  lets IPI : inList_pres_input ND H0 H6. elim_intro IPI IL VEQ;
   [left | right; inversion VEQ]. assumption. reflexivity.
   Qed.
 

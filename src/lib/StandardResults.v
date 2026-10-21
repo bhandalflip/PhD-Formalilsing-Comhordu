@@ -42,16 +42,6 @@ Ltac nonneg_lt0_contra :=
 Definition onePos : posreal. assert (0 < (INR 1)). apply lt_0_INR.
   constructor. eapply mkposreal. apply H. Defined.
 
-(** The minimum of two numbers. Note, r2 is returned if the numbers are equal,
-but in that case r1 = r2, so this is the same as returning r1.*)
-Definition minR (r1 r2 : R) : R :=
-  if (Rlt_le_dec r1 r2) then r1 else r2.
-
-(** The maximum of two numbers. Note, r1 is returned if the numbers are equal,
-but in that case r1 = r2, so this is the same as returning r2.*)
-Definition maxR (r1 r2 : R) : R :=
-  if (Rlt_le_dec r1 r2) then r2 else r1.
-
 Definition zeroNonneg : nonnegreal := mknonnegreal 0 (Rle_refl 0).
 
 (** Euclidean distance is always >= 0.*)
@@ -148,22 +138,14 @@ Lemma addNonnegZeroL : forall (r : nonnegreal),
   generalize dependent cond_nonneg.
   rewrite <- H. intros. f_equal. apply proof_irrelevance. Qed.
 
-(** Removes the proof from an equality of nonnegative reals, simplifying the
-proof obligation to proving the equality on just the reals.*)
-Lemma nonnegEqSimpl : forall (r1 r2 : nonnegreal),
-  nonneg r1 = nonneg r2 -> r1 = r2. intros. destruct r1, r2.
-  simpl in H. generalize dependent cond_nonneg.
-  generalize dependent cond_nonneg. rewrite H. intros.
-  f_equal. apply proof_irrelevance. Qed.
-
 (** Addition of nonnegative reals is associative*)
 Lemma addNonnegAssoc : forall (r1 r2 r3 : nonnegreal),
-  r1 +nn+ (r2 +nn+ r3) = r1 +nn+ r2 +nn+ r3. intros. apply nonnegEqSimpl.
+  r1 +nn+ (r2 +nn+ r3) = r1 +nn+ r2 +nn+ r3. intros. apply nonnegRealEqR.
   repeat (rewrite addNonnegFact). ring. Qed.
 
 Lemma addNonnegComm : forall (r1 r2 : nonnegreal),
   r1 +nn+ r2 = r2 +nn+ r1. intros. destruct r1, r2.
-  simpl. apply nonnegEqSimpl. simpl. ring. Qed.
+  simpl. apply nonnegRealEqR. simpl. ring. Qed.
 
 Lemma addNonnegCancel : forall (r1 r2 r3 : nonnegreal),
   r1 +nn+ r2 = r1 +nn+ r3 -> r2 = r3.
@@ -192,10 +174,6 @@ Lemma eqDecPosReal : eqDec posreal. unfold eqDec. destruct x1, x2.
   generalize dependent cond_pos0. rewrite H0. intros. repeat f_equal.
   apply proof_irrelevance. right. unfold not; intros. inversion H1.
   apply H0. assumption. Qed.
-
-(**Squares each element and the adds them.*)
-Definition sumSquares (r1 r2 : R) : R :=
-  Rsqr r1 + Rsqr r2.
 
 (** Coerce a positive real to a nonnegative real.*)
 Coercion posToNonneg (r : posreal) : nonnegreal :=

@@ -11,14 +11,8 @@ COULD ALL BE BROUGHT TO GETHER.*)
 
 From Stdlib Require Import Arith.
 
-(** Turn a < into a <=.*)
-Ltac ltToLe H := apply le_S in H; apply le_S_n in H.
-
 (** Adds H to the context.*)
 Ltac addHyp H := generalize H; intro.
-
-(** Adds H to the context as Q*)
-Ltac addHypAs H Q := generalize H; intro Q.
 
 (** Inverts and then clears a hypothesis.*)
 Ltac invertClear H := inversion H; clear H.
@@ -115,7 +109,6 @@ Ltac my_applys_eq H := first [my_applys_eq5 H | my_applys_eq4 H |
 Ltac invertClearAs1 H U := inversion H as [U]; clear H.
 Ltac invertClearAs2 H U V := inversion H as [U V]; clear H.
 Ltac invertClearAs3 H U V W := inversion H as [U V W]; clear H.
-Ltac invertClearAs4 H U V W X := inversion H as [U V W X]; clear H.
 
 Ltac elim_intro H H1 H2 := elim H; [intro H1 | intro H2]; clear H.
 
@@ -136,8 +129,6 @@ Ltac elimOr6 P U := let H := fresh in let U1 := fresh U in
 
 (*Decompose an and of multiple parts into named hypotheses.*)
 Ltac decompAnd2 H H1 H2 := elim H; intros H1 H2; clear H.
-Ltac decompAnd3 H H1 H2 H3 := let Q := fresh in elim H; intros H1 Q; clear H;
-  decompAnd2 Q H2 H3.
 
 (*Looks for one conjunction in the hypotheses and flattens the conjuncts into 2
 fresh W names.*)
@@ -159,25 +150,14 @@ Ltac decompEx3 H a b c Q := let H1 := fresh in invertClearAs2 H a H1;
   decompEx2 H1 b c Q.
 Ltac decompEx4 H a b c d Q := let H1 := fresh in invertClearAs2 H a H1;
   decompEx3 H1 b c d Q.
-Ltac decompEx5 H a b c d e Q := let H1 := fresh in invertClearAs2 H a H1;
-  decompEx4 H1 b c d e Q.
-Ltac decompEx6 H a b c d e f Q := let H1 := fresh in invertClearAs2 H a H1;
-  decompEx5 H1 b c d e f Q.
 
 (*Do the tactic t, then to the first subgoal generated to t again etc.*)
 Ltac dofirst2 t := t;[t |..].
 Ltac dofirst3 t := t;[dofirst2 t |..].
 Ltac dofirst4 t := t;[dofirst3 t |..]. 
-Ltac dofirst5 t := t;[dofirst4 t |..].
-Ltac dofirst6 t := t;[dofirst5 t |..]. 
 
 (*Decompose and existential conjuction into variable x and conjuncts H1, H2.*)
 Ltac decompExAnd H x H1 H2 := let Q := fresh in destruct H as [x Q]; decompAnd2 Q H1 H2.
-  
-Ltac unfold_somewhere f :=
-  first [progress unfold f |
-  match goal with [U : context[f] |- _] =>
-  unfold f in U end].
 
 (** Used to solve the goal which is an inequality between two objects.*)
 Ltac neq_inversion := unfold not; let Q := fresh in intro Q; inversion Q.
@@ -201,23 +181,9 @@ Ltac genDep4 x1 x2 x3 x4:= genDep3 x1 x2 x3; generalize dependent x4.
 
 Ltac genDep5 a b c d e := genDep4 a b c d; generalize dependent e.
 
-Ltac uncurry_aux H := intro H; intros; apply H;
-  repeat (split;[assumption | ]); assumption.
-
-Ltac uncurry_step :=
-  let H := fresh in 
-  match goal with
-  | [ |- ?P1 -> ?P2 -> ?Q] =>
-    cut (P1 /\ P2 -> Q); [uncurry_aux H | ]
-  end.
-
-Ltac uncurry := repeat uncurry_step.
-
 (**Safe version of eexists that checks for existential first*)
 Ltac eexists_safe := match goal with [ |- ex _] => eexists end.
 
-Ltac name_evars := repeat match goal with |- context[?V] => is_evar V; set V end.
-  
 (** Given an equality U : a = b, this tactic first tries to rewrite U
 in the goal, then if this does not work rewrites it in a hypothesis.*)
 Ltac subst_once U :=
@@ -232,13 +198,6 @@ Ltac subst_once U :=
 clears the hypothesis.*)
 Ltac subst_all U := match type of U with ?a = ?b =>
   move U at top; repeat subst_once U; clear U end.
-
-(*Performs symmetry on an inequality H. Tries to replace the original
-inequality or failing to do so adds the new inequality as a fresh hypothesis.*)
-Ltac neq_symmetry H := let U := fresh in
-  match type of H with (?a <> ?b) => assert (b <> a) as U; [unfold not;
-  intro; apply H; symmetry; assumption | ]; try (clear H; rename U into H)
-  end.
 
 (*Looks for one disjunction in the hypotheses and flattens the disjuncts
 into 2 fresh W names.*)

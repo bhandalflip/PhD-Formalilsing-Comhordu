@@ -4,13 +4,6 @@ Require Import ComhCoq.lib.GenTacs.
 Require Import ComhCoq.lib.Extras.LibTactics.
 Open Scope R_scope.
 
-Ltac Rmult_le_zero :=
-  match goal with
-  | [ |- 0 <= ?y1 * ?y2] => 
-    replace 0 with (0 * 0);[ | ring];
-    apply Rmult_le_compat;[apply Rle_refl | apply Rle_refl | ..]
-  end.
-
 (** Splits the goal into 2 subgoals based on d <= t or t < d*)
 Ltac Rleltcases d t U :=  let H := fresh in lets H : Rle_or_lt d t;
                                             let U1 := fresh U in elim_intro H U1 U1.
@@ -24,41 +17,6 @@ Lemma RltMinusBothSides : forall (r1 r2 : R),
   intros. lra. Qed.
 
 (**** Rle ****)
-
-Ltac Rle_trans_red := 
-  match goal with
-  | [H1 : ?r1 <= ?r2, H2 : ?r2 <= ?r3 |- ?r1 <= ?r3] =>
-    eapply Rle_trans;[apply H1 | apply H2]
-  | [H1 : ?r1 <= ?r2 |- ?r1 <= ?r3] =>
-    eapply Rle_trans;[apply H1 | ]
-  | [H2 : ?r2 <= ?r3 |- ?r1 <= ?r3] =>
-    eapply Rle_trans;[ | apply H2]
-  end.
-
-Ltac Rle_trans_rev_red := 
-  match reverse goal with
-  | [H1 : ?r1 <= ?r2, H2 : ?r2 <= ?r3 |- ?r1 <= ?r3] =>
-    eapply Rle_trans;[apply H1 | apply H2]
-  | [H1 : ?r1 <= ?r2 |- ?r1 <= ?r3] =>
-    eapply Rle_trans;[apply H1 | ]
-  | [H2 : ?r2 <= ?r3 |- ?r1 <= ?r3] =>
-    eapply Rle_trans;[ | apply H2]
-  end.
-
-Ltac Rplus_le_cancel_middle :=
-  match goal with
-  | [ |- ?x1 + ?r + ?x2 <= ?y1 + ?r + ?y2] =>
-    replace (x1 + r + x2) with (x1 + x2 + r);[ | ring];
-    replace (y1 + r + y2) with (y1 + y2 + r);[ | ring];
-    apply Rplus_le_compat_r
-  | [ |- ?x1 + ?r <= ?y1 + ?r + ?y2] =>
-    replace (y1 + r + y2) with (y1 + y2 + r);[ | ring];
-    apply Rplus_le_compat_r
-  end.
-
-Ltac Rle_ring_solve := apply Req_le; simpl; ring.
-
-Ltac Rle_refl_solve := apply Rle_refl.
 
 Lemma Rle_plus_r : forall (x y : R),
   0 <= y -> x <= x + y.
@@ -79,10 +37,6 @@ Lemma Rmult_le_0_compat : forall r1 r2 : R,
 Lemma Rle_zero_plus : forall r1 r2 : R,
   0 <= r1 -> 0 <= r2 -> 0 <= r1 + r2.
   intros. lra. Qed.
-
-Lemma Rle_zero_mult : forall r1 r2 : R,
-  0 <= r1 -> 0 <= r2 -> 0 <= r1 * r2.
-  intros. nra. Qed.
 
 Lemma RlePlusExistsR : forall (r1 r2 : R),
   r1 <= r2 -> exists r3, r2 = r1 + r3 /\ 0 <= r3.
@@ -128,9 +82,6 @@ Lemma Rplus_le_weaken_ll : forall (x y z : R), x + y <= z -> 0 <= x -> y <= z.
 Lemma Rplus_le_weaken_rr : forall (x y z : R), 0 <= z -> x <= y -> x <= y + z.
   intros. lra. Qed.
 
-Lemma Rplus_le_weaken_rl : forall (x y z : R), 0 <= y -> x <= z -> x <= y + z.
-  intros. lra. Qed.
-
 Lemma Rminus_le_weaken_lr : forall (x y z : R), 0 <= y -> x <= z -> x - y <= z.
   intros. lra. Qed.
 
@@ -172,37 +123,6 @@ Ltac Rplus_le_tac :=
 
 (**** Rlt ****)
 
-Ltac Rlt_trans_red := 
-  match goal with
-  | [H1 : ?r1 < ?r2, H2 : ?r2 < ?r3 |- ?r1 < ?r3] =>
-    eapply Rlt_trans;[apply H1 | apply H2]
-  | [H1 : ?r1 < ?r2 |- ?r1 < ?r3] =>
-    eapply Rlt_trans;[apply H1 | ]
-  | [H2 : ?r2 < ?r3 |- ?r1 < ?r3] =>
-    eapply Rlt_trans;[ | apply H2]
-  end.
-
-Ltac Rlt_trans_rev_red := 
-  match reverse goal with
-  | [H1 : ?r1 < ?r2, H2 : ?r2 < ?r3 |- ?r1 < ?r3] =>
-    eapply Rlt_trans;[apply H1 | apply H2]
-  | [H1 : ?r1 < ?r2 |- ?r1 < ?r3] =>
-    eapply Rlt_trans;[apply H1 | ]
-  | [H2 : ?r2 < ?r3 |- ?r1 < ?r3] =>
-    eapply Rlt_trans;[ | apply H2]
-  end.
-
-Ltac Rplus_lt_cancel_middle :=
-  match goal with
-  | [ |- ?x1 + ?r + ?x2 < ?y1 + ?r + ?y2] =>
-    replace (x1 + r + x2) with (x1 + x2 + r);[ | ring];
-    replace (y1 + r + y2) with (y1 + y2 + r);[ | ring];
-    apply Rplus_lt_compat_r
-  | [ |- ?x1 + ?r < ?y1 + ?r + ?y2] =>
-    replace (y1 + r + y2) with (y1 + y2 + r);[ | ring];
-    apply Rplus_lt_compat_r
-  end.
-
 Lemma Rlt_plus_r : forall (x y : R),
   0 < y -> x < x + y.
   intros. lra. Qed.
@@ -223,10 +143,6 @@ Lemma RltPlusExistsL : forall (r1 r2 : R),
   r1 < r2 -> exists r3, r2 = r3 + r1 /\ 0 < r3.
   intros. exists (r2 - r1). split; lra. Qed.
 
-Lemma RltExistsBetween (r1 r2 : R) : r1 < r2 -> exists r3,
-  r1 < r3 < r2.
-  intros. exists ((r1 + r2) / 2). lra. Qed. 
-
 Lemma Rplus_lt_swap_rl : forall (x y z : R),
   x < y + z -> x - y < z.
   intros. lra. Qed.
@@ -241,14 +157,6 @@ Lemma Rplus_lt_swap_ll : forall (x y z : R),
 
 Lemma Rplus_lt_swap_lr : forall (x y z : R),
   x + y < z -> x < z - y.
-  intros. lra. Qed.
-
-Lemma Rminus_lt_swap_rr : forall (x y z : R),
-  x < y - z -> x + z < y.
-  intros. lra. Qed.
-
-Lemma Rminus_lt_swap_lr : forall (x y z : R),
-  x - y < z -> x < z + y.
   intros. lra. Qed.
 
 Lemma Rplus_lt_reg_l: forall r r1 r2 : R, r1 + r < r2 + r -> r1 < r2.
@@ -267,9 +175,6 @@ Lemma Rplus_lt_weaken_rr : forall (x y z : R), 0 <= z -> x < y -> x < y + z.
   intros. lra. Qed.
 
 Lemma Rplus_lt_weaken_rl : forall (x y z : R), 0 <= y -> x < z -> x < y + z.
-  intros. lra. Qed.
-
-Lemma Rminus_lt_weaken_lr : forall (x y z : R), 0 <= y -> x < z -> x - y < z.
   intros. lra. Qed.
 
 (** Tries to solve an inequality on real numbers.*) 

@@ -22,10 +22,6 @@ From Stdlib Require Import Lists.ListSet.
 
 (*********Basic Stuff********)
 
-Definition toNonneg (r : posreal) : nonnegreal :=
-  let h := (Rlt_le 0 r (cond_pos r)) in
-  mknonnegreal r h.
-
 (** A time value is a non negative real number.*)
 Record Time := mkTime {time :> nonnegreal}.
 
@@ -92,51 +88,7 @@ Definition decToOption {P : Prop} (p : {P} + {~P}) : option P :=
   | right _ => None
   end.
 
-Lemma lt_plus_r (m n : nat) :
-  0 < n -> m < m + n. intros. lia. Qed.
-
-Lemma lt_plus_l (m n : nat) :
-  0 < n -> m < n + m. intros. lia. Qed.
-
-Lemma le_plus_r (m n : nat) :
-  m <= m + n. intros. lia. Qed.
-
-Lemma le_plus_l (m n : nat) :
-  m <= n + m. intros. lia. Qed.
-
 Open Scope R_scope.
-
-(** inAtList a i l says that a is at position i in the list l.
-The first position is position 0.*)
-Inductive inAtList {A : Type} (a : A) : nat -> list A -> Prop :=
-  | inatlFst (l : list A) :
-    inAtList a 0 (a :: l)
-  | inatlCons (i : nat) (a' : A) (l : list A) :
-    inAtList a i l -> inAtList a (S i) (a' :: l).
-
-Notation "a -@ i -: l" := (inAtList a i l) (at level 50).
-
-(** If an element is in a list according to the definition of inAtList,
-then it is in the list according to In.*)
-Theorem inAtList_inList (A : Type) (a : A) (l : list A) (i : nat) :
-  a -@ i -: l -> a _: l. intros. induction H. constructor. reflexivity.
-  simpl. right. assumption. Qed.
-
-(** If a is at i in l and so is a', then a = a'.*)
-Theorem inAtListUnique (A : Type) (a a' : A) (i : nat) (l : list A) :
-  a -@ i -: l -> a' -@ i -: l -> a = a'. intros. induction H.
-  inversion H0. reflexivity. inversion H0. apply IHinAtList. assumption. Qed.
-
-(** There either exists an element at position i or there doesn't.*)
-Theorem decInAtList (A : Type) (i : nat) (l : list A) :
-  decidable (exists a, a -@ i -: l). unfold decidable.
-  intros. generalize dependent i. induction l; intros.
-  right. intro. inversion H. inversion H0. destruct i.
-  left. exists a. constructor. addHyp (IHl i).
-  inversion H; clear H. inversion H0 as [e He]. left.
-  exists e. apply inatlCons. assumption. right. intro.
-  inversion H as [e He]. clear H. inversion He. apply H0. exists e.
-  assumption. Qed.
 
 (**Equality is decidable for times.*)
 Lemma eqDecTime : eqDec Time. unfold eqDec. destruct x1, x2.
@@ -340,47 +292,19 @@ Theorem rightmostNeg : forall (j k : nat) (p : nat -> Prop)
   invertClear H5. split. assumption. split. assumption. intros.
   apply H1. apply H6. assumption. Qed.   
 
-(**This characterisation of le leaves does the inductive part by
-subtracting from the lesser number rather than adding to the larger
-one, and makes certain proofs easier.*)
-Inductive leAlt : nat -> nat-> Prop :=
-  | leaRefl : forall (n : nat), leAlt n n
-  | leaSucc : forall (m n : nat), leAlt (S m) n -> leAlt m n.
-
-(**This is the key difference between leAlt and le.*)
-Lemma leAlt_S : forall (m n : nat), leAlt m n -> leAlt m (S n).
-  intros. induction H. repeat constructor. constructor.
-  assumption. Qed. 
-
-(*The alternative characterisation of le coindices with
-the standard one.*)
-Lemma leAltLe : forall (m n : nat), m <= n <-> leAlt m n.
-  intros. split; intros. induction H. constructor.
-  apply leAlt_S. assumption. induction H. constructor.
-  apply le_S_n. constructor. assumption. Qed.  
-
 (**If a property p is true of the number k, and j <= k,
 then there is some smallest j' between j and k such that p is true at j'.*)
 Theorem leftmost : forall (j k : nat) (p : nat -> Prop)
   (K : forall i : nat, decidable (p i)),
   p k -> j <= k ->
   exists j', j <= j' <= k /\ p j' /\
-  forall x : nat, j <= x < j' -> ~ p x. intros.
-  rewrite leAltLe in H0. induction H0.
-  exists n. split. split; apply Nat.le_refl.
-  split. assumption. intros. inversion H0. apply False_ind.
-  eapply (proj1 (Nat.lt_nge _ _)). apply H2. assumption. apply IHleAlt in H.
-  clear IHleAlt. invertClear H. addHyp (K (m)).
-  invertClear H1. invertClear H3. invertClear H.
-  exists m. split. split. constructor. rewrite leAltLe.
-  constructor. assumption. split. assumption.
-  intros. invertClear H. unfold not. intros. eapply (proj1 (Nat.lt_nge _ _)).
-  apply H6. assumption. exists x. split. invertClear H2. split.
-  apply le_S_n. constructor. assumption. assumption.
-  split. assumption. intros. invertClear H.
-  invertClear H5. rewrite <- H. assumption.
-  apply H4. split. apply le_n_S. assumption.
-  rewrite H7. assumption. Qed.
+  forall x : nat, j <= x < j' -> ~ p x. intros j k p K H H0.
+  assert (D : forall n, (j <= n /\ p n) \/ ~ (j <= n /\ p n)).
+  intro n. destruct (le_dec j n), (K n); tauto.
+  destruct (dec_inh_nat_subset_has_unique_least_element _ D (ex_intro _ k (conj H0 H)))
+    as [j' [[[J Pj] L] _]].
+  exists j'. split. split. assumption. apply L. split; assumption.
+  split. assumption. intros x [X1 X2] Px. specialize (L x (conj X1 Px)). lia. Qed.
 
 (**The same theorem as leftmost but with
 negation of P as existential and P as universal properties.*)
@@ -414,7 +338,7 @@ Theorem rightmostCont : forall (j k : nat) (p : nat -> Prop)
   apply le_lt_eq_dec in H4. invertClear H4.
   (*Case j' < m*) 
   exists j'. split. split. assumption.
-  constructor. ltToLe H2. assumption. intros.
+  constructor. apply Nat.lt_le_incl in H2. assumption. intros.
   rename m0 into n. addHyp (H3 n H4). clear H3.
   invertClear H5. split. assumption. invertClear H6.
   left. assumption. apply False_ind. rewrite <- H5 in H2.
@@ -457,14 +381,6 @@ Lemma inclNotEx {A : Type} (l1 l2 : list A) : (forall x y : A, {x = y} + {x <> y
   invertClear H0. exists x. invertClear H2. split. apply in_cons.
   assumption. assumption. exists a. split. constructor. reflexivity.
   assumption. Qed. 
-
-Lemma incl_emp {A : Type} (l : list A) : incl [] l. unfold incl. intros.
-  inversion H. Qed.
-
-Lemma incl_emp_eq {A : Type} (l : list A) : incl l [] -> l = []. intros.
-  unfold incl in H. destruct l. reflexivity. addHyp (H a).
-  cut (a _: []). intros. inversion H1. apply H0. constructor.
-  reflexivity. Qed.
 
 Lemma diff_emp {A : Type} (l : list A)
   (p : forall x y : A, {x = y} + {x <> y}) : set_diff p l [] = [] -> l = [].
