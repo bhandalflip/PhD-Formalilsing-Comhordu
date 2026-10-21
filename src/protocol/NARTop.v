@@ -101,48 +101,6 @@ Theorem nextSince_fst_deliv_suff (n : Network) (t : Time) (m : Mode)
 
 (*TIDY*)
 
-(** ovReadyN applied to its arguments is ovReady.*)
-Local Lemma ovReadyN_bisim (m : Mode) (e2 : Exp) (l : Position) :
-  ovReadyN $( [eBase (baseMode m), e2, eBase (basePosition l)] )$ ~p~ ovReady m e2 l.
-Proof. unfold_app_bisim. apply bisim_refl. Qed.
-
-(** Of two bisimilar ovWait, the second with a well-formed position timer, first parameters
-that evaluate agree once the period of the mode is subtracted.*)
-Local Lemma ovWait_bisim_first_val (m1 m2 : Mode) u1 x1 y1 u2 x2 y2 t tu1 tu2 :
-  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 -> evalExpFunTime y2 = Some t ->
-  evalExpFunTime u1 = Some tu1 -> evalExpFunTime u2 = Some tu2 ->
-  time tu1 -nn- time (period m1) = time tu2 -nn- time (period m1).
-Proof.
-  intros B E E1 E2.
-  assert (EM : m2 = m1)
-    by exact (proj1 (ovWait_bisim_mode _ _ _ _ _ _ _ _ _ E (bisim_symm _ _ B))).
-  subst m2.
-  destruct (ovWait_bisim_pos_timeout _ _ _ _ _ _ _ _ _ B E) as [x1' [y1' [x2' [y2' [B' E']]]]].
-  assert (S1 : exists q, ovWait m1 u2 x2' y2' -PA- chanPos ;? [basePosition origin] -PA> q).
-  { eexists. unfold ovWait. apply stepDpChoiceL. apply stepDpChoiceR.
-    apply stepDpTimeOut; [ | exact E']. apply stepDpIn. typed_vals. }
-  destruct S1 as [q S1].
-  destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ B') S1) as [r [R BR]].
-  unfold ovWait in S1, R. invert_disc_prefixes. clean_proc_hyp BR.
-  rewrite (subExp_eval_id _ u2 _ E2) in BR. rewrite (subExp_eval_id _ u1 _ E1) in BR.
-  assert (BR' : ovReady m1 u2 origin ~p~ ovReady m1 u1 origin) by
-    (eapply bisim_trans; [apply bisim_symm; apply ovReadyN_bisim | ];
-     eapply bisim_trans; [exact BR | apply ovReadyN_bisim]).
-  assert (S2 : exists q2, ovReady m1 u2 origin -PA-
-    chanOutProc ;! [baseMode m1, basePosition origin] -PA> q2)
-    by (eexists; unfold ovReady; apply stepDpOut; repeat constructor).
-  destruct S2 as [q2 S2].
-  destruct (bisim_step_disc _ _ _ _ BR' S2) as [q1 [S1' BQ]].
-  destruct (ovReady_step_ovWait _ _ _ _ _ S2) as [_ W2].
-  destruct (ovReady_step_ovWait _ _ _ _ _ S1') as [_ W1].
-  assert (BW : ovWait m1 (u1 (-) ePeriod m1) (u1 (-) ePeriod m1) (ePeriod m1) ~p~
-    ovWait m1 (u2 (-) ePeriod m1) (u2 (-) ePeriod m1) (ePeriod m1)) by
-    (eapply bisim_trans; [apply bisim_symm; exact W1 | ];
-     eapply bisim_trans; [apply bisim_symm; exact BQ | exact W2]).
-  lets EX : ovWait_bisim_pause_timer BW (evalExpFunTime_subtract_period m1 u2 tu2 E2).
-  rewrite (evalExpFunTime_subtract_period m1 u1 tu1 E1) in EX. injection EX as EX. exact EX.
-Qed.
-
 (** The wait time between two modes is positive.*)
 Local Lemma waitTime_pos (m1 m2 : Mode) (pr : m1 -mtr-> m2) :
   0 < nonneg (time (waitTime m1 m2 pr)).
@@ -162,50 +120,17 @@ Proof.
   destruct (Rle_dec r r1) as [L1 | L1]; destruct (Rle_dec r r2) as [L2 | L2]; simpl; lra.
 Qed.
 
-(** The timer init sets, the wait time and a period, evaluates to their sum.*)
-Local Lemma init_timer_val (m0 m : Mode) (t : Time) :
-  evalExpFunTime (eWaitTime m0 m (+) ePeriod m) = Some t ->
-  exists (pr : m0 -mtr-> m),
-    nonneg (time t) = nonneg (time (waitTime m0 m pr)) + nonneg (time (period m)).
-Proof.
-  intro E. unfold evalExpFunTime in E. cbn [evalExpFun] in E.
-  destruct (modeTransRelOpt m0 m) as [pr | ]; cbn [option_map] in E; [ | discriminate].
-  exists pr. destruct (waitTime m0 m pr) as [[w wn]].
-  destruct (period m) as [[pp pn]]. cbn in E. injection E as E. subst t. reflexivity.
-Qed.
-
 Lemma init_ovWait_track_net m m' t' i x y n n' a :
   initStateNet m i n -> ovWaitStateNet m' t' x y i n' ->
   n -NA- a -NA> n' -> m = m' /\ x = t' /\ y = zeroTime.
 Proof.
-  intros I OW S. net_state_destr I p1 p2 p3 l h k E.
-  net_state_destr OW p1' p2' p3' l' h' k' E'.
-  lets T : triple_disc_net S E E'. destruct T as [_ [[EQ | [b B]] _]].
-  - (* the overlap component cannot be both *)
-    subst p2'. exfalso.
-    assert (C : ovWait m' t' x y ~p~ init m)
-      by (eapply bisim_trans; [apply bisim_symm; exact OW | exact I]).
-    ovWait_bisim_contra C.
-  - (* init read the current mode m0 and set both timers *)
-    destruct (bisim_step_disc _ _ _ _ I B) as [q [SQ BQ]].
-    unfold init in SQ. invert_disc_prefixes. explicit_typed_input. clean_proc_hyp BQ.
-    match type of BQ with _ ~p~ ovWaitN $( [_, ?T, _] )$ =>
-      assert (BW : ovWait m T T zeroTime ~p~ ovWait m' t' x y) by
-        (eapply bisim_trans; [apply bisim_symm; apply ovWaitN_bisim | ];
-         eapply bisim_trans; [apply bisim_symm; exact BQ | exact OW]) end.
-    assert (EM : m = m') by exact (proj1 (ovWait_bisim_mode _ _ _ _ _ _ _ _ _
-      (evalExpFunTime_time zeroTime) BW)).
-    subst m'.
-    lets EY : ovWait_bisim_pos_timer BW (evalExpFunTime_time y).
-    rewrite evalExpFunTime_time in EY. injection EY as EY.
-    lets EX : ovWait_bisim_pause_timer BW (evalExpFunTime_time x).
-    lets FV : ovWait_bisim_first_val BW (evalExpFunTime_time y) EX (evalExpFunTime_time t').
-    split; [reflexivity | split; [ | symmetry; exact EY]].
-    (* the first parameter is the wait time and a period, more than a period *)
-    destruct (init_timer_val _ _ _ EX) as [pr XV].
-    pose proof (waitTime_pos _ _ pr) as WP.
-    apply timeEqR. apply (subNonnegTot_inj_pos _ _ (time (period m))); [ | exact FV].
-    rewrite XV. lra.
+  intros I OW S.
+  destruct (init_ovWait_timers_net _ _ _ _ _ _ _ _ _ I OW S) as [EM [EY [[m0 [pr XV]] FV]]].
+  subst m'. split; [reflexivity | split; [ | exact EY]].
+  (* the first parameter is the wait time and a period, more than a period *)
+  pose proof (waitTime_pos _ _ pr) as WP.
+  apply timeEqR. apply (subNonnegTot_inj_pos _ _ (time (period m))); [ | symmetry; exact FV].
+  rewrite XV. lra.
 Qed.
 (*Might prove a stronger version of this with the value of t' =
 tx(m, m') + period m', where m is the current mode.*)
@@ -355,7 +280,7 @@ it switched to the fail-safe successor of its mode, which differs from the mode 
 mode was fail safe already (a fail-safe mode may be its own successor).*)
 Theorem tfsBc_not_currSince (n : Network) (m : Mode) (t  : Time)
   (i : nat) (p : reachableProtNet n) :
-  ~ failSafe m -> tfsBcStateNet i n -> currSince m t i n p -> False. Admitted. (*1*)
+  ~ failSafe m -> tfsBcStateNet i n -> currSince m t i n p -> False.
 (**Proof: Induction on currSince. The base case fails because tfsBcState is not switchListen.
 The delay case is easy because by (...backwards del pres state...) the previous state is
 tfsBc also, and we just apply the I.H. to get false. The discrete case proceeds by
@@ -366,6 +291,13 @@ state (currSince-curr) and then showing that the mode transition relation is ant
 & by (...tracking...) we know the action linking the states is a synch on mCurr, so the new
 mode must be different to m, which contradicts the currSince discrete constructor that
 required the currMode to be m.*)
+Proof.
+  intros NF TB CS. apply NF.
+  pose proof (currSince_curr n m t i p CS) as CM. rewrite currMode_ent_ex in CM.
+  destruct CM as [e [E CE]]. destruct TB as [e' TBe E'].
+  assert (e' = e) by (eapply entInNetUnique; eassumption). subst e'.
+  rewrite <- CE. exact (tfsBc_failSafe e (reachable_net_ent _ _ _ p E) TBe).
+Qed.
 
 (*Relates the currSince relation to the state of the broadcast software
 component. In particular, if we're currSince, then the broadcast component is either

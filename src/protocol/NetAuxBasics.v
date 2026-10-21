@@ -1382,7 +1382,7 @@ Qed.
 
 (** Bisimilar ovReady for one mode agree on their timer up to the period: each broadcasts into a
 wait whose pause timer is its timer less the period.*)
-Local Lemma ovReady_bisim_timer (m : Mode) (t1 t2 : Time) (l1 l2 : Position) :
+Lemma ovReady_bisim_timer (m : Mode) (t1 t2 : Time) (l1 l2 : Position) :
   ovReady m t1 l1 ~p~ ovReady m t2 l2 ->
   time t1 -nn- time (period m) = time t2 -nn- time (period m).
 Proof.

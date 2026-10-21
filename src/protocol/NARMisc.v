@@ -357,7 +357,7 @@ Qed.
 (*The tfs relation is at zero time when in the state tfsStart.*)
 
 (** Two named states of the overlap component of one entity are bisimilar.*)
-Local Lemma overlap_states_bisim_net (X Y : ProcTerm) i n :
+Lemma overlap_states_bisim_net (X Y : ProcTerm) i n :
   liftEntNet (liftProcEnt (liftOverlap (fun p => p ~p~ X))) i n ->
   liftEntNet (liftProcEnt (liftOverlap (fun p => p ~p~ Y))) i n -> X ~p~ Y.
 Proof.
@@ -932,7 +932,7 @@ Proof.
 Qed.
 
 (** No entity of a network has its overlap component both init and in a nextSince state.*)
-Local Lemma init_nextSince_net_not m i n :
+Lemma init_nextSince_net_not m i n :
   initStateNet m i n -> nextSinceStateNet i n -> False.
 Proof.
   intros I NS. net_state_destr I p1 p2 p3 l h k E. net_state_ent NS E.
