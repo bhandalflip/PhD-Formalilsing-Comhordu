@@ -1222,10 +1222,96 @@ Proof.
   eapply bisim_trans; [eassumption | ]. currOK_next_unfold_app. apply bisim_refl.
 Qed.
 
+(** A conditional of the protocol's form matters only through the value of its condition and
+its branches.*)
+Lemma cond_branches_bisim b1 b2 p p' q q' :
+  evalBoolExpFun b1 = evalBoolExpFun b2 -> p ~p~ p' -> q ~p~ q' ->
+  b1 $> p $+$ !~ b1 $> q ~p~ b2 $> p' $+$ !~ b2 $> q'.
+Proof.
+  intros E P Q. destruct (evalBoolExpFun b1) as [[ | ] | ] eqn:E1.
+  - eapply bisim_trans; [apply if_then_bisim_true; apply evalBoolExpFunRel; exact E1 | ].
+    eapply bisim_trans; [exact P | ]. apply bisim_symm.
+    apply if_then_bisim_true; apply evalBoolExpFunRel; rewrite <- E; reflexivity.
+  - eapply bisim_trans; [apply if_then_bisim_false; apply evalBoolExpFunRel; exact E1 | ].
+    eapply bisim_trans; [exact Q | ]. apply bisim_symm.
+    apply if_then_bisim_false; apply evalBoolExpFunRel; rewrite <- E; reflexivity.
+  - eapply bisim_trans; [apply if_then_bisim_none; exact E1 | ]. apply bisim_symm.
+    apply if_then_bisim_none. rewrite <- E. reflexivity.
+Qed.
+
+(** gotRange shows its range only through the threat tests of currPincCheck and nextPincCheck,
+against the modes it reads. So two gotRange whose ranges are closed and pass the same tests
+are bisimilar.*)
+Lemma gotRange_threat_bisim (m : Mode) (e e' : Exp) (b b' : BaseType) :
+  evalExpFun e = Some b -> evalExpFun e' = Some b' ->
+  (forall v : Mode, evalBoolExpFun (bPossInc v m e) = evalBoolExpFun (bPossInc v m e')) ->
+  gotRange m e ~p~ gotRange m e'.
+Proof.
+  intros Ee Ee' P.
+  (* gotRange reads the current mode, into currPincCheck *)
+  unfold gotRange. apply inPrefix_bisim_context. intros vs T.
+  explicit_typed_input. clean_proc.
+  rewrite (eval_pres_sub e b _ (evalExpFunRel _ _ Ee)).
+  rewrite (eval_pres_sub e' b' _ (evalExpFunRel _ _ Ee')).
+  unfold_app_bisim. apply bisim_symm. unfold_app_bisim. apply bisim_symm.
+  eapply bisim_trans; [apply choice_bisim_symm | ].
+  eapply bisim_trans; [ | apply choice_bisim_symm].
+  apply cond_branches_bisim; [apply P | apply bisim_refl | ].
+  (* currComp reads stable, into listening, or a next mode, into nextPincCheck *)
+  unfold_app_bisim. apply bisim_symm. unfold_app_bisim. apply bisim_symm.
+  apply choice_bisim_context; [apply bisim_refl | ].
+  apply inPrefix_bisim_context. intros vs T. explicit_typed_input. clean_proc.
+  rewrite (eval_pres_sub e b _ (evalExpFunRel _ _ Ee)).
+  rewrite (eval_pres_sub e' b' _ (evalExpFunRel _ _ Ee')).
+  unfold_app_bisim. apply bisim_symm. unfold_app_bisim. apply bisim_symm.
+  eapply bisim_trans; [apply choice_bisim_symm | ].
+  eapply bisim_trans; [ | apply choice_bisim_symm].
+  apply cond_branches_bisim; [apply P | apply bisim_refl | apply bisim_refl].
+Qed.
+
+(** A time evaluates to the number it holds.*)
+Lemma evalBaseNonnegFun_time (t : Time) : evalBaseNonnegFun (baseTime t) = Some (time t).
+Proof. destruct t. reflexivity. Qed.
+
+(** The step of gotMsg m'' l reads a position v, into gotRange with the range computed from
+it.*)
+Lemma gotMsg_next_act (p p' : ProcTerm) (a : DiscAct) (m'' : Mode) (l : Position) :
+  p -PA- a -PA> p' -> gotMsgState m'' l p ->
+  exists v, a = chanPos ;? [basePosition v] /\
+    gotRangeState m'' (mkDistance (dist2d v l -nn- speedMax *nn* msgLatency)) p'.
+Proof.
+  intros TR GS. unfold gotMsgState in GS.
+  destruct (bisim_step_disc _ _ _ _ GS TR) as [q [TQ B]].
+  unfold gotMsg in TQ. invert_disc_prefixes. explicit_typed_input. clean_proc_hyp B.
+  eexists. split; [reflexivity | ].
+  unfold gotRangeState. eapply bisim_trans; [exact B | ]. unfold_app_bisim.
+  eapply gotRange_threat_bisim; [ | reflexivity | ].
+  - cbn [evalExpFun]. rewrite evalBaseNonnegFun_time. reflexivity.
+  - intro v. cbn [evalBoolExpFun evalExpFun]. rewrite evalBaseNonnegFun_time. reflexivity.
+Qed.
+
+(** The steps of currComp: it reads stable, into listening, or a next mode, into
+nextPincCheck with it.*)
+Lemma currComp_next_act (p p' : ProcTerm) (a : DiscAct) (m'' : Mode) (r : Distance) :
+  p -PA- a -PA> p' -> currCompState m'' r p ->
+  (a = chanMStableRead *? /\ listeningState p') \/
+  (exists m, a = chanMNextRead ;? [baseMode m] /\ nextPincCheckState m m'' r p').
+Proof.
+  intros TR CS. unfold currCompState in CS. unfold currComp in CS.
+  currOK_next_fwd_pre.
+  - left. split; [reflexivity | ]. unfold listeningState.
+    eapply bisim_trans; [eassumption | ]. currOK_next_listening_app.
+  - right. eexists. split; [reflexivity | ]. unfold nextPincCheckState.
+    eapply bisim_trans; [eassumption | ]. currOK_next_unfold_app. apply bisim_refl.
+Qed.
+
 Theorem gotMessage_next (p p' : ProcTerm)
   (a : DiscAct) (m'' : Mode) (l : Position) :
   p -PA- a -PA> p' -> gotMsgState m'' l p ->
-  (exists r, gotRangeState m'' r p'). Admitted. (*#fwd-track*)
+  (exists r, gotRangeState m'' r p').
+Proof.
+  intros TR GS. destruct (gotMsg_next_act _ _ _ _ _ TR GS) as [v [_ GR]]. eexists. exact GR.
+Qed.
 
 Theorem gotRange_next (p p' : ProcTerm)
   (a : DiscAct) (m'' : Mode) (r : Distance) :

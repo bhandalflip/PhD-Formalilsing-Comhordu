@@ -167,6 +167,24 @@ Proof.
     + exfalso. eapply listen_mCurr_out_not; eassumption.
 Qed.
 
+(** In a reachable entity with an unstable mode state, a step that changes the mode state
+leaves the overlap component outside the nextSince states: it has just switched mode, from
+switchCurr or tfsCurr, or aborted, from ovAbort or tfsNext (mState_switch_states_ent).*)
+Lemma mState_change_not_nextSince_ent p l h k p' l' h' k' a :
+  reachableProtEnt ([|p, l, h, k|]) -> unstable k -> k <> k' ->
+  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
+  ~ nextSinceStateEnt ([|p', l', h', k'|]).
+Proof.
+  intros R U NE S NS.
+  destruct (mState_switch_states_ent _ _ _ _ _ _ _ _ _ R U NE S)
+    as [[_ D] | [[_ D] | [[_ D] | [m [_ D]]]]];
+    ent_state_comp D; ent_state_comp NS;
+    destruct NS as [m1 t1 x1 y1 X | m1 t1 l1 X | m1 X | m1 X];
+    prot_outProc_in_not_unfold;
+    pose proof (bisim_trans _ _ _ (bisim_symm _ _ D) X) as BT;
+    prot_outProc_in_not_body; try unfold liftVarList in BT; refute_by_chan BT.
+Qed.
+
 (** The current mode changes in a step of a reachable entity only when the overlap component
 switches mode, from switchCurr or from tfsCurr.*)
 Lemma currMode_switch_states_ent e e' a :

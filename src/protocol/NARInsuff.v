@@ -240,167 +240,119 @@ will cause it to leave the list. But in that case, you have a case for the notif
 So that's it.*)
 
 Theorem nextSince_next (n : Network) (m : Mode) (t : Time) (i : nat) (p : reachableProtNet n) : 
-  nextSince m t i n p -> nextModeNet m i n. 
-  (*By induction on nextSince.*)
-  introz U. induction U. 
-  (*In the base case, we carry over a similar result for ovWait (ovWait_next).*)
-  eapply ovWaitState_nextMode_net.
-  eapply reachNetDisc. apply p. apply w. apply H1.
-  (*In the discrete inductive case, we have by I.H. that the nextMode was m in the previous
-  state. Now let's assume towards a contradiction that the nextMode is no longer m.*)
-  
-(*nextModeNet
-
-Well we can then show by (...linking...) and some elimination that the only
-matching cases are those in which the software component either outputs on stable or on
-mCurr. Now, by (Misc::nextSince_rel_state), we know that in our previous state we were
-in one of the next_since states. We can show elsewhere that none of these are enabled
-on mCurr! or stable! (...PA::activation...). Also, we can show that none of the broadcast
-or listener states are enabled on these actions (...PA::activation...). Hence the software
-process couldn't have done such an action, giving us our contradiction.*)
-
-(*The timed inductive case is easy: the mode state's modes don't
-change with time.*)
-Admitted. (*3*)
+  nextSince m t i n p -> nextModeNet m i n.
+Proof. intro U. exact (ComhCoq.protocol.NARMisc.nextSince_next _ _ _ _ _ U). Qed.
 (**Proof: As detailed above*)
 
 (*If an entity is on the notification abort path, and a
 discrete transition happens, then in the next state it is either still on the
 notification abort path, or it is not in a nextSince state.*)
+
 Theorem notifAbort_not_nextSince (n n' : Network)
   (a : ActDiscNet) (i : nat) (rn : reachableProtNet n) : 
   notifAbortPathNet i n -> n -NA- a -NA> n' ->
-  notifAbortPathNet i n' \/ ~nextSinceStateNet i n'. introz U. 
-  (**Proof: Similar to msgAbort_not_nextSince*)
-  (*Link down to the entity level and eliminate the entity equality case.*)
-  inversion U. link_netentdiscfwd_tac e' b U1. left. econstructor.
-  apply H. rewrite U2. assumption.
-  (*Extract the process transition from the entity one.*)
-  (*Apply linking from the entity transition to the software transition.*)
-  link_entsoftdisc_tac;
-  (*Show and use equality between mode states.*)
-  lets MSI : minet H0; lets MSI' : minet U1;
-  lets NME : notifAbort_modeState_eq U MSI U0;
-  lets MIU : mState_in_net_unique MSI' NME; subst.
-  (*First deal with the case where the process terms are equal.*)
-  left. econstructor;[ | apply U1]. inversion H.
-  econstructor; eassumption. eapply napCuok; eassumption.
-  eapply napAbort; eassumption.
-  (*Now on to the case where the process term transitions.
-  Invert the path predicate and solve all 3 sub-cases.*)
-  inversion H; subst.
-  (*---------------------Case 1: rangeBad-----------------*) 
-  inversion H6; subst. link_partripdiscex_tac_norm. 
-  link_partripdiscW3_tac H1 LPT. elim_intro LPT EQP EXP.
-  (*EQ case, LHS follows directly*)
-  left. subst. econstructor;[ | apply U1].
-  eapply napRng. econstructor. eassumption. reflexivity.
-  assumption. assumption.
-  (*transition case- need to use fwd-tracking.*)
-  ex_flat. lets RBN : rangeBad_next H3 H2. ex_flat.
-  left. econstructor. eapply napCuok. econstructor.
-  eapply currEq_cond_false. apply H8. my_applys_eq H4.
-  remember ([|p1' $||$ p2' $||$ p3', l, h, k0|]) as e'.
-  replace (currModeMState k0) with (currModeEnt e').
-  assert (currEqStateEnt x1 m' e'). subst.
-  (*
-  repeat econstructor.
-  assumption. eapply currEq_mode. eassumption. subst.
-  reflexivity. eassumption. eassumption.
-  (*---------------------Case 2: currOK-----------------*) 
-  inversion H4; subst. link_partripdiscex_tac_norm. swapRename H2 H1.
-  link_partripdiscW3_tac H2 LPT. elim_intro LPT EQP EXP.
-  (*EQ case, LHS follows directly*)
-  left. subst. econstructor;[ | apply U1].
-  eapply napCuok. econstructor. eassumption. assumption.
-  (*transition case- need to use fwd-tracking.*)
-  ex_flat. lets CON : currOK_next H3 H1.
-  elim_intro CON NEX LIS.
-  (*First sub-case of the tracking- show abortOvlp state holds.*)
-  ex_flat. left. econstructor.
-  eapply napAbort. econstructor. eapply nextEq_cond_true;
-  [ | apply H5]. remember ([|p1' $||$ p2' $||$ p3', l, h, k0|]) as e'.
-  assert (nextEqStateEnt x1 m' e'). subst. repeat econstructor. assumption.
-  lets NEM : nextEq_mode H6. rewrite Heqe' in NEM.
-  apply nextMode_ent_mState in NEM. rewrite H7 in NEM. inversion NEM.
-  reflexivity. apply U1.
-  (*Second sub-case of the tracking. Show a contradiction because it implies an input on
-  the channel abort by the listener, which cannot be matched by any component- particularly
-  the mode state, because it has a next mode and so is not stable.*)
-  assert (p3 <> p3') as PNE3. unfold not. intros. subst.
-  state_pred_elim H1 LIS.
-  assert (p1 $||$ p2 $||$ p3 <> p1' $||$ p2' $||$ p3') as PNE.
-  unfold not. intro. inversion H5. subst. apply PNE3. reflexivity.
-  (*apply ent proc link theorem and flatten out the ands, ors and exists.*)
-  lets LEP : link_ent_proc_neq_disc PNE U3. andflat LEP.
-  or_flat; ex_flat; and_flat; try link_partripneq_tac;
-  try (lets CLT : currOK_listening_track H1 LIS AND1; inversion CLT); subst.
-  (*From here there are 5 LEP sub-cases (some were eliminated)*)
-  (*In the first case apply this tactic: link_partriptau_tac,
-  and use tracking to narrow down info and eliminate some cases.*)
-  reach_net_prot_tac.
-  link_partriptau_tac c v LPT;
-  try (lets CLT : currOK_listening_track H1 LIS LPT1;
-  inversion CLT; subst).
-  (*Eliminate first two sub-cases by contradiction.*)
-  subst; contradict PNE3; reflexivity.
-  subst; contradict PNE3; reflexivity.
-  (*Two remaining sub-cases are that p1 or p2 output on MStable.
-  Contradictions can be shown in both cases.*)
-  false. eapply bc_mStable_out_not. apply LPT.
-  inversion RPT. assumption.
-  false. eapply ovlp_mStable_out_not. apply LPT.
-  inversion RPT. assumption.
-  (*Now back to the remaining cases. First eliminate interface/software synch.*)
-  false. eapply inter_mStable_in_not. eassumption.
-  (*Then do the modeState/software synch.*)
-  false. eapply next_modeState_stable_not; eassumption.
-  (*Get rid of p reading current position by tracking and showing that actions can't be equal-
-  incompatible actions in question are input on pos and input on stable*)
-  lets CLT : currOK_listening_track H1 LIS AND; inversion CLT.
-  (*---------------------Case 3: abortOvlp-----------------*) 
-  inversion H3; subst. link_partripdiscex_tac_norm. swapRename H1 H2.
-  link_partripdiscW3_tac H2 LPT. elim_intro LPT EQP EXP.
-  (*EQ case, LHS follows directly*)
-  left. subst. econstructor;[ | apply U1].
-  eapply napAbort. econstructor. eassumption.
-  (*transition case- need to use fwd-tracking.*)
-  ex_flat. lets CON : abortOvlp_next H4 H1. right.
-  (*Assert some useful results for later.*)
-  assert (p3 <> p3') as PNE3. unfold not. intros. subst.
-  false. eapply listening_abort_contra; eassumption.
-  assert (p1 $||$ p2 $||$ p3 <> p1' $||$ p2' $||$ p3') as PNE.
-  unfold not. intro. inversion H5. subst. apply PNE3. reflexivity.
-(*apply ent proc link theorem and flatten out the ands, ors and exists.*)
-  lets LEP : link_ent_proc_neq_disc PNE U3. andflat LEP.
-  or_flat; ex_flat; and_flat; try link_partripneq_tac;
-  try (lets CLT : abortOvlp_listening_track H1 CON AND1; inversion CLT); subst.
-  (*In the first case apply this tactic: link_partriptau_tac,
-  and use tracking to narrow down info and eliminate some cases.*)
-  reach_net_prot_tac.
-  link_partriptau_tac c v LPT;
-  try (lets CLT : abortOvlp_listening_track H1 CON LPT1;
-  inversion CLT; subst).
-  (*Eliminate first two sub-cases by contradiction.*)
-  subst; contradict PNE3; reflexivity.
-  subst; contradict PNE3; reflexivity.
-  (*Two remaining sub-cases are that p1 or p2 output on MStable.
-  Contradictions can be shown in both cases.*)
-  false. eapply bc_abort_in_not. apply LPT.
-  inversion RPT. assumption.
-  (*This is the special case, where we need to show that nextSinceState does not hold.*) 
-  inversion RPT.
-  lets OAI : ovlp_abort_in_notNextSince LPT H9. unfold not. intro. apply OAI.
-  inversion H11. entnetuniq2 EN n'. subst. inversion H12. inversion H6.
-  assumption.
-  (*Now back to the remaining cases. First eliminate interface/software synch.*)
-  false. eapply inter_abort_in_not. eassumption.
-  (*Then do the modeState/software synch.*)
-  false. eapply modeState_abort_in_not; eassumption.
-  (*Get rid of p reading current position by tracking and showing that actions can't be equal-
-  incompatible actions in question are input on pos and input on stable*)
-  lets CLT : abortOvlp_listening_track H1 CON AND; inversion CLT. Qed.*)
-  Admitted. (*R*)
+  notifAbortPathNet i n' \/ ~nextSinceStateNet i n'.
+Proof.
+  intros U W.
+  destruct U as [e E I].
+  destruct (link_net_ent_disc_fwd n n' e i a W I) as [e' [I' [EQ | [b ST]]]].
+  { subst e'. left. econstructor; eassumption. }
+  assert (R : reachableProtEnt e) by (eapply reachable_net_ent; eassumption).
+  destruct e as [p l h k].
+  lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
+  inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+  destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ ST)
+    as [p1' [p2' [p3' [l' [h' [k' [EQ' [W1 [W2 W3]]]]]]]]].
+  subst e'.
+  assert (NSN : ~ nextSinceStateEnt ([|p1' $||$ p2' $||$ p3', l', h', k'|]) ->
+    ~ nextSinceStateNet i n')
+    by (intros NSE NS; apply NSE; exact (liftEntNet_ent _ _ _ _ NS I')).
+  destruct (eqDecProcTerm p3 p3') as [E3 | N3].
+  - (* the listener stays *)
+    subst p3'.
+    inversion E; subst.
+    + match goal with [H : rangeBadStateProt _ _ |- _] =>
+        inversion H as [? ? ? RB]; subst end.
+      destruct (eqDecModeState k k') as [KE | KN].
+      * subst k'. left. econstructor; [ | exact I'].
+        eapply napRng; [constructor; exact RB | reflexivity | eassumption | eassumption].
+      * right. apply NSN. eapply mState_change_not_nextSince_ent; [exact R | | exact KN | exact ST].
+        eapply nextMode_unstable. eassumption.
+    + match goal with [H : currOKStateProt _ _ |- _] =>
+        inversion H as [? ? ? CO]; subst end.
+      destruct (eqDecModeState k k') as [KE | KN].
+      * subst k'. left. econstructor; [ | exact I'].
+        eapply napCuok; [constructor; exact CO | eassumption].
+      * right. apply NSN. eapply mState_change_not_nextSince_ent; [exact R | | exact KN | exact ST].
+        eapply nextMode_unstable. eassumption.
+    + match goal with [H : abortOvlpStateProt _ |- _] =>
+        inversion H as [? ? ? AO]; subst end.
+      left. econstructor; [ | exact I']. eapply napAbort. constructor. exact AO.
+  - (* the listener steps *)
+    destruct W3 as [E3 | [b3 T3]]; [contradiction | ].
+    inversion E; subst.
+    + (* rangeBad: it reads the current mode, which differs from m', into currOK m' *)
+      match goal with [H : rangeBadStateProt _ _ |- _] =>
+        inversion H as [? ? ? RB]; subst end.
+      assert (ACT : forall c, p3 -PA- c -PA> p3' -> entChanAct c).
+      { intros c T. destruct (rangeBad_next_act _ _ _ _ T RB) as [m0 [EC _]].
+        subst c. left. reflexivity. }
+      destruct (triple_disc_ent_chan 2 R ST eq_refl eq_refl ACT) as [E3 | ST3];
+        [contradiction | ].
+      destruct (ent_disc_proc_read _ _ _ _ _ _ _ _ _ ST3) as [E3 | [c [T [_ [RC _]]]]];
+        [contradiction | ].
+      destruct (rangeBad_next_act _ _ _ _ T RB) as [m0 [EC CE]].
+      destruct (RC m0 EC) as [M0 KE]. subst k'.
+      left. econstructor; [ | exact I']. eapply napCuok; [ | eassumption].
+      constructor. eapply currEq_cond_false; [ | exact CE]. congruence.
+    + (* currOK: with a next mode, it reads it on mNext, into abortOvlp *)
+      match goal with [H : currOKStateProt _ _ |- _] =>
+        inversion H as [? ? ? CO]; subst end.
+      assert (ACT : forall c, p3 -PA- c -PA> p3' -> entChanAct c).
+      { intros c T. destruct (currOK_next_act _ _ _ _ T CO) as [[EC _] | [m0 [EC _]]];
+          subst c; left; reflexivity. }
+      destruct (triple_disc_ent_chan 2 R ST eq_refl eq_refl ACT) as [E3 | ST3];
+        [contradiction | ].
+      destruct (ent_disc_proc_read _ _ _ _ _ _ _ _ _ ST3)
+        as [E3 | [c [T [_ [_ [RN RS]]]]]]; [contradiction | ].
+      destruct (currOK_next_act _ _ _ _ T CO) as [[EC _] | [m0 [EC NQ]]].
+      * destruct (RS EC) as [NN _]. congruence.
+      * destruct (RN m0 EC) as [NM KE]. subst k'.
+        left. econstructor; [ | exact I']. eapply napAbort. constructor.
+        eapply nextEq_cond_true; [ | exact NQ]. congruence.
+    + (* abortOvlp: it outputs on abort, which only the overlap component can take, and
+         the overlap component then leaves the nextSince states *)
+      match goal with [H : abortOvlpStateProt _ |- _] =>
+        inversion H as [? ? ? AO]; subst end.
+      assert (TR : forall c, p3 -PA- c -PA> p3' -> c = chanAbort ;! []).
+      { intros c T. eapply abortOvlp_listening_track; [exact AO | | exact T].
+        eapply abortOvlp_next; eassumption. }
+      right. apply NSN. intro NS.
+      (* the step is the software's: a component's own step on an entity channel would be
+         the listener's on abort, which is not one *)
+      inversion ST; subst; try (exfalso; apply N3; reflexivity);
+        match goal with
+        | [K : p1 $||$ p2 $||$ p3 -PA- tauAct -PA> _ |- _] => idtac
+        | [K : p1 $||$ p2 $||$ p3 -PA- _ -PA> _ |- _] =>
+            triple_disc_nonTau K; try (exfalso; apply N3; reflexivity);
+            match goal with [K3 : p3 -PA- _ -PA> _ |- _] =>
+              apply TR in K3; discriminate K3 end
+        end.
+      match goal with [K : p1 $||$ p2 $||$ p3 -PA- tauAct -PA> _ |- _] =>
+        destruct (link_reach_triple_tau _ _ _ _ _ _ K PS) as [c [v CC]] end.
+      destruct CC as [[T1 [T2 E0]] | [[T1 [T2 E0]] | [[T1 [T2 E0]] | [[T1 [T2 E0]] |
+        [[T1 [T2 E0]] | [T1 [T2 E0]]]]]]];
+        try (subst; exfalso; apply N3; reflexivity);
+        try (apply TR in T2; discriminate T2).
+      * (* the broadcaster would take the abort, which it never does *)
+        apply TR in T2. injection T2 as EC EV. subst.
+        eapply bc_abort_in_not; eassumption.
+      * (* the overlap component takes the abort and leaves the nextSince states *)
+        apply TR in T2. injection T2 as EC EV. subst.
+        ent_state_comp NS.
+        eapply ovlp_abort_in_notNextSince; eassumption.
+Qed.
+(**Proof: Similar to msgAbort_not_nextSince*)
 
 (* If a message with mode m was delivered exactly AN time units ago, and the
 coverage of the message was insufficient with respect to said mode, and we have

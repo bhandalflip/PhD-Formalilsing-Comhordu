@@ -700,6 +700,31 @@ Proof.
     (split; [ | split]); intros; congruence.
 Qed.
 
+(** The software step inside a discrete entity step, when there is one, with what a read
+gives: a read of the position gives the entity's position, a read on mCurr or mNext the
+current or next mode, and a read on mStable finds the mode state stable. None of them
+changes the mode state.*)
+Lemma ent_disc_proc_read p l h k p' l' h' k' a :
+  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
+  p = p' \/ exists c, p -PA- c -PA> p' /\
+    (forall v, c = chanPos ;? [basePosition v] -> v = l /\ k' = k) /\
+    (forall m, c = chanMCurrRead ;? [baseMode m] -> m = currModeMState k /\ k' = k) /\
+    (forall m, c = chanMNextRead ;? [baseMode m] -> nextModeMState k = Some m /\ k' = k) /\
+    (c = chanMStableRead *? -> nextModeMState k = None /\ k' = k).
+Proof.
+  intro S. inversion S; subst; try (left; reflexivity); right;
+    match goal with [T : _ -PA- ?c -PA> _ |- _] => exists c; split; [exact T | ] end;
+    (split; [ | split; [ | split]]); intros; try congruence.
+  - match goal with [K : _ -ms- _ -ms> _ |- _] => inversion K; subst end;
+      split; reflexivity.
+  - match goal with [E : _ = _ |- _] => injection E as E; subst end.
+    apply mState_curr_out. assumption.
+  - match goal with [E : _ = _ |- _] => injection E as E; subst end.
+    apply mState_next_out. assumption.
+  - match goal with [E : _ = _ |- _] => injection E as E; subst end.
+    split; reflexivity.
+Qed.
+
 End EntityLanguage.
 
 (** A section's notations and tactics end with it. So that later files can use them, the
