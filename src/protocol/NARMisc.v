@@ -810,7 +810,17 @@ Qed.
 (**Proof: lift from...EA::urgency... #urgent-path*)
 
 Lemma notifBadPathNet_urgent i n n' d :
-  reachableProtNet n -> notifBadPathNet i n -> n -ND- d -ND> n' -> False. Admitted. (*4*)
+  reachableProtNet n -> notifBadPathNet i n -> n -ND- d -ND> n' -> False.
+Proof.
+  (*A reachable entity that can delay is listening (del_listening), and the listener is in
+  rangeBad or badOvlp instead.*)
+  intros RN NB W. destruct NB as [e NE EIN].
+  destruct (del_net_ent e i n n' d EIN W) as [e' ED].
+  lets LS : del_listening (reachable_net_ent _ _ _ RN EIN) ED.
+  inversion NE as [p l h k m RB CM | p l h k BO]; subst; ent_state_comp LS.
+  - inversion RB as [? ? ? X]; subst. ov_disj LS X.
+  - inversion BO as [? ? ? X]; subst. ov_disj LS X.
+Qed.
 (**Proof: Follows from urgency results from all underlying component states.
 Urgency holds in each one because there is always a synch possible with the
 mode state or the overlap component. #urgent-path*)

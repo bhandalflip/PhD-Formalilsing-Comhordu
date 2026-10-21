@@ -398,12 +398,96 @@ Theorem instant_insuff_abort (n : Network) (m : Mode) (l l0 : Position)
   left. lets E : incomingNetNotif_del p w W. invertClearAs2 E Z1 Z2.
   my_applys_eq Z2. apply timeEqR. simpl. rewrite <- x. simpl. ring. Qed.
 
+(* begin helpers for insuff_incomingNotif_bad *)
+(** Only the listener inputs on AN: no broadcast or overlap state does.*)
+Local Lemma broadcast_AN_in_not p p' v :
+  broadcastState p -> p -PA- chanAN ;? v -PA> p' -> False.
+Proof. intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
+
+Local Lemma overlap_AN_in_not p p' v :
+  overlapState p -> p -PA- chanAN ;? v -PA> p' -> False.
+Proof. intros S T. destruct (overlapState_shape _ S); prot_outProc_in_not_contra. Qed.
+
+(** A listener that inputs on AN is listening.*)
+Local Lemma listener_AN_in_listening p p' v :
+  listenerState p -> p -PA- chanAN ;? v -PA> p' -> listeningState p.
+Proof.
+  intros S T.
+  destruct (listenerState_shape _ S) as [B | m B | B | m B | B | m l B | m e B | m e B | B | B];
+    try exact B; prot_outProc_in_not_contra.
+Qed.
+
+(** Listening takes a notification of a range r insufficient for its mode m into rangeBad m.*)
+Local Lemma listening_AN_insuff_rangeBad p p' r m l :
+  listeningState p -> ~ sufficient m r ->
+  p -PA- chanAN ;? [baseDistance r, baseMode m, basePosition l] -PA> p' ->
+  rangeBadState m p'.
+Proof.
+  intros LS NS T. destruct (ProcEquiv.bisim_step_disc _ _ _ _ LS T) as [q [TQ B]].
+  unfold listening in TQ. invert_disc_prefixes. explicit_typed_input. clean_proc_hyp B.
+  red. eapply ProcEquiv.bisim_trans; [exact B | ]. unfold_app_bisim.
+  assert (EB : evalBoolExp (bSufficient (eBase (baseMode m)) (eBase (baseDistance r))) false).
+  { assert (F : suffBool m r = false)
+      by (unfold suffBool; destruct (suffDec m r); [contradiction | reflexivity]).
+    rewrite <- F. apply bevalSufficient_dist; apply evalBase. }
+  eapply ProcEquiv.bisim_trans; [apply (ProcEquiv.if_then_bisim_false _ _ _ EB) | ].
+  unfold_app_bisim. apply ProcEquiv.bisim_refl.
+Qed.
+
+(** A notification with timestamp 0 stays incoming across a discrete step of a reachable
+network, unless the step is its entity's listener, listening, taking it, which leaves the
+rest of the entity's software, its position and its mode state as they were.*)
+Local Lemma incomingNetNotif_zero_disc n n' a i v :
+  reachableProtNet n -> n -NA- a -NA> n' -> incomingNetNotif v zeroTime i n ->
+  incomingNetNotif v zeroTime i n' \/
+  exists p1 p2 p3 p3' lp h h' k,
+    [|p1 $||$ p2 $||$ p3, lp, h, k|] @ i .: n /\
+    [|p1 $||$ p2 $||$ p3', lp, h', k|] @ i .: n' /\
+    listeningState p3 /\ p3 -PA- chanAN ;? v -PA> p3'.
+Proof.
+  intros RN S IN. destruct IN as [p lp li lo ln k E INL].
+  destruct (link_net_ent_disc_fwd _ _ _ _ _ S E) as [e' [E' [EQ | [b B]]]].
+  - subst e'. left. econstructor; eassumption.
+  - lets PS : reachableProtNet_triple RN E. inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+    inversion B; subst;
+      try (left; econstructor; [exact E' | exact INL]; fail);
+      match goal with [Hi : {| li := _; lo := _; ln := _ |} -i- _ -i> _ |- _] =>
+        inversion Hi; subst end;
+      try (left; econstructor; [exact E' | exact INL]; fail).
+    + (* the interface hands a notification to the software *)
+      match goal with [H : ln -nl- _ !! -nl> _ |- _] => inversion H; subst end.
+      simpl in INL.
+      match goal with [H : _ -tl- _ !! -tl> _ |- _] =>
+        destruct (timedList_out _ _ _ _ H INL) as [IN' | EQ] end.
+      * left. econstructor; [exact E' | exact IN'].
+      * injection EQ as EV. subst. right.
+        match goal with [H : _ $||$ _ $||$ _ -PA- chanAN ;? _ -PA> _ |- _] =>
+          triple_disc_nonTau H end.
+        -- exfalso. eapply broadcast_AN_in_not; eassumption.
+        -- exfalso. eapply overlap_AN_in_not; eassumption.
+        -- do 8 eexists. split; [exact E | ]. split; [exact E' | ]. split; [ | eassumption].
+           eapply listener_AN_in_listening; eassumption.
+    + (* the interface broadcasts and buffers a new notification *)
+      left. econstructor; [exact E' | ]. eapply notifList_in_pres; eassumption.
+Qed.
+(* end helpers *)
+
 Theorem insuff_incomingNotif_bad (n n' : Network) (a : ActDiscNet) (m : Mode)
   (r : Distance) (l : Position) (i : nat) : 
   reachableProtNet n -> currModeNet m i n -> n -NA- a -NA> n' -> ~sufficient m r ->
   incomingNetNotif [baseDistance r, baseMode m, basePosition l] zeroTime i n ->
   incomingNetNotif [baseDistance r, baseMode m, basePosition l] zeroTime i n' \/
-  notifBadPathNet i n'. Admitted. (*3*)
+  notifBadPathNet i n'.
+Proof.
+  intros RN CM S NS IN.
+  destruct (incomingNetNotif_zero_disc _ _ _ _ _ RN S IN)
+    as [IN' | [p1 [p2 [p3 [p3' [lp [h [h' [k [E [E' [LS T]]]]]]]]]]]].
+  - left. exact IN'.
+  - (* the listener took the notification into rangeBad m, and the mode is still m *)
+    right. econstructor; [ | exact E']. eapply nbpRng.
+    + constructor. eapply listening_AN_insuff_rangeBad; eassumption.
+    + lets C : liftEntNet_ent CM E. simpl in C. exact C.
+Qed.
 (*Proof: Much like insuff_incomingNotif_abort.*)
 
 (** If the badOvlp state holds at a particular reachable state,
