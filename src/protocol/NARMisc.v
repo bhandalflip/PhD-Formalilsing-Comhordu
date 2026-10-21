@@ -1208,13 +1208,101 @@ Qed.
 shows that ovReadySate and ovWaitState are predecessors to each other and so the I.H. carries forward. The base case follows directly from the
 definition of nextSince.*)
 
+(** A step of the broadcast component into a wait wakes it, with its timer zero, or is the
+broadcast of bcReady, which sets the timer to the period.*)
+Local Lemma bcWait_prev (p p' : ProcTerm) (b : DiscAct) (m : Mode) (x : Time) :
+  p -PA- b -PA> p' -> broadcastState p -> bcWaitState m x p' ->
+  x = zeroTime \/ (exists l, bcReadyState m l p /\ x = period m /\
+    b = chanOutProc ;! [baseMode m, basePosition l]).
+Proof.
+  intros T BS W. red in W. pose proof T as T0.
+  destruct (broadcastState_shape _ BS) as [H | m0 e H | m0 l0 H];
+    shape_step_pre B;
+    change (p' ~p~ bcWait m x) in W.
+  - (* sleeping wakes *)
+    unfold_app_hyp B. change (p' ~p~ bcWait m0 zeroTime) in B.
+    left. destruct (bcWait_bisim_inj _ _ _ _ (bisim_trans _ _ _ (bisim_symm _ _ B) W))
+      as [_ E]. symmetry. exact E.
+  - (* sleeping stays asleep *)
+    exfalso. apply (sleeping_not_bcWait m x). eapply bisim_trans; [ | exact W].
+    apply bisim_symm. eapply bisim_trans; [exact B | ]. apply app_bisim_nil. reflexivity.
+  - (* a wait goes to sleep *)
+    exfalso. apply (sleeping_not_bcWait m x). eapply bisim_trans; [ | exact W].
+    apply bisim_symm. eapply bisim_trans; [exact B | ]. apply app_bisim_nil. reflexivity.
+  - (* a wait reads its position *)
+    exfalso. unfold_app_hyp B.
+    pose proof (bisim_trans _ _ _ (bisim_symm _ _ B) W) as BT.
+    unfold bcWait in BT. refute_by_chan BT.
+  - (* a wait is woken again *)
+    unfold_app_hyp B. change (p' ~p~ bcWait m1 zeroTime) in B.
+    left. destruct (bcWait_bisim_inj _ _ _ _ (bisim_trans _ _ _ (bisim_symm _ _ B) W))
+      as [_ E]. symmetry. exact E.
+  - (* bcReady broadcasts *)
+    output_values.
+    match goal with [TT : p -PA- _ -PA> p' |- _] =>
+      destruct (bc_outProc_out _ _ _ _ TT BS) as [R W2] end.
+    destruct (bcWait_bisim_inj _ _ _ _ (bisim_trans _ _ _ (bisim_symm _ _ W2) W)) as [EM ET].
+    subst m0. right. exists l0. split; [exact R | split; [symmetry; exact ET | reflexivity]].
+Qed.
+
+(** bcReady's only step is its broadcast of its mode and position on outProc.*)
+Lemma bcReady_step_outProc (m : Mode) (l : Position) p p' b :
+  bcReadyState m l p -> p -PA- b -PA> p' -> b = chanOutProc ;! [baseMode m, basePosition l].
+Proof.
+  intros R T. red in R. destruct (bisim_disc_match _ _ _ _ R T) as [q S].
+  unfold bcReady in S. invert_disc_prefixes. output_values. reflexivity.
+Qed.
+
+(** No process is both bcReady and bcWait.*)
+Local Lemma bcReady_not_bcWait (m m' : Mode) (l : Position) (x : Time) p :
+  bcReadyState m l p -> bcWaitState m' x p -> False.
+Proof.
+  intros R W. red in R, W. pose proof (bisim_trans _ _ _ (bisim_symm _ _ R) W) as BT.
+  unfold bcReady, bcWait in BT. refute_by_chan BT.
+Qed.
+
 Lemma bcWait_bktrk_net (n n' : Network) (m : Mode) (x : Time)
-  (i : nat) (a : ActDiscNet) (p : reachableProtNet n) :
-  bcWaitStateNet m x i n' -> n -NA- a -NA> n' ->
-  bcWaitStateNet m x i n \/ (sleepingStateNet i n /\ x = zeroTime) \/
+  (i : nat) (a : ActDiscNet) (p : reachableProtNet n) (w : n -NA- a -NA> n') :
+  bcWaitStateNet m x i n' ->
+  bcWaitStateNet m x i n \/ x = zeroTime \/
   (exists l, bcReadyStateNet m l i n /\ x = period m /\
-  sent [baseMode m, basePosition l] zeroTime i n p). Admitted. (*4*)
+  sent [baseMode m, basePosition l] zeroTime i n' (reachNetDisc n n' a p w)).
 (**Proof: Lift back tracking result.*)
+Proof.
+  intro BW. net_state_destr BW p1' p2' p3' l' h' k' E'.
+  destruct (link_net_ent_disc_bkwd _ _ _ _ _ w E') as [e [E [EQ | [b S]]]].
+  - subst e. left. net_state_intro E. exact BW.
+  - destruct e as [q l h k].
+    lets PS : reachableProtNet_triple p E. inversion PS as [p1 p2 p3 BS OS LS]; subst q.
+    lets T : triple_disc_ent S. destruct T as [[EQ1 | [b1 B1]] _].
+    + subst p1'. left. net_state_intro E. exact BW.
+    + destruct (bcWait_prev _ _ _ _ _ B1 BS BW) as [Z | [l0 [R [X Eb]]]];
+        [right; left; exact Z | right; right].
+      exists l0. split; [net_state_intro E; exact R | split; [exact X | ]].
+      (* the broadcaster took the step alone with the rest of the entity *)
+      lets CU : reachableProt_correctChannelUsage
+        (reachable_ent_prot _ _ _ _ (reachable_net_ent _ _ _ p E)).
+      change (p1 $||$ p2 $||$ p3) with (parAll p1 [p2, p3]) in CU, S.
+      change (p1' $||$ p2' $||$ p3') with (parAll p1' [p2', p3']) in S.
+      assert (ACT : forall c, p1 -PA- c -PA> p1' -> entChanAct c).
+      { intros c TC. rewrite (bcReady_step_outProc _ _ _ _ _ R TC). right. reflexivity. }
+      destruct (ent_disc_comp_chan _ _ _ _ _ _ _ _ _ _ _ _ _ 0 p1 p1' CU S eq_refl eq_refl
+        eq_refl ACT) as [EQ | St].
+      { subst p1'. exfalso. eapply bcReady_not_bcWait; eassumption. }
+      positions_inv.
+      assert (NE : p1 $||$ p2' $||$ p3' <> p1' $||$ p2' $||$ p3').
+      { intro EQ. injection EQ as EQ. subst p1'. eapply bcReady_not_bcWait; eassumption. }
+      lets TAU : procNeq_tau_net E E' w NE. subst a.
+      inversion H2; subst;
+        try solve [exfalso; eapply bcReady_not_bcWait; eassumption];
+        try match goal with [TC : p1 -PA- ?c -PA> p1' |- _] =>
+          let E2 := fresh in pose proof (bcReady_step_outProc _ _ _ _ _ R TC) as E2;
+          try discriminate E2 end.
+      match goal with [EV : chanOutProc ;! ?v = chanOutProc ;! _,
+                       HI : h -i- chanOutProc {? ?v -i> h' |- _] =>
+        injection EV as EV; subst v;
+        eapply sentBase; [exact E | exact E' | apply stepDpParL; exact B1 | exact HI] end.
+Qed.
 
 Lemma msgAbortPathNet_urgent i n n' d :
   reachableProtNet n -> msgAbortPathNet i n -> n -ND- d -ND> n' -> False.

@@ -1537,7 +1537,7 @@ lowest level e.g. ovWaitState p2 (tactic already exists I think?).
 Then apply a matching tactic at this level, and you should be done.*)
 
 (** A truncated difference evaluates to a time only if its first operand does.*)
-Local Lemma evalExpFunTime_subtract_inv (e1 e2 : Exp) (t : Time) :
+Lemma evalExpFunTime_subtract_inv (e1 e2 : Exp) (t : Time) :
   evalExpFunTime (e1 (-) e2) = Some t -> exists t1, evalExpFunTime e1 = Some t1.
 Proof.
   unfold evalExpFunTime. simpl.

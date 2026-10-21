@@ -38,6 +38,7 @@ Require Import ComhCoq.protocol.EntAuxResults.
 Require Import ComhCoq.protocol.NARInsuff.
 Require Import ComhCoq.protocol.NARMisc.
 Require Import ComhCoq.protocol.NARMsgPosition.
+Require Import ComhCoq.protocol.NARNonFS_currSince.
 Require Import ComhCoq.protocol.NAROvlpTime.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
@@ -299,13 +300,389 @@ Proof.
   rewrite <- CE. exact (tfsBc_failSafe e (reachable_net_ent _ _ _ p E) TBe).
 Qed.
 
+(** switchBc's only step wakes the broadcaster in its mode.*)
+Local Lemma switchBc_step_wake (m : Mode) p p' c :
+  switchBcState m p -> p -PA- c -PA> p' -> c = chanWake ;! [baseMode m].
+Proof.
+  intros R T. red in R. destruct (bisim_disc_match _ _ _ _ R T) as [q S].
+  unfold switchBc in S. invert_disc_prefixes. output_values. reflexivity.
+Qed.
+
+(** The listener never inputs on wake.*)
+Local Lemma listener_wake_in_not p p' v :
+  listenerState p -> p -PA- chanWake ;? v -PA> p' -> False.
+Proof. intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra. Qed.
+
+(** A step in which the overlap component leaves switchBc m for switchCurr wakes the
+broadcaster in mode m.*)
+Local Lemma switchBc_switchCurr_ent_wake m p1 p2 p3 p1' p2' p3' l l' h h' k k' b :
+  broadcastState p1 -> overlapState p2 -> listenerState p3 ->
+  switchBcState m p2 -> switchCurrState p2' ->
+  [|p1 $||$ p2 $||$ p3, l, h, k|] -EA- b ->> [|p1' $||$ p2' $||$ p3', l', h', k'|] ->
+  p1 -PA- chanWake ;? [baseMode m] -PA> p1'.
+Proof.
+  intros BS OS LS SB SC S.
+  assert (NE : p2 <> p2').
+  { intro EQ; subst p2'. red in SB, SC.
+    pose proof (bisim_trans _ _ _ (bisim_symm _ _ SB) SC) as BT. ovWait_bisim_contra BT. }
+  inversion S; subst;
+    try (exfalso; apply NE; reflexivity);
+    try match goal with [T : _ $||$ _ $||$ _ -PA- ?c -PA> _ $||$ _ $||$ _ |- _] =>
+      first [ (lets TT : link_reach_triple_tau T (protState _ _ _ BS OS LS);
+               destruct TT as [c0 [v0 TT]];
+               decompose [or and] TT; clear TT; subst;
+               try (exfalso; apply NE; reflexivity);
+               match goal with
+               | [T2 : p2 -PA- c0 ;? v0 -PA> p2' |- _] =>
+                 exfalso; lets E2 : switchBc_step_wake SB T2; discriminate E2
+               | [T2 : p2 -PA- c0 ;! v0 -PA> p2' |- _] =>
+                 lets E2 : switchBc_step_wake SB T2; injection E2 as E2a E2b; subst c0 v0;
+                 first [ assumption
+                       | exfalso; eapply listener_wake_in_not; eassumption ]
+               end)
+            | (triple_disc_nonTau T;
+               first [ exfalso; apply NE; reflexivity
+                     | match goal with [T2 : p2 -PA- _ -PA> _ |- _] =>
+                         exfalso; lets E2 : switchBc_step_wake SB T2; discriminate E2 end ]) ]
+    end.
+Qed.
+
+(** Woken in mode m, the broadcaster waits in mode m with its timer zero.*)
+Local Lemma broadcast_wake_in (m : Mode) p p' : broadcastState p ->
+  p -PA- chanWake ;? [baseMode m] -PA> p' -> bcWaitState m zeroTime p'.
+Proof.
+  intros BS T. destruct (broadcastState_shape _ BS) as [B | m0 e B | m0 l B];
+    destruct (bisim_step_disc _ _ _ _ B T) as [q [TQ BQ]]; prot_outProc_in_not_body;
+    invert_disc_prefixes; explicit_typed_input.
+  all: red; clean_proc_hyp BQ; (eapply bisim_trans; [exact BQ | ]); unfold_app_bisim;
+    apply bisim_refl.
+Qed.
+
+(** The broadcaster waits or is ready to broadcast in mode m.*)
+Local Definition bcModeState (m : Mode) (p : ProcTerm) : Prop :=
+  (exists x, bcWaitState m x p) \/ (exists l, bcReadyState m l p).
+
+(** A wait reads its position into bcReady, or takes trans or wake.*)
+Local Lemma bcWait_step_cases (m : Mode) (x : Time) p p' c :
+  bcWaitState m x p -> p -PA- c -PA> p' ->
+  (exists (l : Position), c = chanPos ;? [basePosition l] /\ bcReadyState m l p') \/
+  (exists v, c = chanTrans ;? v) \/ (exists v, c = chanWake ;? v).
+Proof.
+  intros W T. red in W. destruct (bisim_step_disc _ _ _ _ W T) as [q [TQ BQ]].
+  unfold bcWait in TQ. invert_disc_prefixes; try (unfold liftVarList in *); explicit_typed_input.
+  - right. left. eexists. reflexivity.
+  - left. eexists. split; [reflexivity | ]. red. clean_proc_hyp BQ.
+    eapply bisim_trans; [exact BQ | ]. unfold_app_bisim. apply bisim_refl.
+  - right. right. eexists. reflexivity.
+Qed.
+
+(** A broadcaster in mode m stays in mode m through its own steps, but for an input on trans or
+wake.*)
+Local Lemma bcMode_comp_step (m : Mode) p p' c :
+  bcModeState m p -> broadcastState p -> p -PA- c -PA> p' ->
+  bcModeState m p' \/ (exists v, c = chanTrans ;? v) \/ (exists v, c = chanWake ;? v).
+Proof.
+  intros [[x W] | [l R]] BS T.
+  - destruct (bcWait_step_cases _ _ _ _ _ W T) as [[l [_ R]] | [V | V]].
+    + left. right. exists l. exact R.
+    + right. left. exact V.
+    + right. right. exact V.
+  - left. left. exists (period m). rewrite (bcReady_step_outProc _ _ _ _ _ R T) in T.
+    exact (proj2 (bc_outProc_out _ _ _ _ T BS)).
+Qed.
+
+(** Only tfsBc outputs on trans, and it goes to tfsListen.*)
+Local Lemma overlap_trans_out p p' v : overlapState p -> p -PA- chanTrans ;! v -PA> p' ->
+  tfsBcState p /\ tfsListenState p'.
+Proof.
+  intros O T. destruct (overlapState_shape _ O)
+    as [B | m B | m e2 e3 e4 B | m e2 l B | m B | B | B | B | B | m B | B | B | B];
+    try solve [exfalso; destruct (bisim_disc_match _ _ _ _ B T) as [q TQ];
+      prot_outProc_in_not_body; invert_disc_prefixes].
+  split; [exact B | ]. destruct (bisim_step_disc _ _ _ _ B T) as [q [TQ BQ]].
+  unfold tfsBc in TQ. invert_disc_prefixes. red. clean_proc_hyp BQ.
+  eapply bisim_trans; [exact BQ | ]. unfold_app_bisim. apply bisim_refl.
+Qed.
+
+(** Only switchBc outputs on wake: it wakes the broadcaster in its mode and goes to switchCurr.*)
+Local Lemma overlap_wake_out p p' v : overlapState p -> p -PA- chanWake ;! v -PA> p' ->
+  exists (m : Mode), v = [baseMode m] /\ switchBcState m p /\ switchCurrState p'.
+Proof.
+  intros O T. destruct (overlapState_shape _ O)
+    as [B | m B | m e2 e3 e4 B | m e2 l B | m B | B | B | B | B | m B | B | B | B];
+    try solve [exfalso; destruct (bisim_disc_match _ _ _ _ B T) as [q TQ];
+      prot_outProc_in_not_body; invert_disc_prefixes].
+  exists m. destruct (bisim_step_disc _ _ _ _ B T) as [q [TQ BQ]].
+  unfold switchBc in TQ. invert_disc_prefixes. output_values.
+  split; [reflexivity | split; [exact B | ]]. red. clean_proc_hyp BQ.
+  eapply bisim_trans; [exact BQ | ]. unfold_app_bisim. apply bisim_refl.
+Qed.
+
+(** The listener never outputs on trans or wake.*)
+Local Lemma listener_trans_wake_out_not p p' c v : listenerState p ->
+  (c = chanTrans \/ c = chanWake) -> p -PA- c ;! v -PA> p' -> False.
+Proof.
+  intros S [E | E] T; subst c; destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
+Qed.
+
+(** An entity step leaves a broadcaster in mode m in mode m, unless it is tfsBc's trans or
+switchBc's wake-up.*)
+Local Lemma bcMode_step_ent m p1 p2 p3 p1' p2' p3' l l' h h' k k' b :
+  broadcastState p1 -> overlapState p2 -> listenerState p3 -> bcModeState m p1 ->
+  [|p1 $||$ p2 $||$ p3, l, h, k|] -EA- b ->> [|p1' $||$ p2' $||$ p3', l', h', k'|] ->
+  bcModeState m p1' \/ (tfsBcState p2 /\ tfsListenState p2') \/
+  (exists m', switchBcState m' p2 /\ switchCurrState p2').
+Proof.
+  intros BS OS LS BM S.
+  inversion S; subst; try (left; exact BM).
+  all: match goal with [T : _ $||$ _ $||$ _ -PA- ?c -PA> _ $||$ _ $||$ _ |- _] =>
+    first [
+      (* a tau: two components synchronise *)
+      (destruct (link_reach_triple_tau _ _ _ _ _ _ T (protState _ _ _ BS OS LS)) as [c0 [v0 TT]];
+       destruct TT as [[T1 [T2 E3]] | [[T1 [T2 E3]] | [[T1 [T3 E2]] | [[T1 [T3 E2]]
+         | [[T2 [T3 E1]] | [T2 [T3 E1]]]]]]];
+       [ destruct (bcMode_comp_step _ _ _ _ BM BS T1) as [BM' | [[vt E] | [vt E]]];
+           [left; exact BM' | discriminate E | discriminate E]
+       | destruct (bcMode_comp_step _ _ _ _ BM BS T1) as [BM' | [[vt E] | [vt E]]];
+           [ left; exact BM'
+           | injection E as EC EV; subst; right; left; exact (overlap_trans_out _ _ _ OS T2)
+           | injection E as EC EV; subst; right; right;
+             destruct (overlap_wake_out _ _ _ OS T2) as [m' [_ [SB SC]]];
+             exists m'; split; assumption ]
+       | destruct (bcMode_comp_step _ _ _ _ BM BS T1) as [BM' | [[vt E] | [vt E]]];
+           [left; exact BM' | discriminate E | discriminate E]
+       | destruct (bcMode_comp_step _ _ _ _ BM BS T1) as [BM' | [[vt E] | [vt E]]];
+           [ left; exact BM'
+           | injection E as EC EV; subst; exfalso;
+             exact (listener_trans_wake_out_not _ _ _ _ LS (or_introl eq_refl) T3)
+           | injection E as EC EV; subst; exfalso;
+             exact (listener_trans_wake_out_not _ _ _ _ LS (or_intror eq_refl) T3) ]
+       | subst; left; exact BM
+       | subst; left; exact BM ])
+    | (* not a tau: one component steps with the entity *)
+      (triple_disc_nonTau T;
+       first [ left; exact BM
+             | match goal with [T1 : ?q -PA- _ -PA> _, BM0 : bcModeState _ ?q,
+                                BS0 : broadcastState ?q |- _] =>
+                 destruct (bcMode_comp_step _ _ _ _ BM0 BS0 T1) as [BM' | [[vt E] | [vt E]]];
+                 [left; exact BM' | discriminate E | discriminate E] end ]) ]
+  end.
+Qed.
+
+(** switchCurr's one step is its write on mCurr, into switchListen.*)
+Local Lemma switchCurr_step_listen p p' b :
+  switchCurrState p -> p -PA- b -PA> p' -> switchListenState p'.
+Proof.
+  intros SC T. red in SC. destruct (bisim_step_disc _ _ _ _ SC T) as [q [TQ BQ]].
+  unfold switchCurr in TQ. invert_disc_prefixes. red. clean_proc_hyp BQ.
+  eapply bisim_trans; [exact BQ | ]. unfold_app_bisim. apply bisim_refl.
+Qed.
+
+(** The broadcaster is in mode m, as a network state predicate.*)
+Local Definition bcModeNet (m : Mode) (i : nat) (n : Network) : Prop :=
+  liftEntNet (liftProcEnt (liftBroadcast (bcModeState m))) i n.
+
+Local Lemma bcModeNet_cases m i n : bcModeNet m i n ->
+  (exists x, bcWaitStateNet m x i n) \/ (exists l, bcReadyStateNet m l i n).
+Proof.
+  intro BM. net_state_destr BM p1 p2 p3 l h k E.
+  destruct BM as [[x W] | [l0 R]]; [left; exists x | right; exists l0]; net_state_intro E;
+    assumption.
+Qed.
+
+(** A network step leaves a broadcaster in mode m in mode m, unless it is tfsBc's trans or
+switchBc's wake-up.*)
+Local Lemma bcMode_step_net m n n' a i :
+  reachableProtNet n -> n -NA- a -NA> n' -> bcModeNet m i n ->
+  bcModeNet m i n' \/ (tfsBcStateNet i n /\ tfsListenStateNet i n') \/
+  (exists m', switchBcStateNet m' i n /\ switchCurrStateNet i n').
+Proof.
+  intros R S BM. net_state_destr BM p1 p2 p3 l h k E.
+  lets PS : reachableProtNet_triple R E. inversion PS as [q1 q2 q3 BS OS LS]; subst.
+  destruct (link_net_ent_disc_fwd _ _ _ _ _ S E) as [e' [E' [EQ | [b ST]]]].
+  - subst e'. left. net_state_intro E'. exact BM.
+  - destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ ST) as [p1' [p2' [p3' [l' [h' [k' [EE _]]]]]]].
+    subst e'.
+    destruct (bcMode_step_ent _ _ _ _ _ _ _ _ _ _ _ _ _ _ BS OS LS BM ST)
+      as [BM' | [[TB TL] | [m' [SB SC]]]].
+    + left. net_state_intro E'. exact BM'.
+    + right. left. split; [net_state_intro E | net_state_intro E']; assumption.
+    + right. right. exists m'. split; [net_state_intro E | net_state_intro E']; assumption.
+Qed.
+
+(** A network step from switchCurr stays in switchCurr or goes to switchListen.*)
+Local Lemma switchCurr_step_net n n' a i :
+  reachableProtNet n -> n -NA- a -NA> n' -> switchCurrStateNet i n ->
+  switchCurrStateNet i n' \/ switchListenStateNet i n'.
+Proof.
+  intros R S SC. net_state_destr SC p1 p2 p3 l h k E.
+  destruct (link_net_ent_disc_fwd _ _ _ _ _ S E) as [e' [E' [EQ | [b ST]]]].
+  - subst e'. left. net_state_intro E'. exact SC.
+  - destruct (triple_disc_ent_fwd _ _ _ _ _ _ _ _ ST)
+      as [p1' [p2' [p3' [l' [h' [k' [EE [_ [[EQ2 | [b2 B2]] _]]]]]]]]]; subst e'.
+    + subst p2'. left. net_state_intro E'. exact SC.
+    + right. net_state_intro E'. exact (switchCurr_step_listen _ _ _ SC B2).
+Qed.
+
+(** An entity whose broadcaster waits with timer x cannot let more than x pass: when the timer
+runs out it reads its position, and no time passes while it can.*)
+Local Lemma bcWait_del_timer_ge (m : Mode) (x : Time) p1 p2 p3 l h k (d : Delay) e' :
+  bcWaitState m x p1 -> [|p1 $||$ p2 $||$ p3, l, h, k|] -ED- d ->> e' -> pos (delay d) <= x.
+Proof.
+  intros W DE. destruct (Rle_or_lt (pos (delay d)) x) as [LE | LT]; [exact LE | exfalso].
+  destruct (bcWait_pos_read m x) as [[Z [q R]] | [dx [q [EX [TD [q' R]]]]]].
+  - eapply ent_del_pos_in_not; [ | exact DE]. dae_broadcast.
+    destruct (bisim_disc_match _ _ _ _ (bisim_symm _ _ W) R) as [r R']. exists r. exact R'.
+  - inversion DE as [d0 p p'' l0 delta i0 i'' k0 k'' PD ID KD DISP NS]; subst.
+    assert (POS : 0 < pos (delay d) - pos (delay dx)) by (simpl in *; lra).
+    set (d2 := mkDelay (mkposreal _ POS)).
+    assert (DS : d = dx +d+ d2) by (apply delayEqR; simpl; lra).
+    clearbody d2.
+    destruct (timeSplit _ _ _ _ _ PD DS) as [pm [PD1 _]].
+    destruct (timeSplit_inter _ _ _ _ _ ID DS) as [hm [ID1 _]].
+    destruct (timeSplit_mState _ _ _ _ _ KD DS) as [km [KD1 _]].
+    destruct (NS (chanPos ;? [basePosition origin])) as [_ NS2].
+    assert (LTd : dx < d) by (simpl in *; lra).
+    specialize (NS2 pm hm km dx LTd PD1 ID1 KD1).
+    triple_del_inv PD1.
+    match type of NS2 with noSyncNow _ (parAll ?a [?b, ?c]) _ _ =>
+      match goal with [D1 : p1 -PD- dx -PD> a |- _] =>
+    destruct (bisim_step_del _ _ _ _ W D1) as [q1 [TQ1 BQ1]];
+    assert (RD1 : exists r, q1 -PA- chanPos ;? [basePosition origin] -PA> r);
+    [ destruct (bcWait_del_cases _ _ _ _ TQ1) as [[t [H [EV EQ]]] | [[t [EV [_ RD]]] | [EV _]]];
+      [ subst q1; unfold liftTimeExp in EV; rewrite evalExpFunTime_time in EV;
+        injection EV as EV; subst t;
+        destruct (bcWait_pos_read m (minusTime x dx H)) as [[_ RD] | [d3 [q3 [EQ3 _]]]];
+          [exact RD | exfalso; simpl in EQ3; pose proof (cond_pos (delay d3)); lra]
+      | exact RD
+      | unfold liftTimeExp in EV; rewrite evalExpFunTime_time in EV; discriminate EV ]
+    | destruct RD1 as [r RD1];
+      destruct (bisim_disc_match _ _ _ _ (bisim_symm _ _ BQ1) RD1) as [r' R1];
+      assert (DA : discActEnabled (a $||$ b $||$ c) (chanPos ;? [basePosition origin]))
+        by (dae_broadcast; exists r'; exact R1);
+      exact (proj2 (proj2 (NS2 DA)) origin eq_refl) ] end end.
+Qed.
+
+(** A network delay leaves a broadcaster in mode m in mode m: bcReady cannot delay, and a wait
+counts down.*)
+Local Lemma bcMode_del_net m n n' d i :
+  reachableProtNet n -> n -ND- d -ND> n' -> bcModeNet m i n -> bcModeNet m i n'.
+Proof.
+  intros R D BM. net_state_destr BM p1 p2 p3 l h k E.
+  destruct (link_net_ent_del_fwd _ _ _ _ _ D E) as [e' [E' DE]].
+  destruct e' as [q l' h' k'].
+  lets PS : reachableProtNet_triple (reachNetDel _ _ _ R D) E'.
+  inversion PS as [p1' p2' p3' BS' OS' LS']; subst q.
+  destruct (triple_del_ent _ _ _ _ _ _ _ _ _ _ _ _ _ DE) as [D1 _].
+  net_state_intro E'.
+  destruct BM as [[x W] | [l0 RD]].
+  - left. pose proof (bcWait_del_timer_ge _ _ _ _ _ _ _ _ _ _ W DE) as LE.
+    destruct (bisim_step_del _ _ _ _ W D1) as [q [TQ BQ]].
+    destruct (bcWait_del_cases _ _ _ _ TQ) as [[t [H [EV EQ]]] | [[t [EV [LT2 _]]] | [EV _]]].
+    + subst q. unfold liftTimeExp in EV. rewrite evalExpFunTime_time in EV.
+      injection EV as EV. subst t. exists (minusTime x d H). exact BQ.
+    + exfalso. unfold liftTimeExp in EV. rewrite evalExpFunTime_time in EV.
+      injection EV as EV. subst t. lra.
+    + exfalso. unfold liftTimeExp in EV. rewrite evalExpFunTime_time in EV. discriminate EV.
+  - exfalso. eapply (bcReady_urgent m l0); [ | exact DE]. constructor. constructor. exact RD.
+Qed.
+
+(** A delay keeps switchCurr.*)
+Local Lemma switchCurr_del_net n n' d i :
+  reachableProtNet n -> n -ND- d -ND> n' -> switchCurrStateNet i n -> switchCurrStateNet i n'.
+Proof.
+  intros R D SC. net_state_destr SC p1 p2 p3 l h k E.
+  destruct (link_net_ent_del_fwd _ _ _ _ _ D E) as [e' [E' DE]].
+  destruct e' as [q l' h' k'].
+  lets PS : reachableProtNet_triple (reachNetDel _ _ _ R D) E'.
+  inversion PS as [p1' p2' p3' BS' OS' LS']; subst q.
+  destruct (triple_del_ent _ _ _ _ _ _ _ _ _ _ _ _ _ DE) as [_ [D2 _]].
+  net_state_intro E'. red. eapply bisim_del_pres; [del_self_body | exact SC | exact D2].
+Qed.
+
+(** While entity i is nextSince m and in switchCurr, its broadcaster is in mode m, in which
+switchBc m woke it.*)
+Local Lemma nextSince_switchCurr_bcMode m t i n (p : reachableProtNet n) :
+  nextSince m t i n p -> switchCurrStateNet i n -> bcModeNet m i n.
+Proof.
+  intro NS. induction NS as [a i n n' p w l t t' x y PE OR OW | a t i n n' p w NS IH NSS
+    | d t i n n' p w NS IH]; intro SC.
+  - exfalso. pose proof (overlap_states_bisim_net _ _ _ _ OW SC) as BT. ovWait_bisim_contra BT.
+  - assert (STAY : switchCurrStateNet i n -> bcModeNet m i n').
+    { intro SC0.
+      destruct (bcMode_step_net _ _ _ _ _ p w (IH SC0)) as [BM | [[TB _] | [m' [SB _]]]].
+      - exact BM.
+      - exfalso. pose proof (overlap_states_bisim_net _ _ _ _ TB SC0) as BT.
+        ovWait_bisim_contra BT.
+      - exfalso. pose proof (overlap_states_bisim_net _ _ _ _ SB SC0) as BT.
+        ovWait_bisim_contra BT. }
+    pose proof SC as SC'. net_state_destr SC' p1' p2' p3' l' h' k' E'.
+    destruct (link_net_ent_disc_bkwd _ _ _ _ _ w E') as [e [E [EQ | [b ST]]]].
+    + subst e. apply STAY. net_state_intro E. exact SC'.
+    + destruct e as [q l h k]. lets PS : reachableProtNet_triple p E.
+      inversion PS as [p1 p2 p3 BS OS LS]; subst q.
+      lets T : triple_disc_ent ST. destruct T as [_ [[EQ2 | [b2 B2]] _]].
+      * subst p2'. apply STAY. net_state_intro E. exact SC'.
+      * (* the wake-up by switchBc, for the mode m of nextSince *)
+        destruct (switchCurr_prev _ _ _ B2 OS SC') as [m0 SB0].
+        assert (SBn : switchBcStateNet m0 i n) by (net_state_intro E; exact SB0).
+        rewrite <- (nextSince_switchBc_modeEq _ _ _ _ _ _ NS SBn) in SB0.
+        net_state_intro E'. left. exists zeroTime.
+        exact (broadcast_wake_in _ _ _ BS
+          (switchBc_switchCurr_ent_wake _ _ _ _ _ _ _ _ _ _ _ _ _ _ BS OS LS SB0 SC' ST)).
+  - destruct (reachableProtNet_del_prev _ _ _ _ _ p w SC) as [_ [OS _]].
+    assert (SC0 : switchCurrStateNet i n)
+      by (apply (overlap_del_bkwd_net switchCurr _ _ _ _ OS w SC); intros m0 e2 e3 e4 B;
+          ovWait_bisim_contra B).
+    exact (bcMode_del_net _ _ _ _ _ p w (IH SC0)).
+Qed.
+
+(** While an entity is currSince a mode that is not fail safe, and not in switchCurr, its
+broadcaster is in that mode.*)
+Local Lemma currSince_bcMode m t i n (p : reachableProtNet n) :
+  currSince m t i n p -> ~ failSafe m -> ~ switchCurrStateNet i n -> bcModeNet m i n.
+Proof.
+  intros CS NF.
+  induction CS as [a t i n n' p w NS SC SL | a t i n n' p w CS IH CM | d t i n n' p w CS IH];
+    intro NSC.
+  - destruct (bcMode_step_net _ _ _ _ _ p w (nextSince_switchCurr_bcMode _ _ _ _ _ NS SC))
+      as [BM' | [[TB _] | [m' [SB _]]]].
+    + exact BM'.
+    + exfalso. pose proof (overlap_states_bisim_net _ _ _ _ TB SC) as BT. ovWait_bisim_contra BT.
+    + exfalso. pose proof (overlap_states_bisim_net _ _ _ _ SB SC) as BT. ovWait_bisim_contra BT.
+  - destruct (Classical_Prop.classic (switchCurrStateNet i n)) as [SC | NSC0].
+    + (* the switch from switchCurr makes its next mode current, so m *)
+      destruct (switchCurr_nextSince_ex n p i SC) as [m2 [t2 NS2]].
+      destruct (switchCurr_step_net _ _ _ _ p w SC) as [SC' | SL]; [contradiction | ].
+      pose proof (switch_states_mState _ _ _ _ _ p w SC SL (nextSince_next _ _ _ _ _ NS2)) as CM2.
+      assert (EM : m2 = m).
+      { rewrite currMode_ent_ex in CM, CM2. destruct CM as [e [E CE]], CM2 as [e2 [E2 CE2]].
+        assert (e2 = e) by (eapply entInNetUnique; eassumption). subst e2. congruence. }
+      subst m2.
+      destruct (bcMode_step_net _ _ _ _ _ p w (nextSince_switchCurr_bcMode _ _ _ _ _ NS2 SC))
+        as [BM' | [[TB _] | [m' [SB _]]]].
+      * exact BM'.
+      * exfalso. pose proof (overlap_states_bisim_net _ _ _ _ TB SC) as BT.
+        ovWait_bisim_contra BT.
+      * exfalso. pose proof (overlap_states_bisim_net _ _ _ _ SB SC) as BT.
+        ovWait_bisim_contra BT.
+    + destruct (bcMode_step_net _ _ _ _ _ p w (IH NSC0)) as [BM' | [[TB TL] | [m' [SB SC']]]].
+      * exact BM'.
+      * exfalso. apply NF. exact (tfsListen_failSafe_net m i n' (reachNetDisc _ _ _ p w) TL CM).
+      * exfalso. exact (NSC SC').
+  - assert (NSC0 : ~ switchCurrStateNet i n)
+      by (intro SC; exact (NSC (switchCurr_del_net _ _ _ _ p w SC))).
+    exact (bcMode_del_net _ _ _ _ _ p w (IH NSC0)).
+Qed.
+
 (*Relates the currSince relation to the state of the broadcast software
 component. In particular, if we're currSince, then the broadcast component is either
 waiting to broadcast or ready to broadcast.*)
 Theorem currSince_bc_state (n : Network) (m : Mode) (t : Time)
-  (i : nat) (p : reachableProtNet n) : currSince m t i n p ->
+  (i : nat) (p : reachableProtNet n) : currSince m t i n p -> ~ failSafe m ->
+  ~ switchCurrStateNet i n ->
   (exists x, bcWaitStateNet m x i n) \/
-  (exists l, bcReadyStateNet m l i n). Admitted. (*1*)
+  (exists l, bcReadyStateNet m l i n).
 (**Proof: Induction on currSince. In the base case, we have that the overlap component has
 gone from switchCurr to switchListen, in which case the broadcast component can be shown to
 have stayed the same (...). But in a separate result (...EA::inter_component...) we can
@@ -324,25 +701,104 @@ with the broadcast component contributing an input on trans. Now, it can be show
 (...activation...) that the only state willing to output on trans is tfsBc. But we can show
 elsewhere (tfsBc_not_currSince) that tfsBc implies that we are not currSince, which
 contradicts the hypothesis.*)
+Proof. intros CS NF NSC. exact (bcModeNet_cases _ _ _ (currSince_bcMode _ _ _ _ _ CS NF NSC)). Qed.
 
 (** If we're currSince & we can delay, then we're in the bcWait state.*)
 Corollary currSince_del_bcWait (n n' : Network) (m : Mode) (t : Time)
   (i : nat) (d : Delay) (p : reachableProtNet n) :
-  n -ND- d -ND> n' -> currSince m t i n p ->
-  exists x, bcWaitStateNet m (delToTime (x +dt+ d)) i n. Admitted. (*2*)
+  n -ND- d -ND> n' -> currSince m t i n p -> ~ failSafe m ->
+  exists x, bcWaitStateNet m (delToTime (x +dt+ d)) i n.
 (**Proof: Apply currSince_bc_state and then eliminate bcReady as it is urgent*)
+Proof.
+  intros D CS NF.
+  assert (NSC : ~ switchCurrStateNet i n).
+  { intro SC. destruct SC as [e SCe E]. destruct (link_net_ent_del_fwd _ _ _ _ _ D E) as [e' [_ DE]].
+    exact (swithcCurr_urgent m e e' d (reachable_net_ent _ _ _ p E) SCe DE). }
+  destruct (currSince_bc_state n m t i p CS NF NSC) as [[x W] | [l R]].
+  - pose proof W as W'. net_state_destr W' p1 p2 p3 l h k E.
+    destruct (link_net_ent_del_fwd _ _ _ _ _ D E) as [e' [_ DE]].
+    pose proof (bcWait_del_timer_ge _ _ _ _ _ _ _ _ _ _ W' DE) as LE.
+    exists (minusTime x d LE).
+    assert (EQ : delToTime (minusTime x d LE +dt+ d) = x) by (apply timeEqR; simpl; ring).
+    rewrite EQ. exact W.
+  - exfalso. destruct R as [e Re E]. destruct (link_net_ent_del_fwd _ _ _ _ _ D E) as [e' [_ DE]].
+    exact (bcReady_urgent m l e e' d Re DE).
+Qed.
+
+(** After a step into switchCurr, the overlap component was in switchCurr already, or the step
+woke the broadcaster, whose timer is then zero.*)
+Local Lemma switchCurr_prev_net_bcWait n n' i a m x :
+  reachableProtNet n -> n -NA- a -NA> n' -> switchCurrStateNet i n' ->
+  bcWaitStateNet m x i n' -> switchCurrStateNet i n \/ x = zeroTime.
+Proof.
+  intros R S SC BW. net_state_destr SC p1' p2' p3' l' h' k' E'.
+  net_state_ent BW E'.
+  destruct (link_net_ent_disc_bkwd _ _ _ _ _ S E') as [e [E [EQ | [b ST]]]].
+  - subst e. left. net_state_intro E. exact SC.
+  - destruct e as [q l h k]. lets PS : reachableProtNet_triple R E.
+    inversion PS as [p1 p2 p3 BS OS LS]; subst q.
+    lets T : triple_disc_ent ST. destruct T as [_ [[EQ2 | [b2 B2]] _]].
+    + subst p2'. left. net_state_intro E. exact SC.
+    + right. destruct (switchCurr_prev _ _ _ B2 OS SC) as [m0 SB].
+      pose proof (broadcast_wake_in _ _ _ BS
+        (switchBc_switchCurr_ent_wake _ _ _ _ _ _ _ _ _ _ _ _ _ _ BS OS LS SB SC ST)) as W0.
+      destruct (bcWait_bisim_inj _ _ _ _ (bisim_trans _ _ _ (bisim_symm _ _ W0) BW)) as [_ EX].
+      symmetry. exact EX.
+Qed.
+
+(** While the overlap component is in switchCurr, a waiting broadcaster with time left has
+broadcast since nextSince began.*)
+Local Lemma switchCurr_bcWait_nextSince_time n m m' t x i (p : reachableProtNet n) :
+  nextSince m t i n p -> switchCurrStateNet i n -> bcWaitStateNet m' x i n -> zeroTime < x ->
+  period m' - x <= t.
+Proof.
+  intro NS. revert m' x. induction NS as [a i n n' p w l t t' x y PE OR OW
+    | a t i n n' p w NS IH NSS | d t i n n' p w NS IH]; intros m' x0 SC BW XP.
+  - exfalso. pose proof (overlap_states_bisim_net _ _ _ _ OW SC) as BT. ovWait_bisim_contra BT.
+  - destruct (switchCurr_prev_net_bcWait _ _ _ _ _ _ p w SC BW) as [SC0 | Z];
+      [ | subst x0; simpl in XP; lra].
+    destruct (bcWait_bktrk_net _ _ _ _ _ _ p w BW) as [BW0 | [Z | [l [_ [X _]]]]].
+    + exact (IH _ _ SC0 BW0 XP).
+    + subst x0. simpl in XP. lra.
+    + subst x0. pose proof (cond_nonneg (time t)). lra.
+  - destruct (reachableProtNet_del_prev _ _ _ _ _ p w SC) as [BS [OS _]].
+    assert (SC0 : switchCurrStateNet i n)
+      by (apply (overlap_del_bkwd_net switchCurr _ _ _ _ OS w SC); intros m0 e2 e3 e4 B;
+          ovWait_bisim_contra B).
+    lets BW0 : bcWaitNet_del_bkwd BS XP w BW.
+    assert (XP0 : zeroTime < delToTime (x0 +dt+ d))
+      by (simpl; simpl in XP; pose proof (cond_pos (delay d)); lra).
+    lets IH0 : IH SC0 BW0 XP0. simpl in *. lra.
+Qed.
 
 (* If we are in the wait state of the broadcast component with time x,
 and we are currSince for time t, then x <= t.*)
 Theorem bcWait_currSince_time (n : Network) (m : Mode) (x t: Time)
   (i : nat) (p : reachableProtNet n) :
-  bcWaitStateNet m x i n -> currSince m t i n p -> period m - x <= t.
-  Admitted. (*2*)
+  bcWaitStateNet m x i n -> zeroTime < x -> currSince m t i n p -> period m - x <= t.
 (**Proof: Induction on currSince.
 Base case: x = period m, so <= t is trivial.
 Discrete inductive: x and t preserved so I.H. carries forth.
 Delay inductive: x decreases, t increases, so I.H. is more than enough.
 *)
+Proof.
+  intros BW XP CS. revert x BW XP.
+  induction CS as [a t i n n' p w NS SC SL | a t i n n' p w CS IH CM | d t i n n' p w CS IH];
+    intros x0 BW XP.
+  - destruct (bcWait_bktrk_net _ _ _ _ _ _ p w BW) as [BW0 | [Z | [l [_ [X _]]]]].
+    + eapply switchCurr_bcWait_nextSince_time; eassumption.
+    + subst x0. simpl in XP. lra.
+    + subst x0. pose proof (cond_nonneg (time t)). lra.
+  - destruct (bcWait_bktrk_net _ _ _ _ _ _ p w BW) as [BW0 | [Z | [l [_ [X _]]]]].
+    + exact (IH _ BW0 XP).
+    + subst x0. simpl in XP. lra.
+    + subst x0. pose proof (cond_nonneg (time t)). lra.
+  - destruct (reachableProtNet_del_prev _ _ _ _ _ p w BW) as [BS _].
+    lets BW0 : bcWaitNet_del_bkwd BS XP w BW.
+    assert (XP0 : zeroTime < delToTime (x0 +dt+ d))
+      by (simpl; simpl in XP; pose proof (cond_pos (delay d)); lra).
+    lets IH0 : IH BW0 XP0. simpl in *. lra.
+Qed.
 
 (* If we are in the wait state of the broadcast component, and the clock value is non-zero,
 then a message containing the mode in question and some position was sent exactly
@@ -360,10 +816,10 @@ Theorem bcWait_sent (n : Network) (m : Mode) (x : Time)
   (*The discrete inductive case follows from the theorem (bcWait_bktrk_net).*)
   assert (x <> zeroTime) as Q. unfold not. intro F. rewrite F in H0.
   contradiction (Rlt_irrefl zeroTime).
-  lets BB : bcWait_bktrk_net p H s. decompOr3 BB W1 W2 W3.
+  lets BB : bcWait_bktrk_net p s H. decompOr3 BB W1 W2 W3.
   apply IHp in W1. decompEx2 W1 l q V. exists l q. constructor. assumption.
-  assumption. andflat Y. contradiction Q. invertClearAs2 W3 l L.
-  andflat Y. rewrite <- Y1. exists l (Rle_refl x). constructor. my_applys_eq Y2.
+  assumption. contradiction (Q W2). invertClearAs2 W3 l L.
+  andflat Y. rewrite <- Y1. exists l (Rle_refl x). my_applys_eq Y2.
   timering.
   (*The delay inductive case follows by an application of I.H. and then the delay
   constructor for sent.*)
@@ -381,7 +837,7 @@ question m and some position l0 within the window t' and t' + period m. We also 
 that the message was sent at most t units ago.*)
 Theorem currSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   (i : nat) (p : reachableProtNet n) :
-  currSince m t i n p -> t' < t ->
+  currSince m t i n p -> ~ failSafe m -> t' < t ->
   exists t'' l, t' < (time t'')  /\ t'' <= t' + period m /\ t'' <= t /\
   sent [baseMode m, basePosition l] t'' i n p. 
   (*Let us start with a little attempt at a sketch of what is to be proven:
@@ -391,7 +847,7 @@ Theorem currSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
         sent------------t''----------  
 
   Now we proceed by induction on currSince.*)
-  intros. generalize dependent t'. induction H; intros.
+  intros H NF H0. generalize dependent t'. induction H; intros.
   (*In the base case, we have that the previous state was nextSince. In which case we
   apply (nextSince_periodic_sent) and the discrete sent constructor and we're done.*)
   addHyp (nextSince_periodic_sent n m t t' i p H H2). decompose [ex] H3.
@@ -423,7 +879,7 @@ Theorem currSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   constructor. assumption.
   (*Now all that remains is the delay case where t' < d. Well we know that the previous state
   was bcWait m (x + d)*)
-  addHyp (currSince_del_bcWait n n' m t i d p w H). invertClear H1.
+  addHyp (currSince_del_bcWait n n' m t i d p w H NF). invertClear H1.
   (*So by (bcWait_sent) we get sent <m, l> (period m - (x + d)) for the previous case*)
   assert (zeroTime < (delToTime (x +dt+ d))). simpl. replace 0 with (0 + 0).
   apply Rplus_le_lt_compat. timeNonneg. delPos. ring.
@@ -438,7 +894,7 @@ Theorem currSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   (*But we also clearly have that period m - x <= t' + period m*)
   simpl. rewrite Rplus_comm.
   apply Rminus_le_weaken_lr. timeNonneg. apply Rplus_le_weaken_rr. timeNonneg.
-  apply Rle_refl. split. simpl. addHyp (bcWait_currSince_time n m (x +dt+ d) t i p H3 H).
+  apply Rle_refl. split. simpl. addHyp (bcWait_currSince_time n m (x +dt+ d) t i p H3 H1 H).
   simpl in H5. apply Rminus_le_swap_lr. eapply Rle_trans;[ |apply H5].
   apply Req_le. ring.
   (*So now by the delay constructor of sent, we get sent <m, l> (period m - x) for the current
@@ -591,7 +1047,7 @@ Theorem pre_del_suff (n : Network) (m : Mode) (t : Time)
   (nonneg (time transMax)) + nonneg (time (trans m)) =
   nonneg ((msgLatency +t+ timeMax adaptNotif transMax) +t+ trans m)). simpl.
   ring. rewrite H3 in H1. rewrite <- Heqw in H1.
-  addHyp (currSince_periodic_sent n m t w i p H H1). decompose [ex] H4.
+  addHyp (currSince_periodic_sent n m t w i p H Q H1). decompose [ex] H4.
   clear H4. decompose [and] H6. clear H6. rename x0 into l0. rename x into t'.
   assert (t' <= u). rewrite Hequ. eapply Rle_trans. apply H7. rewrite Heqw.
   rewrite <- H3. rewrite Rplus_assoc. rewrite Rplus_comm. rewrite Rplus_assoc.

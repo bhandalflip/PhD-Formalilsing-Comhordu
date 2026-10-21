@@ -114,7 +114,7 @@ u = x + period m. So t + u = t + x + period m. But we know again by our mutual I
 that t + x = tw(m0, m). And so t + u = tw(m0, m) + period m as required.*)
 
 (** ovReadyN applied to three expressions is ovReady of them.*)
-Local Lemma ovReadyN_bisim (e1 e2 e3 : Exp) : ovReadyN $( [e1, e2, e3] )$ ~p~ ovReady e1 e2 e3.
+Lemma ovReadyN_bisim (e1 e2 e3 : Exp) : ovReadyN $( [e1, e2, e3] )$ ~p~ ovReady e1 e2 e3.
 Proof. unfold_app_bisim. apply bisim_refl. Qed.
 
 (** Of two bisimilar ovWait, the second with a well-formed position timer, first parameters
@@ -203,7 +203,7 @@ Proof.
 Qed.
 
 (** Bisimilar ovReady are for the same mode.*)
-Local Lemma ovReady_bisim_mode (m1 m2 : Mode) u1 u2 (l1 l2 : Position) :
+Lemma ovReady_bisim_mode (m1 m2 : Mode) u1 u2 (l1 l2 : Position) :
   ovReady (eBase (baseMode m1)) u1 (eBase (basePosition l1)) ~p~
   ovReady (eBase (baseMode m2)) u2 (eBase (basePosition l2)) -> m1 = m2.
 Proof.
@@ -239,7 +239,7 @@ Qed.
 
 (** A discrete step of the network, seen at the overlap component of entity i: the component
 stays as it is or steps.*)
-Local Lemma overlap_disc_net_cases (X : ProcTerm -> Prop) i n n' a :
+Lemma overlap_disc_net_cases (X : ProcTerm -> Prop) i n n' a :
   reachableProtNet n -> n -NA- a -NA> n' -> liftEntNet (liftProcEnt (liftOverlap X)) i n' ->
   exists p p', overlapState p /\ (p = p' \/ exists b, p -PA- b -PA> p') /\
     (forall Z, liftEntNet (liftProcEnt (liftOverlap Z)) i n <-> Z p) /\
