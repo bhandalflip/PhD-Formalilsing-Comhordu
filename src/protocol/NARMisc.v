@@ -848,12 +848,11 @@ Proof.
         discriminate CD] end.
 Qed.
 
-Lemma msgBad_disc_net (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mode)
+Lemma msgBad_disc_net (n n' : Network) (a : ActDiscNet) (i : nat)
   (p : reachableProtNet n) (w : n -NA- a -NA> n') :
-  msgBadPathNet i n -> currModeNet m i n ->
-  msgBadPathNet i n' \/ tfsStateNet i n'.
+  msgBadPathNet i n -> msgBadPathNet i n' \/ tfsStateNet i n'.
 Proof.
-  intros U _.
+  intros U.
   destruct U as [e E I].
   destruct (link_net_ent_disc_fwd n n' e i a w I) as [e' [I' [EQ | [b ST]]]].
   { subst e'. left. econstructor; eassumption. }

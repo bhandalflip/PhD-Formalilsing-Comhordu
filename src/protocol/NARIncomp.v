@@ -317,7 +317,7 @@ Theorem instant_incomp_abort (n : Network) (t : Time) (l l' : Position) (i : nat
   msgBadPath m r i n' or the entity is in a tfs state, which is no nextSince state.*)
   assert (exists m0, currModeNet m0 i n) as CMX. destruct MB as [e _ E].
   exists (currModeEnt e). econstructor; [reflexivity | exact E]. destruct CMX as [m0 CM].
-  lets MD : msgBad_disc_net p w MB CM. elim_intro MD MB' TS.
+  lets MD : msgBad_disc_net p w MB. elim_intro MD MB' TS.
   right. right. assumption.
   false. eapply tfsStateNet_nextSinceStateNet_disj; eassumption.
   (*Delay case: contradicion, the time parameter to received was assumed to be 0*)
@@ -449,7 +449,7 @@ Theorem instant_incomp_tfs (n : Network) (t : Time) (l l' : Position) (i : nat)
   left. assumption. right. left. assumption.
   (*If msgBadPath holds, then we can show elsewhere that it is either preserved or goes to
   a tfs state, where the entity is tfs m for some time, both of which satisfy our goal.*)
-  lets MD : msgBad_disc_net p w MB J. elim_intro MD MD1 MD2. right. left. assumption.
+  lets MD : msgBad_disc_net p w MB. elim_intro MD MD1 MD2. right. left. assumption.
   right. right. apply tfsState_tfs_exists; assumption.
   (*We can also show that tfs in turn is preserved.*)
   right. right. exists t1. apply tfsDisc; [exact TF | ].

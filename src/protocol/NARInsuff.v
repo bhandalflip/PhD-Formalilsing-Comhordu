@@ -656,7 +656,7 @@ Proof.
   assert (msgBadPathNet i n) as MB.
   { destruct BO as [e E I]. econstructor; [ | exact I].
     inversion E as [q l h k P]; subst. apply mbpBad. exact P. }
-  destruct (msgBad_disc_net n n' a i m rn w MB CM) as [MB' | TS].
+  destruct (msgBad_disc_net n n' a i rn w MB) as [MB' | TS].
   - exfalso. destruct MB' as [e E I]. destruct LS as [e' E' I'].
     pose proof (entInNetUnique _ _ _ _ I I') as EQ. subst e'.
     inversion E' as [q l h k LP]; subst.
