@@ -18,7 +18,7 @@ Theorem 4.7 says that a process that can't do a $\tau$ action can delay, whateve
 
 These results, about an entity that has been in its current mode $m$ since some time $t$, need the hypothesis $\neg fs(m)$. A fail-safe mode may be its own fail-safe successor (p.44), so an entity in one can react to a threat and come back to **dormant** in the same mode: still $\mathit{currSince}(m, t)$, but no longer tfs and no longer broadcasting. With a zero transition time (p.107) this can all happen within an instant. The safety proof applies these results only to non-fail-safe modes (step 1 of the proof of Theorem 6.1, p.141), so its result stands.
 
-**Where:** Theorems 6.2 (p.143), 6.3 (p.144), 6.6 (p.146) and 6.11 (p.148), Lemma 6.29 (p.154), Listings 7.34 and 7.35 (p.175). **Found in:** [#14](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/14), from the pass-1 report's [root cause 11](../reports/2026-10-14-proof-completion-pass-1/root-causes-and-fixes.md#11-gaps-in-the-model-axioms).
+**Where:** Theorems 6.2 (p.143), 6.3 (p.144), 6.6 (p.146), 6.11 (p.148) and 6.12 (p.148), Lemma 6.29 (p.154), Listings 7.34, 7.35 and 7.36 (p.175). **Found in:** [#14](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/14), from the pass-1 report's [root cause 11](../reports/2026-10-14-proof-completion-pass-1/root-causes-and-fixes.md#11-gaps-in-the-model-axioms), and [#20](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/20) for Theorem 6.12 and Listing 7.36.
 
 ## 4. The proof of Theorem 6.6 assumes a positive transition time
 
@@ -43,3 +43,21 @@ Remark 4.1 says that values are computed only in Boolean expressions, so that ty
 The software uses each of $chanStable$, $chanCurr$ and $chanNext$ both ways, to read the mode state and to write it, so two software components can synchronise on one of them directly (SYNC-LR and SYNC-RL). The listener can take the next mode that the overlap component writes in **tfsNext** before the mode state does. The overlap component is then in **tfsCurr** with no fail-safe next mode in the mode state: it waits for a switch that may never come, or it makes the switch that a later request starts, to a mode that need not be fail-safe. That breaks the proof of Lemma 6.17, which assumes that **tfsNext**'s output reached the mode state, and with it Theorem 6.7. Splitting each of these channels into one that the software reads from and one that it writes to leaves only the mode state at the other end, and the results stand.
 
 **Where:** Table 4.3 (p.67), the mode-state rules of Table 4.15 (p.99) and their description (p.96), the overlap component (p.115), the listener (p.122), Theorem 6.7 (p.146), the proof of Lemma 6.17 (p.151). **Found in:** [#15](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/15), from the pass-1 report's [root cause 9](../reports/2026-10-14-proof-completion-pass-1/root-causes-and-fixes.md#9-internal-synchronisation-on-mode-state-channels).
+
+## 8. The overlap component's listing defines **tfsCurr** twice
+
+The second definition, $cTrans!.\mathbf{tfsListen}$, is that of **tfsBc**, which the listing never defines, and the output on $chanCurr$ in the first should lead to **tfsBc**, not back to **tfsCurr**. Example 5.12 (p.120) has both right.
+
+**Where:** the overlap component (p.115). **Found in:** [#20](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/20).
+
+## 9. A fail-safe transition may be under way already
+
+These results assume that an incompatible message starts the entity's fail-safe transition. But the entity may be part-way through one already: **tfsCurr** takes the listener's bad signal and stays. So the third case of Theorem 6.6 should be that the entity is $tfs(m, t)$ for some $t$, and Theorem 6.2 should conclude $tfs(m, t'')$ for some $t'' \geq t'$. The proof of Theorem 6.1 needs only $t \leq trans(m)$ (step 10, p.143), so its result stands.
+
+**Where:** Theorems 6.2 (p.143) and 6.6 (p.146). **Found in:** [#20](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/20).
+
+## 10. The listener reacts to a threat to the current mode first
+
+The listener checks the current mode before the next mode. So a message that threatens both sends it down the bad path, not the abort path, and so does a notification of insufficient coverage for a next mode that equals the current mode, which a fail-safe mode that is its own successor allows (p.44). These results need the bad path as a further case. The listener reacts either way, so the results built on them stand.
+
+**Where:** Lemmas 6.15 (p.150), 6.21 (p.152) and 6.26 (p.154), Listing 7.33 (p.175). **Found in:** [#20](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/20).
