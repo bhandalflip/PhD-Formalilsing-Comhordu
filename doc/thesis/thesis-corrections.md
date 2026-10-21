@@ -1,5 +1,7 @@
 # Thesis corrections
 
+The heart of the thesis's safety proof stands, with the small corrections below. But safety does not stand without them, so anyone implementing the protocol or modelling a coordination system should apply them.
+
 Errors in the [thesis](2014-10-28-phd-thesis.pdf) as written, found while formalising it, and their corrections. Page numbers are the printed ones.
 
 ## 1. The listener reads too few fields from a notification
