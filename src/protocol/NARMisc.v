@@ -944,7 +944,18 @@ Urgency holds in each one because there is always a synch possible with the
 mode state or the overlap component. #urgent-path*)
 
 Lemma msgBadPathNet_urgent (n n' : Network) (d : Delay) (i : nat) :
-  reachableProtNet n -> msgBadPathNet i n -> n -ND- d -ND> n' -> False. Admitted. (*4*)
+  reachableProtNet n -> msgBadPathNet i n -> n -ND- d -ND> n' -> False.
+Proof.
+  (*Each state of the path is urgent: gotMsg reads the position, gotRange reads the current
+  mode, both always on offer, and badOvlp is on the notification bad path too.*)
+  intros RN MB DEL. destruct MB as [e ME EI].
+  destruct (del_net_ent e i n n' d EI DEL) as [e' ED].
+  inversion ME as [p l h k m'' m l' GM CM PI | p l h k m'' m r GR CM PI | p l h k BO]; subst.
+  - eapply gotMsgStateEnt_urgent; [ | exact ED]. constructor. exact GM.
+  - eapply gotRangeStateEnt_urgent; [ | exact ED]. constructor. exact GR.
+  - eapply notifBadPathNet_urgent; [exact RN | | exact DEL].
+    econstructor; [ | exact EI]. apply nbpBad. exact BO.
+Qed.
 (**Proof: Lift urgency from EA urgency result. #urgent-path*)
 
 (* begin helpers for msgAbort_paused_disj_net *)
