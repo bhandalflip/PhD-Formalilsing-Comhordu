@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Summarise what the top-level `safety` theorem still rests on, as Markdown.
 
-Runs `Print Assumptions safety` against the compiled project (run `make` first) and
-groups the result into: model axioms (ComhBasics, deliberate), Parameter stubs,
-unproved project lemmas (Admitted / Conjecture), and standard-library axioms.
-Also counts every `Admitted` / `Conjecture` in src/, whether or not `safety` uses it.
+Runs `Print Assumptions safety` against the compiled project (run `make` first) and leads with
+the unproved results it rests on (Admitted / Conjecture), the measure of what is left to prove.
+The model axioms (ComhBasics) are deliberate and shown consistent in ModelConsistency.v, so they
+and the standard-library axioms come after, as counts. Also counts every `Admitted` /
+`Conjecture` in src/, whether or not `safety` uses it.
 
 Usage: python3 helper-scripts/summarise_assumptions.py   (from the repository root)
 """
@@ -64,36 +65,31 @@ def source_counts():
 
 def main():
     names = print_assumptions()
-    groups = collections.defaultdict(list)
+    model, std, unproved = [], [], []
     for n in names:
         mod = n.split(".")[0]
         if mod == "ComhBasics":
-            groups["Model axioms (ComhBasics, deliberate)"].append(n)
-        elif n in ("EntAuxDefs.reachableEnt", "EntAuxDefs.nextModeEnt", "EntAuxDefs.inPosEnt",
-                   "NetAuxBasics.currModeNet", "NetAuxBasics.nextModeNet"):
-            groups["Parameter stubs"].append(n)
+            model.append(n)
         elif mod in ("ClassicalDedekindReals", "ProofIrrelevance", "FunctionalExtensionality",
                      "Eqdep", "Classical_Prop", "ClassicalEpsilon", "IndefiniteDescription",
                      "Description", "ClassicalUniqueChoice", "PropExtensionality", "JMeq"):
-            groups["Standard-library axioms"].append(n)
+            std.append(n)
         else:
-            groups["Unproved project lemmas (Admitted / Conjecture)"].append(n)
+            unproved.append(n)
     admitted, conjectures = source_counts()
 
-    print("## Assumptions under `safety`\n")
-    print(f"**{len(names)}** assumptions in total.\n")
-    print("| Kind | Count |\n|---|---|")
-    for k in ("Unproved project lemmas (Admitted / Conjecture)", "Parameter stubs",
-              "Model axioms (ComhBasics, deliberate)", "Standard-library axioms"):
-        print(f"| {k} | {len(groups[k])} |")
-    print(f"\nWhole codebase: **{sum(admitted.values())}** `Admitted`, "
+    print("## What `safety` rests on\n")
+    print(f"**{len(unproved)}** unproved results.\n")
+    byfile = collections.defaultdict(list)
+    for n in unproved:
+        byfile[n.split(".")[0]].append(n.split(".", 1)[1])
+    for f in sorted(byfile, key=lambda f: (-len(byfile[f]), f)):
+        print(f"- `{f}`: " + ", ".join(f"`{x}`" for x in sorted(byfile[f])))
+    print(f"\nIt also rests on {len(model)} model axioms, which are deliberate and shown consistent "
+          f"in `ModelConsistency.v`, and on {len(std)} standard-library axioms.\n")
+    print(f"Whole codebase: **{sum(admitted.values())}** `Admitted`, "
           f"**{sum(conjectures.values())}** `Conjecture`.\n")
-    print("<details><summary>Unproved lemmas under safety, by file</summary>\n")
-    byfile = collections.Counter(n.split(".")[0] for n in groups["Unproved project lemmas (Admitted / Conjecture)"])
-    for f, c in byfile.most_common():
-        print(f"- `{f}`: {c}")
-    print("\n</details>\n")
-    print("<details><summary>Full list</summary>\n\n```")
+    print("<details><summary>Everything it rests on</summary>\n\n```")
     for n in names:
         print(n)
     print("```\n</details>")

@@ -41,7 +41,7 @@ From the repository root, run:
 
 This uses Rocq's ``rocq makefile`` to generate ``Makefile.coq`` from ``_CoqProject`` and then compiles every ``.v`` file in dependency order. Editors such as VsCoq and coq-lsp read ``_CoqProject`` for load paths.
 
-To see what the top-level ``safety`` theorem still rests on (admitted lemmas, stubs, model axioms and stdlib axioms), run:
+To see the unproved results that the top-level ``safety`` theorem still rests on, and the axioms besides, run:
 
 ``make assumptions``
 

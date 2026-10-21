@@ -31,9 +31,9 @@
 - Use Rocq **9.2.0** with `rocq-stdlib`. Dependencies are declared in `rocq-comhordu.opam`. The reference environment is the Docker image `rocq/rocq-prover:9.2.0`, the same one CI uses.
 - If `rocq` isn't on the `PATH`, and neither a Docker daemon nor opam is available (the usual case in a sandboxed agent session, where opam's repository is also blocked), run `helper-scripts/install_rocq.sh` as root and then `export PATH=/home/rocq/.opam/4.14.2+flambda/bin:$PATH`. It downloads the reference image's layers from Docker Hub with `curl` and unpacks the image's Rocq to the path it has in the image; see [`helper-scripts/README.md`](helper-scripts/README.md). Check `rocq --version` first: it may already be installed.
 - `make` builds everything (`_CoqProject` → `rocq makefile` → `Makefile.coq`).
-- `make assumptions` prints what `safety` still rests on.
+- `make assumptions` prints the unproved results that `safety` still rests on, then the axioms.
 - `make clean` removes build products.
-- CI (`.github/workflows/build.yml`) builds every pull request (when it's opened, and on each new commit) and reports remaining assumptions. Keep it green: never merge a red build.
+- CI (`.github/workflows/build.yml`) builds every pull request (when it's opened, and on each new commit) and reports the unproved results that remain. Keep it green: never merge a red build.
 
 ## Writing
 
@@ -48,9 +48,10 @@
 ## Working rules
 
 - Work is planned and tracked in `doc/workstreams/`, and decisions are recorded in `doc/adr/`.
-- **The PR is the record of a step.** Its description says what changed, what `safety` rests on now, and any decision a human must take, and no more. The workstream ticks the step with a sentence or two and the PR link. Don't repeat a PR's content in a log entry, a long commit message or a report.
+- **The PR is the record of a step.** Its description says what changed, how many unproved results `safety` rests on now, and any decision a human must take, and no more. The workstream ticks the step with a sentence or two and the PR link. Don't repeat a PR's content in a log entry, a long commit message or a report.
 - A report in `doc/reports/` is only for a detailed write-up that a human explicitly asks for, such as the results of a proving pass. It is never a default per PR.
 - **Changing what the project *claims* needs explicit human approval**: the statement of `safety` above all, and any theorem or lemma statement, definition or model axiom, and deleting an unproved result. Agents propose such changes in the PR description, or in a report when one is asked for, and don't make them until a human agrees. The human reviewing the PR checks that this held. Deleting a proved result that a more general one replaces is not such a change; see `src/AGENTS.md`.
 - **Ask for approval one change at a time.** Walk the human through the proposed changes in the conversation, one per message: what changes and why, in two or three sentences, more only when asked, and the next one only after an answer. Then record the decisions in the PR description in one batch, once they are all answered, not one edit or commit per approval. Push the work a decision asks for in the same batch, and only when every change has an answer or the human asks for a push. When no human is present, open the PR with the changes listed as awaiting approval, and walk through them when one is.
 - Whenever a PR finds an error in the thesis itself, record its correction in [`doc/thesis/thesis-corrections.md`](doc/thesis/thesis-corrections.md) in the same PR. What counts as an error, and how to write corrections and [remarks](doc/thesis/thesis-remarks.md), is in [`doc/thesis/AGENTS.md`](doc/thesis/AGENTS.md).
+- Measure progress by the unproved results that `safety` rests on: the `Admitted` lemmas and `Conjecture`s its proof uses. The model axioms are deliberate, and `src/model/ModelConsistency.v` shows they are consistent, so they are not work left.
 - Never weaken the trust base silently. If a change adds an entry to `make assumptions` output, call it out in the PR.
