@@ -799,6 +799,16 @@ Ltac output_values := repeat match goal with
   | [H : evalExpLists [] _ |- _] => inversion H; subst; clear H
   | [H : evalExp (eBase _) _ |- _] => inversion H; subst; clear H end.
 
+(** After a step into tfsStart, the overlap component was dormant or waiting: both take a
+bad message there.*)
+Lemma tfsStart_prev (p p' : ProcTerm) (a : DiscAct) :
+  p -PA- a -PA> p' -> overlapState p -> tfsStartState p' ->
+  dormantState p \/ exists (m : Mode) e2 e3 e4, p ~p~ ovWait m e2 e3 e4.
+Proof.
+  intros TR O SP. red in SP. backtrack_shape SP;
+    first [left; exact B | right; do 4 eexists; exact B].
+Qed.
+
 (** After a step into tfsNext, the overlap component was tfsStart, or was tfsNext already:
 tfsNext loops when it writes on mStable.*)
 Theorem tfsNext_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) :

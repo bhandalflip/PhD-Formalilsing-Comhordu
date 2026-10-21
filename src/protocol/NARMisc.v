@@ -147,112 +147,6 @@ Proof.
 Qed.
 (*+*)
 
-(** In a reachable entity, an overlap component in init m, ovWait m, ovReady m or switchBc m is
-changing to mode m: m is the mode state's next mode. Whatever ovWait's timers, its position
-timer is well formed. Dormant reads the next mode on mNext into init, and from there to
-switchBc nothing writes on the mode state, while the mode state takes a new next mode only when
-it is stable.*)
-Local Lemma overlap_nextMode_ent e : reachableProtEnt e ->
-  forall p1 p2 p3 l h k, e = [|p1 $||$ p2 $||$ p3, l, h, k|] ->
-  (forall m : Mode, p2 ~p~ init m -> nextModeMState k = Some m) /\
-  (forall (m : Mode) (e2 e3 e4 : Exp), p2 ~p~ ovWait m e2 e3 e4 ->
-    nextModeMState k = Some m /\ exists t, evalExpFunTime e4 = Some t) /\
-  (forall (m : Mode) (u : Exp) (l0 : Position), p2 ~p~ ovReady m u l0 ->
-    nextModeMState k = Some m) /\
-  (forall m : Mode, p2 ~p~ switchBc m -> nextModeMState k = Some m).
-Proof.
-  intro R. induction R as [e I | e e' a R IH S | e e' d R IH S].
-  - (* initial: the overlap component is dormant *)
-    intros p1 p2 p3 l h k EQ. subst e. inversion I; subst.
-    repeat split; intros; exfalso;
-      match goal with [X : dormant ~p~ _ |- _] =>
-        unfold dormant, init, ovWait, ovReady, switchBc, liftNameProc in X;
-        try unfold liftVarList in X; refute_by_chan X end.
-  - (* a discrete step *)
-    intros p1' p2' p3' l' h' k' EQ'. subst e'.
-    destruct e as [p l h k].
-    lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
-    inversion PS as [p1 p2 p3 BS OS LS]; subst p.
-    destruct (IH p1 p2 p3 l h k eq_refl) as [II [IW [IR IB]]]. clear IH.
-    destruct (triple_disc_ent _ _ _ _ _ _ _ _ _ _ _ _ _ S) as [_ [OV _]].
-    (* the mode state keeps its next mode unless the overlap component writes on it *)
-    assert (KEEP : forall m0, nextModeMState k = Some m0 ->
-      ~ tfsCurrState p2 -> ~ switchCurrState p2 -> ~ ovAbortState p2 ->
-      (forall m1, ~ tfsNextState m1 p2) -> nextModeMState k' = Some m0).
-    { intros m0 NM N1 N2 N3 N4.
-      rewrite (mState_stays_ent _ _ _ _ _ _ _ _ _ _ _ _ _ R (nextMode_unstable _ _ NM) S
-        N1 N2 N3 N4). exact NM. }
-    split; [ | split; [ | split]].
-    + (* init: the overlap component stayed, or was dormant and read the next mode *)
-      intros m X. destruct OV as [EQ | [b B2]].
-      * subst p2'. apply (KEEP m (II m X));
-          [intro Y; ov_disj X Y | intro Y; ov_disj X Y | intro Y; ov_disj X Y
-          | intros m1 Y; ov_disj X Y].
-      * destruct (init_prev _ _ _ _ B2 OS X) as [DO _].
-        assert (ACT : forall b0, p2 -PA- b0 -PA> p2' -> entChanAct b0).
-        { intros b0 B0. destruct (init_prev _ _ _ _ B0 OS X) as [_ E0]. subst b0.
-          left. reflexivity. }
-        destruct (triple_disc_ent_chan 1 R S eq_refl eq_refl ACT) as [E2 | S2].
-        { subst p2'. exfalso. ov_disj DO X. }
-        destruct (ent_disc_proc_act _ _ _ _ _ _ _ _ _ S2) as [E2 | [c [T2 [_ [_ CN]]]]].
-        { subst p2'. exfalso. ov_disj DO X. }
-        destruct (init_prev _ _ _ _ T2 OS X) as [_ Ec]. subst c.
-        destruct (CN m eq_refl) as [NM EK]. subst k'. exact NM.
-    + (* ovWait: the overlap component stayed, or was init or ovReady for the same mode *)
-      intros m e2 e3 e4 X. destruct OV as [EQ | [b B2]].
-      * subst p2'. destruct (IW m e2 e3 e4 X) as [NM WF]. split; [ | exact WF].
-        apply (KEEP m NM);
-          [intro Y; ov_disj X Y | intro Y; ov_disj X Y | intro Y; ov_disj X Y
-          | intros m1 Y; ov_disj X Y].
-      * destruct (ovWaitExp_prev _ _ _ _ _ _ _ B2 OS X) as [WF [IN | [u [l0 RD]]]];
-          split; try exact WF.
-        -- apply (KEEP m (II m IN));
-             [intro Y; ov_disj IN Y | intro Y; ov_disj IN Y | intro Y; ov_disj IN Y
-             | intros m1 Y; ov_disj IN Y].
-        -- apply (KEEP m (IR m u l0 RD));
-             [intro Y; ov_disj RD Y | intro Y; ov_disj RD Y | intro Y; ov_disj RD Y
-             | intros m1 Y; ov_disj RD Y].
-    + (* ovReady: the overlap component stayed, or was ovWait for the same mode *)
-      intros m u l0 X. destruct OV as [EQ | [b B2]].
-      * subst p2'. apply (KEEP m (IR m u l0 X));
-          [intro Y; ov_disj X Y | intro Y; ov_disj X Y | intro Y; ov_disj X Y
-          | intros m1 Y; ov_disj X Y].
-      * destruct (ovReadyExp_prev _ _ _ _ _ _ B2 OS X) as [f2 [f3 [f4 W]]].
-        apply (KEEP m (proj1 (IW m f2 f3 f4 W)));
-          [intro Y; ov_disj W Y | intro Y; ov_disj W Y | intro Y; ov_disj W Y
-          | intros m1 Y; ov_disj W Y].
-    + (* switchBc: the overlap component stayed, or was ovWait for the same mode *)
-      intros m X. destruct OV as [EQ | [b B2]].
-      * subst p2'. apply (KEEP m (IB m X));
-          [intro Y; ov_disj X Y | intro Y; ov_disj X Y | intro Y; ov_disj X Y
-          | intros m1 Y; ov_disj X Y].
-      * destruct (switchBc_prev _ _ _ _ B2 OS X) as [t0 [y0 W]].
-        apply (KEEP m (proj1 (IW m t0 zeroTime y0 W)));
-          [intro Y; ov_disj W Y | intro Y; ov_disj W Y | intro Y; ov_disj W Y
-          | intros m1 Y; ov_disj W Y].
-  - (* a delay: it keeps the next mode, and the overlap component's state up to its timers *)
-    intros p1' p2' p3' l' h' k' EQ'. subst e'.
-    destruct e as [p l h k].
-    lets PS : reachableProt_triple (reachable_ent_prot _ _ _ _ R).
-    inversion PS as [p1 p2 p3 BS OS LS]; subst p.
-    destruct (IH p1 p2 p3 l h k eq_refl) as [II [IW [IR IB]]]. clear IH.
-    lets T : triple_del_ent S. destruct T as [_ [D2 _]].
-    assert (NE : nextModeMState k' = nextModeMState k)
-      by (symmetry; exact (stepTimedEnt_nextMode _ _ _ S)).
-    rewrite NE. split; [ | split; [ | split]].
-    + intros m X. apply II. apply (overlap_del_bkwd (init m) _ _ _ OS D2 X).
-      intros m0 e2 e3 e4 B. ovWait_bisim_contra B.
-    + intros m e2 e3 e4 X.
-      destruct (ovWait_del_bkwd _ _ _ _ _ _ _ OS D2 X) as [m0 [f2 [f3 [f4 [W C]]]]].
-      destruct (IW m0 f2 f3 f4 W) as [NM WF]. destruct (C WF) as [EQ WF']. subst m0.
-      split; [exact NM | exact WF'].
-    + intros m u l0 X. apply (IR m u l0).
-      apply (overlap_del_bkwd (ovReady m u l0) _ _ _ OS D2 X).
-      intros m0 e2 e3 e4 B. ovWait_bisim_contra B.
-    + intros m X. apply (IB m). apply (overlap_del_bkwd (switchBc m) _ _ _ OS D2 X).
-      intros m0 e2 e3 e4 B. ovWait_bisim_contra B.
-Qed.
-
 Lemma switchBc_nextMode_net m i n :
   reachableProtNet n -> switchBcStateNet m i n -> nextModeNet m i n.
 Proof.
@@ -365,16 +259,6 @@ Proof.
   lets HY' : liftEntNet_ent HY E. inversion HY' as [q l' h' k' HYp]; subst.
   inversion HYp as [q1 q2 q3 BY]; subst.
   eapply bisim_trans; [apply bisim_symm; exact HX | exact BY].
-Qed.
-
-(** After a step into tfsStart, the overlap component was dormant or waiting: both take a
-bad message there.*)
-Local Lemma tfsStart_prev (p p' : ProcTerm) (a : DiscAct) :
-  p -PA- a -PA> p' -> overlapState p -> tfsStartState p' ->
-  dormantState p \/ exists (m : Mode) e2 e3 e4, p ~p~ ovWait m e2 e3 e4.
-Proof.
-  intros TR O SP. red in SP. backtrack_shape SP;
-    first [left; exact B | right; do 4 eexists; exact B].
 Qed.
 
 (** A discrete step from tfsStart or tfsNext keeps the current mode: only switchCurr and
