@@ -529,7 +529,7 @@ Qed.
 
 (*LOCAL TIDY*)
 
-(** An output step of a timed list keeps every element but the one it outputs.*)
+(** An output step of a timed list can only drop a timed-out element.*)
 Local Lemma timedList_out_pres l l' u x :
   l -tl- u!! -tl> l' -> x _: l -> x _: l' \/ x = <(u, zeroTime)>.
 Proof.
