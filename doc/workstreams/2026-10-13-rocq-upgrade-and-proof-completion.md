@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Started** | 2026-10-13 |
-| **Status** | 🧑 Phase 5: step 30 in review |
+| **Status** | 🧑 Phase 5: step 31 in review |
 | **Branch** | One per PR |
 | **Goal** | Port the Comhordú formalisation to **Rocq 9.2.0**, then close every assumption under `safety` that can be closed, and write up the ones that can't. |
 | **Supersedes** | [2015 project plan](../archive/2015-05-08-coq-project-plan.pdf). What was carried over is in [`doc/archive/README.md`](../archive/README.md). |
@@ -89,7 +89,7 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 - [x] 🧑 **28. Prune `lib/`'s duplicates of the standard library.** ✅ 2026-10-21. 47 unused lemmas, definitions and tactics in `lib/` that the standard library or a standard tactic already gives are gone, and the unused ones that are new to this repo stay. `inList_pres_input`, which pass 1 found false, takes a non-delay hypothesis and is proved, and `safety` still rests on 61 assumptions. [#18](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/18).
 - [x] 🧑 **29. Name helpers by what they say.** ✅ 2026-10-21. 24 of the 27 results named `<lemma>_aux…` are renamed by what they state, mostly after their neighbours, such as `ovWait_abort_in` beside `tfsCurr_abort_in`. `safety_aux`, `guarded_rect_aux` and `timeSplit_notifList_aux` state nearly what the result they support states, so they keep `_aux`. All 27 are `Local`, and `safety` still rests on 61 assumptions. [#19](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/19).
 - [x] 🤖 **30. Pass 2.** ✅ 2026-10-21. Of the 63 unproved results that `safety` rested on or that their intended proofs use, 39 are proved. With approval, the 24 found false are restated and proved or, if nothing used them, deleted, and the thesis gains corrections 8 to 10. `safety` rests on no unproved result, down from 29, which unblocks the prune in the final phase, but it now also uses the model axioms `modeTransTime_bound` and `failSafeSucc_successor`. [#20](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/20).
-- [ ] 🤖 **31. Weaken `modeTransTime_bound`** to fail-safe successors, as the thesis's Definition 5.2 (p.107) has it. The axiom bounds the transition time to any successor by `trans m`, but the proof needs only the fail-safe ones, so the weaker axiom makes `safety` hold in more models.
+- [x] 🤖 **31. Weaken `modeTransTime_bound`.** ✅ 2026-10-21. It now bounds by `trans m` only the time to reach a fail-safe successor, as the thesis's Definition 5.2 (p.107) does, so `safety` holds in more models. [#21](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/21).
 - [ ] 🧑 **32. `Module Type` refactor** of the model axioms (from step 6). It touches 22 files, so it is easier after pass 2.
 - [ ] 🧑 **33. Non-triviality.** Decide whether to prove that, without the protocol, an unsafe state is reachable. This is a 2015 "future extension".
 - [ ] 🧑 **34. Initial interfaces.** Decide whether `initialEnt` should constrain an entity's interface, for example to start empty. Today it allows any contents, which is why step 12 needed a length hypothesis.
