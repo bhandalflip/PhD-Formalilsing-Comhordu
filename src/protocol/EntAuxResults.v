@@ -126,9 +126,6 @@ Qed.
 (***************************** Inter-Component Relationships *****************************)
 (**In here, I'd like results that relate the states of things within a reachable entity e.g. the state of the software component and the mode state.*)
 
-Lemma currEq_mode m m'' e : reachableProtEnt e ->
-  currEqStateEnt m m'' e -> m = currModeEnt e. Admitted.
-
 (** An unstable mode state changes in a step of a reachable entity only by the standard mode
 switch, the mode switch to fail safe, or the overlap component aborting the mode change.*)
 Lemma mState_switch_states_ent p l h k p' l' h' k' a :
@@ -845,10 +842,6 @@ Qed.
 Relies on a chain of support of similar results for switchBc, ovWait,
 ovReady and init. Each one relying on the last. The ovWait and ovReady ones
 would need to be proved by mutual induction.*)
-
-Lemma tfsListen_paused p1 p2 p3 :
-   tfsListenStateProt (p1 $||$ p2 $||$ p3) -> pausedStateProt (p1 $||$ p2 $||$ p3).
-  Admitted. (*C*)(*Need to add process reachability as a hypothesis*)
 
 (** The listener becomes paused only by taking chanPause.*)
 Local Lemma paused_prev_act p p' b : listenerState p -> p -PA- b -PA> p' -> pausedState p' ->
@@ -1715,7 +1708,7 @@ Qed.
 we are either in abortOvlp, badOvlp, paused or listening. If the last case
 is true, then we are done. From here, we apply (del_ovlp) to further get
 dormant, tfsCurr or ovWait as possibilities for the current state. Now,
-if we are paused, then by (paused_switch) we are switchState- but this
+if we are paused, then by (paused_switch_ent) we are switchState- but this
 contradicts the three possibilities for an overlap state, so it must be
 thrown away. Hence we are either abortOvlp or badOvlp. But all three overlap
 possibilities can input on both abort and bad, so in all six cases a synchronisation
@@ -1770,16 +1763,6 @@ Ltac ent_disc_pres_pos_tac := match goal with
   let EDP := fresh "EDP" in
   lets EDP : stepEnt_disc_pres_pos V; simpl in EDP end.
 
-Lemma gotMsg_gotRange_track_ent (m m' : Mode) (l l' l1 : Position)
-  (r : Distance) (p p' : ProcTerm) h h' k k' a :
-  gotMsgStateEnt m l1 ([|p, l, h, k|]) ->
-  gotRangeStateEnt m' r ([|p', l', h', k'|]) ->
-  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
-  l = l' /\ m = m' /\
-  r = {| distance := dist2d l l1 -nn- speedMax *nn* msgLatency |}.
-  Admitted.
-(*Proof: Entity tracking result: possibly use generic tactic? Use software tracking
-result? Use inter-component relationship result/tactics?*)
 (*+*)
 (** A step of an entity whose listener is in gotRange: the listener stays, or it read the
 current mode off the mode state and is in currPincCheck with it. Bisimilar currPincCheck
@@ -1831,31 +1814,9 @@ Proof.
   right. simpl. constructor. constructor. exact C.
 Qed.
 (*+*)
-Lemma currComp_listening_track_ent m'' r l l' p p' h h' k k' a :
-  currCompStateEnt m'' r ([|p, l, h, k|]) ->
-  listeningStateEnt ([|p', l', h', k'|]) ->
-  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
-  k -ms- chanMStableRead @! -ms> k' /\ h = h'. Admitted.
+
   (*Add entity-level tracking result.*)
 (*+*)
-Lemma currComp_nextPincCheck_track_ent (m2 m1' m2' : Mode) (l l' : Position)
-  (r r' : Distance) (p p' : ProcTerm) h h' k k' a :
-  currCompStateEnt m2 r ([|p, l, h, k|]) ->
-  nextPincCheckStateEnt m1' m2' r' ([|p', l', h', k'|]) ->
-  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
-  m2 = m2' /\ r = r' /\ nextModeMState k = Some m1'.
-  Admitted.
-
-Lemma ovReady_ovWait_track_ent m m' t t' x' y' l0 a
-  p p' l l' h h' k k' :
-  ovReadyStateEnt m t l0 ([|p, l, h, k|]) ->
-  ovWaitStateEnt m' t' x' y' ([|p', l', h', k'|]) ->
-  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
-  p -PA- chanOutProc ;! [baseMode m, basePosition l0] -PA> p' /\
-  h -i- chanOutProc {? [baseMode m, basePosition l0] -i> h' /\
-  k = k' /\ m = m' /\ l = l0.
-  (*Some aspects of the proof e.g. l = l0 may require separate results.
-  Maybe they already exist?*)Admitted.
 
 (** In a reachable entity, a step from ovReady into ovWait is the overlap component's broadcast
 of its mode and the entity's position, which the interface takes in; the mode state and the

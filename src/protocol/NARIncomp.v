@@ -428,7 +428,7 @@ Theorem instant_incomp_tfs (n : Network) (t : Time) (l l' : Position) (i : nat)
   eapply entInNetUnique. apply X. assumption.
   (*The cases of msgAbortPath and msgBadPath yield a contradiction: we know that since a
   switch from nextSince to currSince occurred, then we are in a switchState. So then by
-  (PA::paused_switch) we have that we are paused.*)
+  (paused_switch_ent) we have that we are paused.*)
   assert (switchStateNet i n) as SS. econstructor. apply switchCurr_switch_ent.
   apply F1. assumption. rewrite <- (paused_switch_net n i p) in SS.
   (*But paused is disjoint from a msgAbortState and from a msgBadState (...auto...), hence

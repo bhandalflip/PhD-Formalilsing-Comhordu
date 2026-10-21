@@ -167,11 +167,5 @@ Who cares if this is strictly the "Defs" file.*)
 >Destruct path predicate to get all the possible state predicates on listener, and in each
 case, state_pred_elim_net gets rid of these by contradiction
 *)
-Theorem msgAbort_modeState_eq (n n' : Network) (a : ActDiscNet) (i : nat) k : 
-  msgAbortPathNet i n -> mState_in_net k i n -> n -NA- a -NA> n' ->
-  mState_in_net k i n'. Admitted.
-Theorem notifAbort_modeState_eq (n n' : Network) (a : ActDiscNet) (i : nat) k : 
-  notifAbortPathNet i n -> mState_in_net k i n -> n -NA- a -NA> n' ->
-  mState_in_net k i n'. Admitted.
 
 (*-LOCAL TIDY*)

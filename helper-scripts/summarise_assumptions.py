@@ -85,7 +85,9 @@ def main():
         byfile[n.split(".")[0]].append(n.split(".", 1)[1])
     for f in sorted(byfile, key=lambda f: (-len(byfile[f]), f)):
         print(f"- `{f}`: " + ", ".join(f"`{x}`" for x in sorted(byfile[f])))
-    print(f"\nIt also rests on {len(model)} model axioms, which are deliberate and shown consistent "
+    if unproved:
+        print()
+    print(f"It also rests on {len(model)} model axioms, which are deliberate and shown consistent "
           f"in `ModelConsistency.v`, and on {len(std)} standard-library axioms.\n")
     print(f"Whole codebase: **{sum(admitted.values())}** `Admitted`, "
           f"**{sum(conjectures.values())}** `Conjecture`.\n")

@@ -698,10 +698,6 @@ and p from there.*)
 
 (*** Bidirectional tracking (action/variable matching) ***)
 
-Lemma currOK_listening_track m p p' a : currOKState m p ->
-  listeningState p' -> p -PA- a -PA> p' -> a = (chanMStableRead *?).
-  Admitted.
-
 Lemma abortOvlp_listening_track (p p' : ProcTerm) (a : DiscAct) :
   abortOvlpState p -> listeningState p' -> p -PA- a -PA> p' ->
   a = chanAbort;! [].
@@ -2626,15 +2622,6 @@ i.e. ones that can be reached by the transition semantics via the
 protocol process. Results about the relationship between states of
 the various components belong here e.g. "If the overlap component
 is in such a state, then the listener is paused".*)
-
-(**If a reachable process is paused, then it is in the process of a
-mode switch and vice versa.*)
-Theorem paused_switch (p : ProcTerm) : 
-  reachableProt p ->
-  (pausedStateProt p <-> switchStateProt p). Admitted. (*5*)
-(**Proof: Induction on reachable. Then show that whenever either of these states happens initially, the other happens. Then show that if
-both are true, and a transition happens, then either bother are still true or an unpause happens from switchListenState and both become
-false. This is all evident on inspection of the overlap and listener component diagrams.*)
 
 (** reachableProt is the language's reachability from the protocol process.*)
 Lemma reachableProt_reachableFrom (p : ProcTerm) :

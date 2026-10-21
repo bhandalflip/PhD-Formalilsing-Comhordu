@@ -477,17 +477,6 @@ the desirable cases. Finally map the entity level results back up to the network
 level using a tactic- netState_auto_tac or some variant?*)
 
 (*tfs and tfsNext state simultaneously mean the mode parameters coincide*)
-Lemma tfsNext_tfs_mode_eq : forall (n : Network) (t : Time)
-  (i : nat) (m1 m2 : Mode) (p : reachableProtNet n),
-  tfs m1 t i n p -> tfsNextStateNet m2 i n -> m1 = m2. 
-(**Proof: Induction on tfs. BaseType case fails by state pred elim with tfsNext. Discrete inductive
-case can use back-tracking to show that the previous state was either tfsStart or tfsNext. In the former
-case, we use an auxiliary theorem (...write it...) like this one except instead of tfsNextStateNet m2 i n we
-have tfsStartStateNet i n  and currModeNet m2. In the latter case, as in the delay inductive case (due to delay pres),
-we can just apply I.H. For the discrete case, a result currModeNet_switch_states will do (the possible states contradict
-the one given) to give the mode equality for this state. In the timed case, a delay preservation result
-on currModeNet suffices*)
-  Admitted. (*3*)
 
 (* If the nextSince relation holds for some m t then the entity in question
 is in a nextSinceState.*)

@@ -1215,12 +1215,6 @@ Conjecture transGuard_disc_pres : forall (n n' : Network)
   n -NA- a -NA> n' -> transGuard t i n -> transGuard t i n'.
 (**Proof: Obvious: discrete action preserves guard on mode state, immediate from mode state semantics*)
 
-Conjecture transGuard_del : forall (n n' : Network)
-  (d : Delay) (t : Time) (i : nat),
-  n -ND- d -ND> n' -> transGuard t i n -> 
-  exists p, transGuard (minusTime t d p) i n'.
-(**Proof: Obvious- transGuard definition and mode state semantics*)
-
 (* begin helpers for currModeNet_dec *)
 From Stdlib Require Import Classical.
 (* end helpers *)
