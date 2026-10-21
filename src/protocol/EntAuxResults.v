@@ -483,6 +483,22 @@ Ltac urgency_pre_tac2_1 SE SP S :=
 
 (*** Urgency Results ***)
 
+(** A delaying entity's software cannot read a position at any point of the delay.*)
+Lemma ent_del_pos_sort_not p l h k d e' l0 :
+  [|p, l, h, k|] -ED- d ->> e' -> sort (chanPos ;? [basePosition l0]) d p -> False.
+Proof.
+  intros DEL S. inversion DEL as [d0 p0 p' l1 delta h0 h' k0 k' DP DH DK DM NS]; subst.
+  destruct (sort_del _ _ _ S (tae _ _ _ DP)) as [[p'' [d' [DP' [LT DA]]]] | DA].
+  - assert (ED : d = d' +d+ minusDelay d d' LT)
+      by (rewrite addDelayComm; symmetry; apply minusAddDelay).
+    destruct (timeSplit_inter _ _ _ _ _ DH ED) as [h1 [H1 _]].
+    destruct (delEnabledMState k d') as [k1 K1].
+    destruct (NS (chanPos ;? [basePosition l0])) as [_ NS2].
+    destruct (NS2 p'' h1 k1 d' LT DP' H1 K1 DA) as [_ [_ NP]]. apply (NP l0). reflexivity.
+  - destruct (NS (chanPos ;? [basePosition l0])) as [NS1 _].
+    destruct (NS1 DA) as [_ [_ NP]]. apply (NP l0). reflexivity.
+Qed.
+
 (* begin helpers for gotMsgStateEnt_urgent *)
 (** A process in the gotMsg state can read any position on the channel pos.*)
 Local Lemma gotMsg_pos_in (p : ProcTerm) (m : Mode) (l l0 : Position) :
@@ -989,6 +1005,56 @@ Lemma ovReady_ovWait_track_ent m m' t t' x' y' l0 a
   k = k' /\ m = m' /\ l = l0.
   (*Some aspects of the proof e.g. l = l0 may require separate results.
   Maybe they already exist?*)Admitted.
+
+(** In a reachable entity, a step from ovReady into ovWait is the overlap component's broadcast
+of its mode and the entity's position, which the interface takes in; the mode state and the
+mode stay the same.*)
+Lemma ovReady_ovWait_bcast_ent m m' t t' x' y' l0 a p p' l l' h h' k k' :
+  reachableProtEnt ([|p, l, h, k|]) ->
+  ovReadyStateEnt m t l0 ([|p, l, h, k|]) ->
+  ovWaitStateEnt m' t' x' y' ([|p', l', h', k'|]) ->
+  [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
+  p -PA- chanOutProc ;! [baseMode m, basePosition l0] -PA> p' /\
+  h -i- chanOutProc {? [baseMode m, basePosition l0] -i> h' /\
+  k = k' /\ m = m' /\ l = l0.
+Proof.
+  intros R OR OW S. pose proof OR as OR0.
+  pose proof (reachable_ent_prot _ _ _ _ R) as RP.
+  lets PS : reachableProt_triple RP. lets CU : reachableProt_correctChannelUsage RP.
+  inversion PS as [p1 p2 p3 BS OS LS]; subst p.
+  ent_state_comp OR.
+  inversion OW as [q lq hq kq OWq]; subst.
+  inversion OWq as [p1' p2' p3' OW2]; subst.
+  (* the overlap component only broadcasts *)
+  assert (PD : forall b, p2 -PA- b -PA> p2' ->
+    b = chanOutProc ;! [baseMode m, basePosition l0] /\
+    p2' ~p~ ovWait m (t (-) ePeriod m) (t (-) ePeriod m) (ePeriod m)).
+  { intros b B. destruct (bisim_step_disc _ _ _ _ OR B) as [q [SQ BQ]].
+    destruct (ovReady_step_ovWait _ _ _ _ _ SQ) as [EB BW]. split; [exact EB | ].
+    eapply bisim_trans; [exact BQ | exact BW]. }
+  assert (NE : p2 <> p2').
+  { intro EQ. subst p2'. eapply ovReady_ovWait_bisim_not.
+    eapply bisim_trans; [apply bisim_symm; exact OW2 | exact OR]. }
+  assert (ACT : forall b, p2 -PA- b -PA> p2' -> entChanAct b).
+  { intros b B. destruct (PD b B) as [EB _]. subst b. right. reflexivity. }
+  change (p1 $||$ p2 $||$ p3) with (parAll p1 [p2, p3]) in S, CU.
+  change (p1' $||$ p2' $||$ p3') with (parAll p1' [p2', p3']) in S.
+  destruct (ent_disc_comp_chan _ _ _ _ _ _ _ _ _ _ _ _ _ 1 p2 p2' CU S eq_refl eq_refl eq_refl ACT)
+    as [EQ | St]; [contradiction | ].
+  positions_inv.
+  match goal with [S2 : [|p2, l, h, k|] -EA- a ->> [|p2', l', h', k'|] |- _] =>
+    inversion S2; subst; try (exfalso; apply NE; reflexivity);
+    try (match goal with [B : p2 -PA- _ -PA> p2' |- _] =>
+      destruct (PD _ B) as [EB _]; discriminate EB end) end.
+  match goal with [B : p2 -PA- chanOutProc ;! ?v -PA> p2' |- _] =>
+    destruct (PD _ B) as [EB BW]; injection EB as EB; subst v end.
+  assert (BW' : ovWait m (t (-) ePeriod m) (t (-) ePeriod m) (ePeriod m) ~p~ ovWait m' t' x' y')
+    by (eapply bisim_trans; [apply bisim_symm; exact BW | exact OW2]).
+  split; [ | split; [assumption | split; [reflexivity | split]]].
+  - apply stepDpParR. apply stepDpParL. assumption.
+  - exact (proj1 (ovWait_bisim_mode _ _ _ _ _ _ _ _ _ (evalExpFunTime_period m) BW')).
+  - exact (ovReady_pos _ _ _ _ R OR0).
+Qed.
 
 (* begin helpers for tfsNext_next_ent *)
 Lemma tfsNext_next_ent_currN : ProcEquiv.bisimulation (tfsCurrN $([])$) tfsCurr.

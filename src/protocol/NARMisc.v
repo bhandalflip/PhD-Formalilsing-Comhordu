@@ -147,73 +147,6 @@ Proof.
 Qed.
 (*+*)
 
-(** A waiting overlap component whose position timer has run out reads its position at once.*)
-Local Lemma ovWait_pos_read_zero (m : Mode) (u x y : Exp) :
-  evalExpFunTime y = Some zeroTime ->
-  exists q, ovWait m u x y -PA- chanPos ;? [basePosition origin] -PA> q.
-Proof.
-  intro E. eexists. unfold ovWait. apply stepDpChoiceL. apply stepDpChoiceR.
-  apply stepDpTimeOut; [ | exact E]. apply stepDpIn. typed_vals.
-Qed.
-
-(** Two bisimilar waits, the first with its position timer run out, are for the same mode, and
-the second's position timer has run out too: the first reads its position and then offers its
-mode on outProc, and the second has to match both.*)
-Local Lemma ovWait_bisim_mode_zero (m1 m2 : Mode) (u1 x1 y1 u2 x2 y2 : Exp) :
-  evalExpFunTime y1 = Some zeroTime ->
-  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 ->
-  m1 = m2 /\ evalExpFunTime y2 = Some zeroTime.
-Proof.
-  intros E1 B.
-  destruct (ovWait_pos_read_zero m1 u1 x1 y1 E1) as [q1 S1].
-  destruct (bisim_step_disc _ _ _ _ B S1) as [q2 [S2 BQ]].
-  unfold ovWait in S1, S2. invert_disc_prefixes. clean_proc_hyp BQ.
-  bt_step BQ (chanOutProc ;! [baseMode m1, basePosition origin]) S3.
-  destruct (bisim_step_disc _ _ _ _ BQ S3) as [r2 [R2 _]].
-  invert_app_trans. invert_disc_prefixes. output_values. split; [reflexivity | assumption].
-Qed.
-
-(** Two bisimilar waits, the first with a well-formed position timer, are for the same mode, and
-the second's position timer is well formed too. Once the first timer has run out, the first
-wait reads its position and offers its mode, and the second has to match. The other timers may
-be ill formed: an ovWait's mode shows only through the moves its timers enable.*)
-Local Lemma ovWait_bisim_mode (m1 m2 : Mode) (u1 x1 y1 u2 x2 y2 : Exp) (t1 : Time) :
-  evalExpFunTime y1 = Some t1 ->
-  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 ->
-  m1 = m2 /\ exists t2, evalExpFunTime y2 = Some t2.
-Proof.
-  intros E1 B. destruct t1 as [[r nn]].
-  destruct (Rle_lt_or_eq_dec 0 r nn) as [Hlt | Heq].
-  - (* delay by the timer, then the first wait reads its position *)
-    set (d := mkDelay (mkposreal r Hlt)).
-    assert (Hd : d <= mkTime (mknonnegreal r nn)) by (simpl; apply Rle_refl).
-    unfold ovWait in B.
-    match type of B with ((?A $+$ ?Bb) $+$ ($< _ >$ ?C)) $+$ ($< ?x >$ ?D) ~p~ _ =>
-      destruct (taeDel d x D (taeOut d _ _ _)) as [D1 TD1];
-      assert (TD : ((A $+$ Bb) $+$ ($< y1 >$ C)) $+$ ($< x >$ D) -PD- d -PD>
-        (((A $+$ Bb) $+$ ($< minusTime (mkTime (mknonnegreal r nn)) d Hd >$ C)) $+$ D1))
-        by (apply stepTpSum; [apply stepTpSum; [apply stepTpSum; apply stepTpIn | ] | exact TD1];
-            apply stepTpDelSub; exact E1)
-    end.
-    destruct (bisim_step_del _ _ _ _ B TD) as [q2 [TD2 BQ]]. clear TD TD1.
-    match type of BQ with ?q1 ~p~ _ =>
-      eassert (S1 : q1 -PA- chanPos ;? [basePosition origin] -PA> _) end.
-    { apply stepDpChoiceL. apply stepDpChoiceR. apply stepDpTimeOut.
-      - apply stepDpIn. typed_vals.
-      - unfold liftTimeExp. rewrite evalExpFunTime_time. f_equal. apply timeEqR. simpl. ring. }
-    destruct (bisim_step_disc _ _ _ _ BQ S1) as [r2 [S2 BR]]. clear S1 BQ B.
-    (* the second wait's delay and position read: its position timer was well formed *)
-    invert_del_prefixes; invert_disc_prefixes; clean_proc_hyp BR.
-    all: try congruence.
-    all: bt_step BR (chanOutProc ;! [baseMode m1, basePosition origin]) S3;
-      destruct (bisim_step_disc _ _ _ _ BR S3) as [r3 [R3 _]];
-      invert_app_trans; invert_disc_prefixes; output_values; split; [reflexivity | eexists; eassumption].
-  - (* the timer is zero already *)
-    apply ovWait_bisim_mode_zero in B.
-    + destruct B as [EQ E2]. split; [exact EQ | eexists; exact E2].
-    + rewrite E1. f_equal. apply timeEqR. simpl. symmetry. exact Heq.
-Qed.
-
 (** A wait with a well-formed position timer delays into a wait for the same mode, with a time as
 its position timer.*)
 Local Lemma ovWait_del_posTimer (m : Mode) (u x y : Exp) (t : Time) (d : Delay) q :
@@ -1090,6 +1023,29 @@ Proof.
   eapply tfs_rel_state. exact T.
 Qed.
 
+(** No overlap component is both init and in a nextSince state.*)
+Local Lemma init_nextSinceState_not (m : Mode) (q : ProcTerm) :
+  initState m q -> nextSinceState q -> False.
+Proof.
+  intros I NS.
+  assert (S : exists q', init m -PA- chanMCurrRead ;? [baseMode m] -PA> q')
+    by (eexists; unfold init; apply stepDpIn; typed_vals).
+  destruct S as [q' S].
+  destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ I) S) as [r [R _]].
+  destruct NS as [m' t x y H | m' t l H | m' H | m' H];
+    destruct (bisim_disc_match _ _ _ _ H R) as [r2 R2];
+    [unfold ovWait in R2 | unfold ovReady in R2 | unfold switchBc in R2 | unfold switchCurr in R2];
+    invert_disc_prefixes.
+Qed.
+
+(** No entity of a network has its overlap component both init and in a nextSince state.*)
+Local Lemma init_nextSince_net_not m i n :
+  initStateNet m i n -> nextSinceStateNet i n -> False.
+Proof.
+  intros I NS. net_state_destr I p1 p2 p3 l h k E. net_state_ent NS E.
+  exact (init_nextSinceState_not _ _ I NS).
+Qed.
+
 Lemma ovWait_nextSince_time (n : Network) (m : Mode) (x y t t1: Time) (i : nat)
   (p : reachableProtNet n) :
   ovWaitStateNet m t x y i n -> nextSince m t1 i n p -> period m - y <= t1.
@@ -1099,31 +1055,24 @@ inductive case, neither t1 nor y changes, and so the I.H. suffices.
 For the timed inductive case, y decreases and t1 increases proportionally.
 Hence both sides of the inequality increase by the same amount, which can be
 cancelled, and then the I.H. is applicable.*)
-  intros OW NS. generalize dependent OW. induction NS; intro OW.
-  lets OWT : ovReady_wait_track_net H0 H1 w. andflat EQ.
-  (*
-  state_pred_elim_net OW H1; unique_exps; my_applys_eq (Rle_refl 0); ring.
-  (*Discrete inductive case*)
-  lets OWP : ovWait_prev_net OW w. elim_intro OWP OWN ORX.
-  apply IHNS; assumption.
-  (*Now we case analyse on whether the previous state was ovReady or init.*)
-  elim_intro ORX ORS IS.
-  (*In the case of ovReady, we use ovReady_wait_track_net.*)
-  invertClearAs2 ORS l OR.
-  lets OWT : ovReady_wait_track_net OR OW w. andflat EQ. subst.
-  Rminus_refl_simpl. timeNonneg.
-  (*In the case of init, we show a contradiction with nextSince.*)
-  apply nextSince_rel_state in NS. apply nexSinceStateNet_cases in NS.
-  or_flat; ex_flat; [ | rename H0 into H1 |
-  rename H0 into H1 | rename OR0 into H1];
-  (state_pred_elim H1 IS; entnetuniq2 EN n; subst;
-  state_pred_elim H3 H0; state_pred_elim H5 H7;
-  state_pred_elim H11 H8).
-  (*Delay inductive case*)
-  assert (ovWaitStateNet m t x y i n) as ODP. eapply ovWait_del_pres_net.
-  apply w. assumption. eapply Rle_trans. apply IHNS. assumption.
-  simpl. Rplus_le_tac. apply Rlt_le. delPos. Qed.*)
-  Admitted. (*R*)
+Proof.
+  intros OW NS. revert t x y OW.
+  induction NS as [a i0 n0 n0' p0 w l t0 t' x0 y0 PE OR OW0
+    | a t2 i0 n0 n0' p0 w NS IH NSS | d t2 i0 n0 n0' p0 w NS IH]; intros tt xx yy OW.
+  - (* the broadcast that starts nextSince sets the position timer to the period *)
+    destruct (ovReady_wait_track_net _ _ _ _ _ _ _ _ _ _ _ OR OW w) as [_ EY].
+    subst yy. simpl. lra.
+  - (* back to the state before the step *)
+    destruct (ovWait_prev_net _ _ _ _ _ _ _ _ p0 OW w) as [OWN | [[t3 [l3 [_ [_ EY]]]] | IS]].
+    + exact (IH _ _ _ OWN).
+    + subst yy. pose proof (cond_nonneg (time t2)). lra.
+    + exfalso. eapply init_nextSince_net_not; [exact IS | ].
+      eapply nextSince_rel_state. exact NS.
+  - (* back across the delay: the position timer was longer by the delay *)
+    pose proof (proj1 (proj2 (reachableProtNet_del_prev _ _ _ _ _ p0 w OW))) as OS.
+    destruct (ovWait_del_bkwd_net _ _ _ _ _ _ _ _ OS w OW) as [x1 OW1].
+    pose proof (IH _ _ _ OW1) as IH1. simpl in *. lra.
+Qed.
 
 (*The mode parameter of ovWait is the same as that of the nextSince relation if both hold.*)
 Lemma nextSince_ovWait_modes_eq (n : Network) (m1 m2 : Mode) (t t1 x y : Time)

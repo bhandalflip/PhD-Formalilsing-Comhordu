@@ -4,6 +4,7 @@ School of Computer Science and Statistics, Trinity College, Dublin, Ireland.*)
 (***************************** Standard Imports *****************************)
 
 From Stdlib Require Import Program.Equality.
+From Stdlib Require Import Lra.
 
 Require Import ComhCoq.lib.Extras.LibTactics.
 
@@ -21,6 +22,8 @@ Require Import ComhCoq.lang.InterfaceLanguage.
 Require Import ComhCoq.lang.ModeStateLanguage.
 Require Import ComhCoq.lang.EntityLanguage.*)
 Require Import ComhCoq.lang.NetworkLanguage.
+Require Import ComhCoq.lang.ProcEquiv.
+Require Import ComhCoq.protocol.ProtAuxResults.
 (*Require Import ComhCoq.EntAux.*)
 Require Import ComhCoq.protocol.NetAuxBasics.
 Require Import ComhCoq.protocol.NetAuxDefs.
@@ -98,14 +101,126 @@ Theorem nextSince_fst_deliv_suff (n : Network) (t : Time) (m : Mode)
 
 (*TIDY*)
 
+(** ovReadyN applied to its arguments is ovReady.*)
+Local Lemma ovReadyN_bisim (m : Mode) (e2 : Exp) (l : Position) :
+  ovReadyN $( [eBase (baseMode m), e2, eBase (basePosition l)] )$ ~p~ ovReady m e2 l.
+Proof. unfold_app_bisim. apply bisim_refl. Qed.
+
+(** Of two bisimilar ovWait, the second with a well-formed position timer, first parameters
+that evaluate agree once the period of the mode is subtracted.*)
+Local Lemma ovWait_bisim_first_val (m1 m2 : Mode) u1 x1 y1 u2 x2 y2 t tu1 tu2 :
+  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 -> evalExpFunTime y2 = Some t ->
+  evalExpFunTime u1 = Some tu1 -> evalExpFunTime u2 = Some tu2 ->
+  time tu1 -nn- time (period m1) = time tu2 -nn- time (period m1).
+Proof.
+  intros B E E1 E2.
+  assert (EM : m2 = m1)
+    by exact (proj1 (ovWait_bisim_mode _ _ _ _ _ _ _ _ _ E (bisim_symm _ _ B))).
+  subst m2.
+  destruct (ovWait_bisim_pos_timeout _ _ _ _ _ _ _ _ _ B E) as [x1' [y1' [x2' [y2' [B' E']]]]].
+  assert (S1 : exists q, ovWait m1 u2 x2' y2' -PA- chanPos ;? [basePosition origin] -PA> q).
+  { eexists. unfold ovWait. apply stepDpChoiceL. apply stepDpChoiceR.
+    apply stepDpTimeOut; [ | exact E']. apply stepDpIn. typed_vals. }
+  destruct S1 as [q S1].
+  destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ B') S1) as [r [R BR]].
+  unfold ovWait in S1, R. invert_disc_prefixes. clean_proc_hyp BR.
+  rewrite (subExp_eval_id _ u2 _ E2) in BR. rewrite (subExp_eval_id _ u1 _ E1) in BR.
+  assert (BR' : ovReady m1 u2 origin ~p~ ovReady m1 u1 origin) by
+    (eapply bisim_trans; [apply bisim_symm; apply ovReadyN_bisim | ];
+     eapply bisim_trans; [exact BR | apply ovReadyN_bisim]).
+  assert (S2 : exists q2, ovReady m1 u2 origin -PA-
+    chanOutProc ;! [baseMode m1, basePosition origin] -PA> q2)
+    by (eexists; unfold ovReady; apply stepDpOut; repeat constructor).
+  destruct S2 as [q2 S2].
+  destruct (bisim_step_disc _ _ _ _ BR' S2) as [q1 [S1' BQ]].
+  destruct (ovReady_step_ovWait _ _ _ _ _ S2) as [_ W2].
+  destruct (ovReady_step_ovWait _ _ _ _ _ S1') as [_ W1].
+  assert (BW : ovWait m1 (u1 (-) ePeriod m1) (u1 (-) ePeriod m1) (ePeriod m1) ~p~
+    ovWait m1 (u2 (-) ePeriod m1) (u2 (-) ePeriod m1) (ePeriod m1)) by
+    (eapply bisim_trans; [apply bisim_symm; exact W1 | ];
+     eapply bisim_trans; [apply bisim_symm; exact BQ | exact W2]).
+  lets EX : ovWait_bisim_pause_timer BW (evalExpFunTime_subtract_period m1 u2 tu2 E2).
+  rewrite (evalExpFunTime_subtract_period m1 u1 tu1 E1) in EX. injection EX as EX. exact EX.
+Qed.
+
+(** The wait time between two modes is positive.*)
+Local Lemma waitTime_pos (m1 m2 : Mode) (pr : m1 -mtr-> m2) :
+  0 < nonneg (time (waitTime m1 m2 pr)).
+Proof.
+  unfold waitTime. rewrite timeMax_RMax. eapply Rlt_le_trans; [ | apply Rmax_r].
+  assert (DW : forall d : Delay, nonneg (time (delToTime d)) = pos (delay d))
+    by (intros [[r rp]]; reflexivity).
+  simpl. rewrite DW. pose proof msgLatency_positive. pose proof (cond_pos (delay waitSurplus)).
+  pose proof (cond_nonneg (time (timeMax adaptNotif transMax))). simpl in *. lra.
+Qed.
+
+(** Truncated subtraction of r is injective on the numbers above r.*)
+Local Lemma subNonnegTot_inj_pos (r1 r2 r : nonnegreal) :
+  nonneg r < nonneg r1 -> r1 -nn- r = r2 -nn- r -> nonneg r1 = nonneg r2.
+Proof.
+  intros L E. apply (f_equal nonneg) in E. revert E. unfold subNonnegTot.
+  destruct (Rle_dec r r1) as [L1 | L1]; destruct (Rle_dec r r2) as [L2 | L2]; simpl; lra.
+Qed.
+
+(** The timer init sets, the wait time and a period, evaluates to their sum.*)
+Local Lemma init_timer_val (m0 m : Mode) (t : Time) :
+  evalExpFunTime (eWaitTime m0 m (+) ePeriod m) = Some t ->
+  exists (pr : m0 -mtr-> m),
+    nonneg (time t) = nonneg (time (waitTime m0 m pr)) + nonneg (time (period m)).
+Proof.
+  intro E. unfold evalExpFunTime in E. cbn [evalExpFun] in E.
+  destruct (modeTransRelOpt m0 m) as [pr | ]; cbn [option_map] in E; [ | discriminate].
+  exists pr. destruct (waitTime m0 m pr) as [[w wn]].
+  destruct (period m) as [[pp pn]]. cbn in E. injection E as E. subst t. reflexivity.
+Qed.
+
 Lemma init_ovWait_track_net m m' t' i x y n n' a :
   initStateNet m i n -> ovWaitStateNet m' t' x y i n' ->
   n -NA- a -NA> n' -> m = m' /\ x = t' /\ y = zeroTime.
-  Admitted. (*#lift-track-net*)
+Proof.
+  intros I OW S. net_state_destr I p1 p2 p3 l h k E.
+  net_state_destr OW p1' p2' p3' l' h' k' E'.
+  lets T : triple_disc_net S E E'. destruct T as [_ [[EQ | [b B]] _]].
+  - (* the overlap component cannot be both *)
+    subst p2'. exfalso.
+    assert (C : ovWait m' t' x y ~p~ init m)
+      by (eapply bisim_trans; [apply bisim_symm; exact OW | exact I]).
+    ovWait_bisim_contra C.
+  - (* init read the current mode m0 and set both timers *)
+    destruct (bisim_step_disc _ _ _ _ I B) as [q [SQ BQ]].
+    unfold init in SQ. invert_disc_prefixes. explicit_typed_input. clean_proc_hyp BQ.
+    match type of BQ with _ ~p~ ovWaitN $( [_, ?T, _] )$ =>
+      assert (BW : ovWait m T T zeroTime ~p~ ovWait m' t' x y) by
+        (eapply bisim_trans; [apply bisim_symm; apply ovWaitN_bisim | ];
+         eapply bisim_trans; [apply bisim_symm; exact BQ | exact OW]) end.
+    assert (EM : m = m') by exact (proj1 (ovWait_bisim_mode _ _ _ _ _ _ _ _ _
+      (evalExpFunTime_time zeroTime) BW)).
+    subst m'.
+    lets EY : ovWait_bisim_pos_timer BW (evalExpFunTime_time y).
+    rewrite evalExpFunTime_time in EY. injection EY as EY.
+    lets EX : ovWait_bisim_pause_timer BW (evalExpFunTime_time x).
+    lets FV : ovWait_bisim_first_val BW (evalExpFunTime_time y) EX (evalExpFunTime_time t').
+    split; [reflexivity | split; [ | symmetry; exact EY]].
+    (* the first parameter is the wait time and a period, more than a period *)
+    destruct (init_timer_val _ _ _ EX) as [pr XV].
+    pose proof (waitTime_pos _ _ pr) as WP.
+    apply timeEqR. apply (subNonnegTot_inj_pos _ _ (time (period m))); [ | exact FV].
+    rewrite XV. lra.
+Qed.
 (*Might prove a stronger version of this with the value of t' =
 tx(m, m') + period m', where m is the current mode.*)
 
 (*-TIDY*)
+
+(** No entity has its overlap component in both ovReady and ovWait.*)
+Local Lemma ovReady_ovWait_ent_not m t l0 m' t' x' y' q l h k l' h' k' :
+  ovReadyStateEnt m t l0 ([|q, l, h, k|]) -> ovWaitStateEnt m' t' x' y' ([|q, l', h', k'|]) ->
+  False.
+Proof.
+  intros OR OW. inversion OR as [q1 l1 h1 k1 ORq]; subst. inversion OW as [q2 l2 h2 k2 OWq]; subst.
+  inversion ORq as [p1 p2 p3 OR2]; subst. inversion OWq as [p1' p2' p3' OW2 EQ]; subst.
+  eapply ovReady_ovWait_bisim_not. eapply bisim_trans; [apply bisim_symm; exact OW2 | exact OR2].
+Qed.
 
 (* If we are in the wait state of the overlap component, and the y clock value is non-zero,
 then a message containing the mode in question and some position was sent exactly
@@ -115,50 +230,53 @@ Theorem ovWait_sent (n : Network) (m : Mode) (t x y : Time) (i : nat) (p : reach
   exists l q,
   sent [baseMode m, basePosition l] (minusTime (period m) y q) i n p.  
   (*Induction on p.*)
-  introz U. genDep2 x y. induction p; intros y U0 x U.
-  (*
-  (*The base case fails because we know all entities are dormant to begin with.*)
-  initNet_contra U.
-  (*The discrete inductive case has three major cases, which we get by applying a back
-  tracking result for ovWait*)
-  lets OWP : ovWait_prev_net U s. or_flat.
-  (*In the first case, our previous state was ovWait, in which case the I.H. and the
-  discrete sent constructor will do.*)
-  apply IHp in OR. ex_flat. exists x0 x1. constructor. assumption. assumption.
-  (*In the ovReady case, we further have that y = period m, and the action linking
-  the states is a tau consisting of output of outProc of m l*)
-  ex_flat. lets ORWT : ovReady_wait_track_net H0 U s. and_flat.
-  ex_flat. subst.
-  (*Now we have the sent base case, because period m - period m = 0.*)
-  exists x1 (Rle_refl (period m)).
-  state_pred_elim H0 U. state_pred_elim H H2. subst.
-  link_netentdisc_tac b. inversion H. subst. state_pred_elim H7 H5.
-  subst. state_pred_elim H6 H9.
-  lets OOTE : ovReady_ovWait_track_ent H H2 H9. and_flat. subst.
-  ent_disc_pres_pos_tac. subst.
-  assert (p0 <> p1) as PNE. unfold not. intro. subst.
-  state_pred_elim H H2. subst. state_pred_elim H7 H8.
-  subst. state_pred_elim H6 H11. lets TAU : procNeq_tau_net H1 H3 s PNE.
-  subst. lets SB : sentBase p s H1 H3 AND0. apply SB in AND2.
-  my_applys_eq AND2. apply timeEqR. simpl. ring. 
-  (*The case where the previous state was init fails, because we
-  get y = 0, contradicting the positivity of y from the hypothesis.*)
-  lets IOT : init_ovWait_track_net OR1 U s. and_flat.
-  subst. false. eapply Rle_not_lt;[ | apply U0].
-  apply Rle_refl.
-  (*The delay inductive case follows by delay preservation,
-  an application of I.H. and then the delay constructor for sent.*)
-  lets OPB : ovWait_del_pres_bkwd_net_strong s U. apply IHp in OPB.
-  ex_flat.
-  assert (y <= period m) as YLE. eapply Rle_trans;[ | apply x1].
-  simpl. Rplus_le_tac. apply Rlt_le. delPos. exists x0 YLE.
-  match goal with [U : sent ?v ?t ?i ?n p |-
-  sent ?v ?t' ?i ?n' (reachNetDel ?n ?n' ?d _ _)] =>
-  replace t' with (delToTime (t +dt+ d)) end.
-  constructor. assumption. apply timeEqR. simpl. ring.
-  eapply Rlt_trans. apply U0. simpl. Rplus_lt_tac. delPos.
-  Qed.*)
-  Admitted. (*R*)
+Proof.
+  intros OW YP. revert t x y OW YP.
+  induction p as [n I | n n' a p IH w | n n' d p IH w]; intros t x y OW YP.
+  - (* initially the overlap component is dormant, which no ovWait is *)
+    exfalso. destruct OW as [e OWe E]. lets IE : initialNet_ent I E. inversion IE; subst.
+    inversion OWe as [q lq hq kq OWq]; subst. unfold procProtocol in OWq.
+    inversion OWq as [q1 q2 q3 OW2]; subst.
+    destruct (dormant_mNext_in dormant m (bisim_refl _)) as [r S].
+    destruct (bisim_disc_match _ _ _ _ OW2 S) as [r2 R2]. unfold ovWait in R2.
+    invert_disc_prefixes.
+  - (* a discrete step: back to ovWait, ovReady or init *)
+    destruct (ovWait_prev_net _ _ _ _ _ _ _ _ p OW w) as [OWN | [[t0 [l0 [OR [_ EY]]]] | IS]].
+    + destruct (IH _ _ _ OWN YP) as [l [q S]]. exists l q. apply sentDisc. exact S.
+    + (* the broadcast of ovReady, which sent the message just now *)
+      subst y. destruct OR as [e ORe E]. destruct OW as [e' OWe E'].
+      destruct e as [q l h k]. destruct e' as [q' l' h' k'].
+      destruct (link_net_ent_disc _ _ _ _ _ _ w E E') as [EQ | [a' S]].
+      * exfalso. injection EQ as EQ1 EQ2 EQ3 EQ4. subst.
+        eapply ovReady_ovWait_ent_not; [exact ORe | exact OWe].
+      * assert (RE : reachableProtEnt ([|q, l, h, k|])) by (eapply reachableNet_ent; eassumption).
+        lets BC : ovReady_ovWait_bcast_ent RE ORe OWe S.
+        destruct BC as [TQ [TH [EK [_ EL]]]].
+        lets PP : stepEnt_disc_pres_pos S. simpl in PP. subst l' k'.
+        assert (NQ : q <> q').
+        { intro EQ. subst q'. eapply ovReady_ovWait_ent_not; [exact ORe | exact OWe]. }
+        lets TAU : procNeq_tau_net E E' w NQ. subst a.
+        exists l0 (Rle_refl (period m)).
+        replace (minusTime (period m) (period m) (Rle_refl (period m))) with zeroTime
+          by (apply timeEqR; simpl; ring).
+        eapply sentBase; eassumption.
+    + (* init sets the position timer to zero *)
+      destruct (init_ovWait_track_net _ _ _ _ _ _ _ _ _ IS OW w) as [_ [_ EY]].
+      subst y. simpl in YP. lra.
+  - (* a delay: the position timer was longer by the delay *)
+    pose proof (proj1 (proj2 (reachableProtNet_del_prev _ _ _ _ _ p w OW))) as OS.
+    destruct (ovWait_del_bkwd_net _ _ _ _ _ _ _ _ OS w OW) as [x1 OW1].
+    assert (YP1 : 0 < nonneg (time (delToTime (y +dt+ d))))
+      by (simpl; pose proof (cond_pos (delay d)); lra).
+    destruct (IH _ _ _ OW1 YP1) as [l [q S]].
+    assert (Q : nonneg (time y) <= nonneg (time (period m)))
+      by (simpl in q; pose proof (cond_pos (delay d)); lra).
+    exists l Q.
+    replace (minusTime (period m) y Q)
+      with (delToTime (minusTime (period m) (delToTime (y +dt+ d)) q +dt+ d))
+      by (apply timeEqR; simpl; ring).
+    apply sentDel. exact S.
+Qed.
 
 (* Let's say an entity has been awaiting transition to the mode m since t time units ago.
 Then for any t' < t, we can assert that a message was sent containing the mode in
@@ -190,7 +308,7 @@ Theorem nextSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   (Misc::nextSince_rel_state) to get the possible states for nextSince.*)
   lets NR : nextSince_rel_state H.
   (*We show by (...EA::urgency...) that the only such state capable of delay is ovWait.*)
-  lets ND : nextSince_del_ovWait p w NR. decompEx4 ND m0 t0 x y OS. assert (m0 = m) as ME.
+  lets ND : nextSince_del_ovWait_pos p w NR. decompEx4 ND m0 t0 x y OS. assert (m0 = m) as ME.
   eapply nextSince_ovWait_modes_eq. apply OS. apply H.
   (*We then proceed analogously to currSince_periodic_sent, case analysing on d <= t' or
   t' < d etc. only we use (ovWait_sent) in the place of (bcWait_sent).*)

@@ -19,6 +19,7 @@ Require Import ComhCoq.lang.EntityLanguage.
 Require Import ComhCoq.lang.ProcEquiv.
 Require Import ComhCoq.protocol.ProtocolBridge.
 From Stdlib Require Import Reals Lra.
+From Stdlib Require Classical_Prop.
 
 (****************** (TIDY?) General Stuff ******************)
 
@@ -1065,6 +1066,222 @@ Proof.
     first [assumption | apply evalExpFunTime_time].
 Qed.
 
+(** An ovWait whose position timer has run out reads a position.*)
+Local Lemma ovWait_pos_read_zero (m : Mode) (u x y : Exp) :
+  evalExpFunTime y = Some zeroTime ->
+  exists q, ovWait m u x y -PA- chanPos ;? [basePosition origin] -PA> q.
+Proof.
+  intro E. eexists. unfold ovWait. apply stepDpChoiceL. apply stepDpChoiceR.
+  apply stepDpTimeOut; [ | exact E]. apply stepDpIn. typed_vals.
+Qed.
+
+(** Two bisimilar ovWait, the first with its position timer run out, are for the same mode, and
+the second's position timer has run out too.*)
+Local Lemma ovWait_bisim_mode_zero (m1 m2 : Mode) (u1 x1 y1 u2 x2 y2 : Exp) :
+  evalExpFunTime y1 = Some zeroTime ->
+  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 ->
+  m1 = m2 /\ evalExpFunTime y2 = Some zeroTime.
+Proof.
+  intros E1 B.
+  destruct (ovWait_pos_read_zero m1 u1 x1 y1 E1) as [q1 S1].
+  destruct (bisim_step_disc _ _ _ _ B S1) as [q2 [S2 BQ]].
+  unfold ovWait in S1, S2. invert_disc_prefixes. clean_proc_hyp BQ.
+  bt_step BQ (chanOutProc ;! [baseMode m1, basePosition origin]) S3.
+  destruct (bisim_step_disc _ _ _ _ BQ S3) as [r2 [R2 _]].
+  invert_app_trans. invert_disc_prefixes. output_values. split; [reflexivity | assumption].
+Qed.
+
+(** Two bisimilar ovWait, the first with a well-formed position timer, are for the same mode, and
+the second's position timer is well formed too, whatever the other timers.*)
+Lemma ovWait_bisim_mode (m1 m2 : Mode) (u1 x1 y1 u2 x2 y2 : Exp) (t1 : Time) :
+  evalExpFunTime y1 = Some t1 ->
+  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 ->
+  m1 = m2 /\ exists t2, evalExpFunTime y2 = Some t2.
+Proof.
+  intros E1 B. destruct t1 as [[r nn]].
+  destruct (Rle_lt_or_eq_dec 0 r nn) as [Hlt | Heq].
+  - (* delay by the timer, then the first wait reads its position *)
+    set (d := mkDelay (mkposreal r Hlt)).
+    assert (Hd : d <= mkTime (mknonnegreal r nn)) by (simpl; apply Rle_refl).
+    unfold ovWait in B.
+    match type of B with ((?A $+$ ?Bb) $+$ ($< _ >$ ?C)) $+$ ($< ?x >$ ?D) ~p~ _ =>
+      destruct (taeDel d x D (taeOut d _ _ _)) as [D1 TD1];
+      assert (TD : ((A $+$ Bb) $+$ ($< y1 >$ C)) $+$ ($< x >$ D) -PD- d -PD>
+        (((A $+$ Bb) $+$ ($< minusTime (mkTime (mknonnegreal r nn)) d Hd >$ C)) $+$ D1))
+        by (apply stepTpSum; [apply stepTpSum; [apply stepTpSum; apply stepTpIn | ] | exact TD1];
+            apply stepTpDelSub; exact E1)
+    end.
+    destruct (bisim_step_del _ _ _ _ B TD) as [q2 [TD2 BQ]]. clear TD TD1.
+    match type of BQ with ?q1 ~p~ _ =>
+      eassert (S1 : q1 -PA- chanPos ;? [basePosition origin] -PA> _) end.
+    { apply stepDpChoiceL. apply stepDpChoiceR. apply stepDpTimeOut.
+      - apply stepDpIn. typed_vals.
+      - unfold liftTimeExp. rewrite evalExpFunTime_time. f_equal. apply timeEqR. simpl. ring. }
+    destruct (bisim_step_disc _ _ _ _ BQ S1) as [r2 [S2 BR]]. clear S1 BQ B.
+    (* the second wait's delay and position read: its position timer was well formed *)
+    invert_del_prefixes; invert_disc_prefixes; clean_proc_hyp BR.
+    all: try congruence.
+    all: bt_step BR (chanOutProc ;! [baseMode m1, basePosition origin]) S3;
+      destruct (bisim_step_disc _ _ _ _ BR S3) as [r3 [R3 _]];
+      invert_app_trans; invert_disc_prefixes; output_values; split; [reflexivity | eexists; eassumption].
+  - (* the timer is zero already *)
+    apply ovWait_bisim_mode_zero in B.
+    + destruct B as [EQ E2]. split; [exact EQ | eexists; exact E2].
+    + rewrite E1. f_equal. apply timeEqR. simpl. symmetry. exact Heq.
+Qed.
+
+(** A timer guard over a process that can delay by any amount can delay by any amount.*)
+Local Lemma del_guard_any (e : Exp) (p : ProcTerm) (d : Delay) :
+  (forall d', exists q, p -PD- d' -PD> q) -> exists q, $< e >$ p -PD- d -PD> q.
+Proof.
+  intro P. destruct (evalExpFunTime e) as [t | ] eqn:E.
+  - destruct (Rle_lt_dec d t) as [LE | LT].
+    + eexists. eapply stepTpDelSub with (H := LE). exact E.
+    + destruct (P (minusDelay d t LT)) as [q Q]. exists q.
+      rewrite (minusDelayAddTime d t LT). apply stepTpDelAdd; assumption.
+  - eexists. apply stepTpDelIll. exact E.
+Qed.
+
+(** ovWait can delay by any amount.*)
+Lemma ovWait_del_any m e2 e3 e4 d : exists q, ovWait m e2 e3 e4 -PD- d -PD> q.
+Proof.
+  unfold ovWait.
+  match goal with [ |- exists q, (( _ $+$ _) $+$ $< e4 >$ ?P4) $+$ $< e3 >$ ?P3 -PD- d -PD> q ] =>
+    destruct (del_guard_any e4 P4 d) as [q4 Q4]; [intro d'; eexists; apply stepTpIn | ];
+    destruct (del_guard_any e3 P3 d) as [q3 Q3]; [intro d'; eexists; apply stepTpOut | ] end.
+  eexists. repeat apply stepTpSum; first [apply stepTpIn | exact Q4 | exact Q3].
+Qed.
+
+(** Inverts every sort of a sum, a prefix or a timer guard in the context.*)
+Local Ltac invert_sorts := repeat match goal with
+  | [H : sort _ _ (sum _ _) |- _] => inversion H; clear H; subst
+  | [H : sort _ _ (inPrefix _ _ _) |- _] => inversion H; clear H; subst
+  | [H : sort _ _ (outPrefix _ _ _) |- _] => inversion H; clear H; subst
+  | [H : sort _ _ (del _ _) |- _] => inversion H; clear H; subst
+  end.
+
+(** ovWait can read a position within d exactly when its position timer is less than d.*)
+Lemma ovWait_sort_pos m e2 e3 e4 l d :
+  sort (chanPos ;? [basePosition l]) d (ovWait m e2 e3 e4) <->
+  exists t4, evalExpFunTime e4 = Some t4 /\ nonneg (time t4) < pos (delay d).
+Proof.
+  unfold ovWait. split.
+  - intro S. invert_sorts. eexists. split; [eassumption | ]. simpl.
+    match goal with [ |- _ < _ + pos (delay ?d0)] => pose proof (cond_pos (delay d0)) end.
+    lra.
+  - intros [t4 [E LT]]. rewrite (minusDelayAddTime d t4 LT).
+    apply sortSumL. apply sortSumR. apply sortDel; [exact E | ]. apply sortIn. typed_vals.
+Qed.
+
+(** ovWait can pause within d exactly when its pause timer is less than d.*)
+Lemma ovWait_sort_pause m e2 e3 e4 d :
+  sort (chanPause *!) d (ovWait m e2 e3 e4) <->
+  exists t3, evalExpFunTime e3 = Some t3 /\ nonneg (time t3) < pos (delay d).
+Proof.
+  unfold ovWait. split.
+  - intro S. invert_sorts. eexists. split; [eassumption | ]. simpl.
+    match goal with [ |- _ < _ + pos (delay ?d0)] => pose proof (cond_pos (delay d0)) end.
+    lra.
+  - intros [t3 [E LT]]. rewrite (minusDelayAddTime d t3 LT).
+    apply sortSumR. apply sortDel; [exact E | ]. apply sortOut. constructor.
+Qed.
+
+(** Two non-negative numbers below the same delays are equal.*)
+Local Lemma nonneg_eq_from_delays (r1 r2 : R) : 0 <= r1 -> 0 <= r2 ->
+  (forall d : Delay, r1 < pos (delay d) <-> r2 < pos (delay d)) -> r1 = r2.
+Proof.
+  intros N1 N2 H. destruct (Rtotal_order r1 r2) as [LT | [EQ | GT]]; [ | exact EQ | ];
+    exfalso.
+  - assert (P : 0 < (r1 + r2) / 2) by lra.
+    specialize (H (mkDelay (mkposreal _ P))). simpl in H. lra.
+  - assert (P : 0 < (r1 + r2) / 2) by lra.
+    specialize (H (mkDelay (mkposreal _ P))). simpl in H. lra.
+Qed.
+
+(** A timer that is below exactly the delays above a time t is t.*)
+Local Lemma timer_from_delays (e : Exp) (t : Time) :
+  (forall d : Delay, (exists t1, evalExpFunTime e = Some t1 /\ nonneg (time t1) < pos (delay d))
+    <-> nonneg (time t) < pos (delay d)) ->
+  evalExpFunTime e = Some t.
+Proof.
+  intro H. destruct (proj2 (H (t +dt+ mkDelay onePos))) as [t1 [E LT]];
+    [simpl; pose proof (cond_pos onePos); lra | ].
+  rewrite E. f_equal. apply timeEqR. apply nonneg_eq_from_delays; [timeNonneg | timeNonneg | ].
+  intro d. rewrite <- (H d). split.
+  - intro L. exists t1. split; [exact E | exact L].
+  - intros [t2 [E2 L2]]. rewrite E in E2. injection E2 as E2. subst. exact L2.
+Qed.
+
+(** Of two bisimilar ovWait, the first's position timer is the time the second's is.*)
+Lemma ovWait_bisim_pos_timer m1 u1 x1 y1 m2 u2 x2 y2 t :
+  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 -> evalExpFunTime y2 = Some t ->
+  evalExpFunTime y1 = Some t.
+Proof.
+  intros B E. apply timer_from_delays. intro d.
+  rewrite <- (ovWait_sort_pos m1 u1 x1 y1 origin d).
+  rewrite (bisim_sort_iff _ _ _ d B (ovWait_del_any _ _ _ _ d)).
+  rewrite (ovWait_sort_pos m2 u2 x2 y2 origin d). split.
+  - intros [t2 [E2 L2]]. rewrite E in E2. injection E2 as E2. subst. exact L2.
+  - intro L. exists t. split; [exact E | exact L].
+Qed.
+
+(** Of two bisimilar ovWait, the first's pause timer is the time the second's is.*)
+Lemma ovWait_bisim_pause_timer m1 u1 x1 y1 m2 u2 x2 y2 t :
+  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 -> evalExpFunTime x2 = Some t ->
+  evalExpFunTime x1 = Some t.
+Proof.
+  intros B E. apply timer_from_delays. intro d.
+  rewrite <- (ovWait_sort_pause m1 u1 x1 y1 d).
+  rewrite (bisim_sort_iff _ _ _ d B (ovWait_del_any _ _ _ _ d)).
+  rewrite (ovWait_sort_pause m2 u2 x2 y2 d). split.
+  - intros [t2 [E2 L2]]. rewrite E in E2. injection E2 as E2. subst. exact L2.
+  - intro L. exists t. split; [exact E | exact L].
+Qed.
+
+(** Two bisimilar ovWait, the second with a well-formed position timer, delay into two
+bisimilar ovWait with the same first two parameters, the second's position timer run out.*)
+Lemma ovWait_bisim_pos_timeout m1 u1 x1 y1 m2 u2 x2 y2 t :
+  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 -> evalExpFunTime y2 = Some t ->
+  exists x1' y1' x2' y2', ovWait m1 u1 x1' y1' ~p~ ovWait m2 u2 x2' y2' /\
+    evalExpFunTime y2' = Some zeroTime.
+Proof.
+  intros B E. destruct (Rle_lt_or_eq_dec 0 t (cond_nonneg t)) as [LT | EQ].
+  - set (d := mkDelay (mkposreal _ LT)).
+    destruct (ovWait_del_any m2 u2 x2 y2 d) as [b' DB].
+    destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ B) DB) as [a' [DA BAB]].
+    destruct (ovWait_del_shape _ _ _ _ _ _ DB) as [e3b [e4b BB]].
+    destruct (ovWait_del_shape _ _ _ _ _ _ DA) as [e3a [e4a BA]].
+    exists e3a e4a e3b e4b. split.
+    + eapply bisim_trans; [apply bisim_symm; exact BA | ].
+      eapply bisim_trans; [apply bisim_symm; exact BAB | exact BB].
+    + apply timer_from_delays. intro d'.
+      rewrite <- (ovWait_sort_pos m2 u2 e3b e4b origin d').
+      rewrite (bisim_sort_iff _ _ _ d' (bisim_symm _ _ BB) (ovWait_del_any _ _ _ _ d')).
+      rewrite (sortDerivEquiv _ _ _ _ _ DB). rewrite (ovWait_sort_pos m2 u2 x2 y2 origin).
+      simpl. split.
+      * intros _. pose proof (cond_pos (delay d')). lra.
+      * intros _. exists t. split; [exact E | ]. simpl. pose proof (cond_pos (delay d')). lra.
+  - exists x1 y1 x2 y2. split; [exact B | ]. rewrite E. f_equal. apply timeEqR.
+    simpl. symmetry. exact EQ.
+Qed.
+
+(** ovWaitN applied to its arguments is ovWait with its pause timer set to its first
+parameter.*)
+Lemma ovWaitN_bisim (m : Mode) (e2 e4 : Exp) :
+  ovWaitN $( [eBase (baseMode m), e2, e4] )$ ~p~ ovWait m e2 e2 e4.
+Proof. unfold_app_bisim. apply bisim_refl. Qed.
+
+(** ovReady's only step is its broadcast, into ovWait with its timer less the period as first
+parameter and pause timer, and the period as position timer.*)
+Lemma ovReady_step_ovWait (m : Mode) (u : Exp) (l : Position) b q :
+  ovReady m u l -PA- b -PA> q ->
+  b = chanOutProc ;! [baseMode m, basePosition l] /\
+  q ~p~ ovWait m (u (-) ePeriod m) (u (-) ePeriod m) (ePeriod m).
+Proof.
+  intro S. unfold ovReady in S. invert_disc_prefixes. output_values. split; [reflexivity | ].
+  unfold_app_bisim. apply bisim_refl.
+Qed.
+
 (** After a step into switchCurr, the overlap component was switchBc.*)
 Theorem switchCurr_prev (p p' : ProcTerm) (a : DiscAct) :
   p -PA- a -PA> p' -> overlapState p -> switchCurrState p' ->
@@ -1846,6 +2063,116 @@ Proof.
   destruct (ovWait_del_shape _ _ _ _ _ _ TQ) as [e3' [e4' B']].
   eapply NW. eapply bisim_trans; [apply bisim_symm; exact B' | ].
   eapply bisim_trans; [apply bisim_symm; exact BQ | exact BZ].
+Qed.
+
+(** No process is both ovReady and ovWait.*)
+Lemma ovReady_ovWait_bisim_not (m1 m2 : Mode) u1 (l : Position) u2 x2 y2 :
+  ovWait m2 u2 x2 y2 ~p~ ovReady m1 u1 l -> False.
+Proof. intro B. ovWait_bisim_contra B. Qed.
+
+(** Two bisimilar ovWait, the second with a well-formed position timer, stay bisimilar with the
+same timers in both.*)
+Local Lemma ovWait_bisim_same_timers (m1 m2 : Mode) u1 x1 y1 u2 x2 y2 t e3 e4 :
+  ovWait m1 u1 x1 y1 ~p~ ovWait m2 u2 x2 y2 -> evalExpFunTime y2 = Some t ->
+  ovWait m1 u1 e3 e4 ~p~ ovWait m2 u2 e3 e4.
+Proof.
+  intros B E.
+  assert (EM : m2 = m1)
+    by exact (proj1 (ovWait_bisim_mode _ _ _ _ _ _ _ _ _ E (bisim_symm _ _ B))).
+  subst m2.
+  destruct (ovWait_bisim_pos_timeout _ _ _ _ _ _ _ _ _ B E) as [x1' [y1' [x2' [y2' [B' E']]]]].
+  clear B E. unfold ovWait in B' |- *.
+  apply choice_bisim_context; [ | apply bisim_refl].
+  apply choice_bisim_context; [apply bisim_refl | ].
+  apply del_bisim_context. apply inPrefix_bisim_context. intros v TV.
+  match goal with [ |- ?L ~p~ ?R ] =>
+    assert (S : (( chanAbort ? ovAbortN $+$ chanBad ? tfsStartN) $+$
+      $< y2' >$ chanPos $< vL >$ ? ovReadyN $( [eBase (baseMode m1), u2, eVar vL] )$) $+$
+      $< x2' >$ chanPause ! switchBcN $( eBase (baseMode m1) )$ -PA- chanPos ;? v -PA> R) end.
+  { apply stepDpChoiceL. apply stepDpChoiceR. apply stepDpTimeOut; [ | exact E'].
+    apply stepDpIn. exact TV. }
+  destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ B') S) as [r [R BR]].
+  invert_disc_prefixes. apply bisim_symm. exact BR.
+Qed.
+
+(** A timer that is below exactly the delays d + d' with d' above t, and is not below d,
+is t + d.*)
+Local Lemma timer_shift (e : Exp) (d : Delay) (t : Time) :
+  (forall d' : Delay, (exists t1, evalExpFunTime e = Some t1 /\
+    nonneg (time t1) < pos (delay (d +d+ d'))) <-> nonneg (time t) < pos (delay d')) ->
+  ~ (exists t1, evalExpFunTime e = Some t1 /\ nonneg (time t1) < pos (delay d)) ->
+  evalExpFunTime e = Some (delToTime (t +dt+ d)).
+Proof.
+  intros H N. apply timer_from_delays. intro d''.
+  destruct (Rlt_le_dec (pos (delay d)) (pos (delay d''))) as [GT | LE].
+  - assert (EQ : d'' = d +d+ minusDelay d'' d GT)
+      by (rewrite addDelayComm; symmetry; apply minusAddDelay).
+    rewrite EQ. rewrite (H (minusDelay d'' d GT)). simpl. lra.
+  - split.
+    + intros [t1 [E1 L1]]. exfalso. apply N. exists t1. split; [exact E1 | lra].
+    + intro L. exfalso. simpl in L. pose proof (cond_nonneg (time t)). lra.
+Qed.
+
+(** Back across a delay d into ovWait m t x y, an overlap component could read its position
+during the delay, or was ovWait for m with first parameter t, a time as its pause timer and
+y + d as its position timer; its pause timer was x + d unless it could pause during the
+delay.*)
+Lemma ovWait_timers_del_bkwd (p p' : ProcTerm) (d : Delay) (m : Mode) (t x y : Time) :
+  overlapState p -> p -PD- d -PD> p' -> ovWaitState m t x y p' ->
+  sort (chanPos ;? [basePosition origin]) d p \/
+  exists (x0 : Time), ovWaitState m t x0 (delToTime (y +dt+ d)) p /\
+    (~ sort (chanPause *!) d p -> x0 = delToTime (x +dt+ d)).
+Proof.
+  intros OS D OW. red in OW.
+  destruct (overlapState_shape _ OS)
+    as [B | m0 B | m0 e2 e3 e4 B | m0 e2 l B | m0 B | B | B | B | B | m0 B | B | B | B];
+    try solve [exfalso; match type of B with _ ~p~ ?Z =>
+      assert (C : ovWait m t x y ~p~ Z) by (eapply bisim_trans;
+        [apply bisim_symm; exact OW | eapply bisim_del_pres; [del_self_body | exact B | exact D]])
+      end; first [ovWait_bisim_contra C | destruct (dormant_mNext_in _ m C) as [q S];
+        unfold ovWait in S; invert_disc_prefixes]].
+  destruct (bisim_step_del _ _ _ _ B D) as [a' [DA BA]].
+  destruct (ovWait_del_shape _ _ _ _ _ _ DA) as [e3' [e4' BS]].
+  assert (BW : ovWait m0 e2 e3' e4' ~p~ ovWait m t x y) by (eapply bisim_trans;
+    [apply bisim_symm; exact BS | eapply bisim_trans; [apply bisim_symm; exact BA | exact OW]]).
+  assert (EM : m = m0) by exact (proj1 (ovWait_bisim_mode _ _ _ _ _ _ _ _ _
+    (evalExpFunTime_time y) (bisim_symm _ _ BW))).
+  subst m0.
+  pose proof (bisim_del_any _ _ B (ovWait_del_any _ _ _ _)) as PD.
+  pose proof (bisim_del_any _ _ OW (ovWait_del_any _ _ _ _)) as PD'.
+  assert (HY : forall d' : Delay, (exists t4, evalExpFunTime e4 = Some t4 /\
+    nonneg (time t4) < pos (delay (d +d+ d'))) <-> nonneg (time y) < pos (delay d')).
+  { intro d'. rewrite <- (ovWait_sort_pos m e2 e3 e4 origin).
+    rewrite <- (bisim_sort_iff _ _ _ _ B (PD _)). rewrite <- (sortDerivEquiv _ _ _ _ _ D).
+    rewrite (bisim_sort_iff _ _ _ _ OW (PD' _)). rewrite ovWait_sort_pos.
+    unfold liftTimeExp. rewrite evalExpFunTime_time. split.
+    - intros [t1 [E1 L1]]. injection E1 as E1. subst. exact L1.
+    - intro L. exists y. split; [reflexivity | exact L]. }
+  assert (HX : forall d' : Delay, (exists t3, evalExpFunTime e3 = Some t3 /\
+    nonneg (time t3) < pos (delay (d +d+ d'))) <-> nonneg (time x) < pos (delay d')).
+  { intro d'. rewrite <- (ovWait_sort_pause m e2 e3 e4).
+    rewrite <- (bisim_sort_iff _ _ _ _ B (PD _)). rewrite <- (sortDerivEquiv _ _ _ _ _ D).
+    rewrite (bisim_sort_iff _ _ _ _ OW (PD' _)). rewrite ovWait_sort_pause.
+    unfold liftTimeExp. rewrite evalExpFunTime_time. split.
+    - intros [t1 [E1 L1]]. injection E1 as E1. subst. exact L1.
+    - intro L. exists x. split; [reflexivity | exact L]. }
+  destruct (Classical_Prop.classic (sort (chanPos ;? [basePosition origin]) d p)) as [SP | NSP];
+    [left; exact SP | right].
+  assert (E4 : evalExpFunTime e4 = Some (delToTime (y +dt+ d))).
+  { apply timer_shift; [exact HY | ]. intro C. apply NSP.
+    apply (bisim_sort_iff _ _ _ _ B (PD _)). apply ovWait_sort_pos. exact C. }
+  destruct (proj2 (HX (x +dt+ mkDelay onePos))) as [t3 [E3 _]];
+    [simpl; pose proof (cond_pos onePos); lra | ].
+  exists t3. split.
+  - red. eapply bisim_trans; [exact B | ].
+    eapply bisim_trans; [ | exact (ovWait_bisim_same_timers _ _ _ _ _ _ _ _ _ _ _ BW
+      (evalExpFunTime_time y))].
+    unfold ovWait. repeat apply choice_bisim_context; try apply bisim_refl;
+      apply del_bisim_guard; unfold liftTimeExp; rewrite evalExpFunTime_time; assumption.
+  - intro NSX. assert (E3' : evalExpFunTime e3 = Some (delToTime (x +dt+ d))).
+    { apply timer_shift; [exact HX | ]. intro C. apply NSX.
+      apply (bisim_sort_iff _ _ _ _ B (PD _)). apply ovWait_sort_pause. exact C. }
+    rewrite E3 in E3'. injection E3' as E3'. exact E3'.
 Qed.
 
 (****************** Linking ******************)

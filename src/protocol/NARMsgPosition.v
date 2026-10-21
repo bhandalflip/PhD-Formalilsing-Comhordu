@@ -103,7 +103,8 @@ Proof.
   eapply ovReady_not_ovWait_prot; eassumption.
   (*Tracking yields that the software component outputs <m, l> on outProc and the interface
   inputs it, with the mode state and position unchanged.*)
-  lets T : ovReady_ovWait_track_ent E1 E1' ST. destruct T as [T1 [T2 [T3 [T4 T5]]]]. subst.
+  assert (RE : reachableProtEnt ([|q, l1, h, k|])) by (eapply reachableNet_ent; eassumption).
+  lets T : ovReady_ovWait_bcast_ent RE E1 E1' ST. destruct T as [T1 [T2 [T3 [T4 T5]]]]. subst.
   lets PP : stepEnt_disc_pres_pos ST. simpl in PP. subst.
   (*The software term has changed, so the network action is a tau.*)
   assert (q <> q') as NE. intro. subst. inversion E1; inversion E1'; subst.

@@ -428,6 +428,24 @@ Lemma bisim_del_sort p q a d : p ~p~ q -> timedActEnabled p d ->
   lets BD : bisim_dae U DA. apply enabledInSort. assumption.
   eapply sortNotTau. eassumption. Qed.
 
+(** Bisimilar processes, the first of which can delay by d, have the same actions within d.*)
+Lemma bisim_sort_iff p q a d : p ~p~ q -> (exists p', p -PD- d -PD> p') ->
+  (sort a d p <-> sort a d q).
+Proof.
+  intros B [p' D]. split; intro S.
+  - eapply bisim_del_sort; [exact B | econstructor; exact D | exact S].
+  - destruct (bisim_step_del _ _ _ _ B D) as [q' [D' _]].
+    eapply bisim_del_sort; [apply bisim_symm; exact B | econstructor; exact D' | exact S].
+Qed.
+
+(** A process bisimilar to one that can delay by any amount can delay by any amount.*)
+Lemma bisim_del_any p q : p ~p~ q -> (forall d, exists q', q -PD- d -PD> q') ->
+  forall d, exists p', p -PD- d -PD> p'.
+Proof.
+  intros B H d. destruct (H d) as [q' D].
+  destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ B) D) as [p' [D' _]]. exists p'. exact D'.
+Qed.
+
 (*** Bisimulation and Syntax ***)
 
 CoFixpoint choice_bisim_symm p1 p2 : p1 $+$ p2 ~p~ p2 $+$ p1. constructor.
