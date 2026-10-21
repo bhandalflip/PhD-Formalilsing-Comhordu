@@ -138,8 +138,10 @@ Lemma speedMax_nonneg : 0 <= speedMax.
 
 Axiom adaptNotif_positive : 0 < adaptNotif.
 
-Axiom modeTransTime_bound : forall (m m' : Mode) (p : m -mtr-> m'),
-  modeTransTime m m' p <= trans m.
+(** trans m bounds the time to transition from m to any fail-safe successor
+(Definition 5.2, p.107).*)
+Axiom modeTransTime_bound : forall (m mF : Mode) (p : m -mtr-> mF),
+  failSafe mF -> modeTransTime m mF p <= trans m.
 
 (** The coverage r is sufficient for an entity broadcasting in mode m.*)
 Definition sufficient (m : Mode) (r : Distance) : Prop :=

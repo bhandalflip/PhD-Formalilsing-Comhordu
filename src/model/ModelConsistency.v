@@ -66,8 +66,8 @@ Record ComhModel := {
   cm_period_positive : forall m : cm_Mode, 0 < cm_period m;
   cm_speedMax_pos : 0 < cm_speedMax;
   cm_adaptNotif_positive : 0 < cm_adaptNotif;
-  cm_modeTransTime_bound : forall (m m' : cm_Mode) (p : cm_modeTransRel m m'),
-    cm_modeTransTime m m' p <= cm_trans m
+  cm_modeTransTime_bound : forall (m mF : cm_Mode) (p : cm_modeTransRel m mF),
+    cm_failSafe mF -> cm_modeTransTime m mF p <= cm_trans m
 }.
 
 (** The global axioms form a [ComhModel]: the record captures exactly them. *)
@@ -166,7 +166,7 @@ Definition concrete_model : ComhModel := {|
   cm_period_positive := fun _ => Rlt_0_1;
   cm_speedMax_pos := Rlt_0_1;
   cm_adaptNotif_positive := Rlt_0_1;
-  cm_modeTransTime_bound := fun _ _ _ => Rle_refl 1
+  cm_modeTransTime_bound := fun _ _ _ _ => Rle_refl 1
 |}.
 
 (** The model really is non-degenerate. *)

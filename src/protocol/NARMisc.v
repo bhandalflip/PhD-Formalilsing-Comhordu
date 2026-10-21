@@ -551,7 +551,7 @@ Proof.
       { destruct MS as [q' l' h' E']. lets C : liftEntNet_ent CM' E'. simpl in C. exact C. }
       subst m1 t0. exists (modeTransTime m mF pr). split.
       * eapply transGuard_intro. exact MS.
-      * simpl. pose proof (modeTransTime_bound m mF pr). lra.
+      * simpl. pose proof (modeTransTime_bound m mF pr FS). lra.
   - (* a delay: in tfsCurr before it, and the timer goes down as the time goes up *)
     destruct (reachableProtNet_del_prev _ _ _ _ _ p0 w0 TC) as [_ [OS _]].
     assert (TC0 : tfsCurrStateNet i0 n0)
