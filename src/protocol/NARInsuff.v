@@ -176,7 +176,7 @@ Qed.
 (*A delay of at most the timestamp t just ages an incoming notification by d. Unlike
 (Basics::incomingNetNotif_del), this needs nothing about the listener, so it holds for
 any v.*)
-Local Lemma delivered_incomingNetNotif_aux (n n' : Network) (d : Delay) (v : list BaseType)
+Local Lemma incomingNetNotif_del_le (n n' : Network) (d : Delay) (v : list BaseType)
   (t : Time) (i : nat) (q : d <= t) :
   n -ND- d -ND> n' -> incomingNetNotif v t i n ->
   incomingNetNotif v (minusTime t d q) i n'.
@@ -209,12 +209,12 @@ Theorem delivered_incomingNetNotif (n : Network) (v : list BaseType) (r : Distan
   assert (t < adaptNotif) as Q. eapply Rplus_lt_weaken_lr. apply q. apply Rlt_le. delPos.
   (*So by IH incomingNetNotif r::v (AN - t) i n.*)
   lets IH : IHdelivered Q. clear IHdelivered.
-  (*Since t + d < AN, the delay d is at most AN - t, so by (delivered_incomingNetNotif_aux) we
+  (*Since t + d < AN, the delay d is at most AN - t, so by (incomingNetNotif_del_le) we
   have incomingNetNotif r::v (AN - t - d) i n' which is the same as incomingNetNotif r::v
   (AN - (t + d)) i n and we're done.*)
   assert (d <= minusTime adaptNotif t (Rlt_le t adaptNotif Q)) as DL.
   simpl. simpl in q. lra.
-  lets Q2 : delivered_incomingNetNotif_aux DL w IH.
+  lets Q2 : incomingNetNotif_del_le DL w IH.
   my_applys_eq Q2. apply timeEqR. simpl. ring. Qed.
 
 

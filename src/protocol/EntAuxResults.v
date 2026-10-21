@@ -467,7 +467,7 @@ Ltac urgency_pre_tac2_1 SE SP S :=
 
 (* begin helpers for gotMsgStateEnt_urgent *)
 (** A process in the gotMsg state can read any position on the channel pos.*)
-Lemma gotMsgStateEnt_urgent_aux1 (p : ProcTerm) (m : Mode) (l l0 : Position) :
+Local Lemma gotMsg_pos_in (p : ProcTerm) (m : Mode) (l l0 : Position) :
   gotMsgState m l p -> discActEnabled p (chanPos ;? [basePosition l0]).
   activation_tac. Qed.
 (* end helpers *)
@@ -481,12 +481,12 @@ Proof.
   inversion GS; subst.
   match goal with [H : gotMsgStateProt _ _ _ |- _] => inversion H; subst end.
   eapply ent_del_pos_in_not with (l0 := l); [ | eassumption].
-  dae_listener. eapply gotMsgStateEnt_urgent_aux1. eassumption.
+  dae_listener. eapply gotMsg_pos_in. eassumption.
 Qed.
 
 (* begin helpers for gotRangeStateEnt_urgent *)
 (** A process in the gotRange state can read any mode on the channel mCurr.*)
-Lemma gotRangeStateEnt_urgent_aux1 (p : ProcTerm) (m m0 : Mode) (r : Distance) :
+Local Lemma gotRange_mCurr_in (p : ProcTerm) (m m0 : Mode) (r : Distance) :
   gotRangeState m r p -> discActEnabled p (chanMCurrRead ;? [baseMode m0]).
   activation_tac. Qed.
 (* end helpers *)
@@ -499,17 +499,17 @@ Proof.
   match goal with [H : gotRangeStateProt _ _ _ |- _] => inversion H; subst end.
   eapply ent_del_mCurr_in_not; [ | eassumption].
   intro m0. dae_listener.
-  eapply gotRangeStateEnt_urgent_aux1. eassumption.
+  eapply gotRange_mCurr_in. eassumption.
 Qed.
 
 (* begin helpers for currCompStateEnt_urgent *)
 (** A process in the currComp state can input on mStable.*)
-Lemma currCompStateEnt_urgent_aux1 (p : ProcTerm) (m : Mode) (r : Distance) :
+Local Lemma currComp_mStable_in (p : ProcTerm) (m : Mode) (r : Distance) :
   currCompState m r p -> discActEnabled p (chanMStableRead *?).
   activation_tac. Qed.
 
 (** A process in the currComp state can input any mode on mNext.*)
-Lemma currCompStateEnt_urgent_aux2 (p : ProcTerm) (m m0 : Mode) (r : Distance) :
+Local Lemma currComp_mNext_in (p : ProcTerm) (m m0 : Mode) (r : Distance) :
   currCompState m r p -> discActEnabled p (chanMNextRead ;? [baseMode m0]).
   activation_tac. Qed.
 (* end helpers *)
@@ -521,9 +521,9 @@ Proof.
   inversion CS; subst.
   match goal with [H : currCompStateProt _ _ _ |- _] => inversion H; subst end.
   eapply ent_del_mStable_mNext_in_not; [ | | eassumption].
-  - dae_listener. eapply currCompStateEnt_urgent_aux1. eassumption.
+  - dae_listener. eapply currComp_mStable_in. eassumption.
   - intro m0. dae_listener.
-    eapply currCompStateEnt_urgent_aux2. eassumption.
+    eapply currComp_mNext_in. eassumption.
 Qed. (*Relies on the result that the mode state can always
 EITHER output on next or stable. #modif-urgent*)
 
@@ -1063,7 +1063,7 @@ Ltac tfsCurr_next_ent_fwd_tac :=
   tfsCurr_next_ent_close_tac.
 
 (** Process-level forward tracking from the tfsCurr state.*)
-Lemma tfsCurr_next_ent_aux p p' b :
+Local Lemma tfsCurr_next p p' b :
   p -PA- b -PA> p' -> tfsCurrState p -> tfsCurrState p' \/ tfsBcState p'.
 Proof. tfsCurr_next_ent_fwd_tac. Qed.
 (* end helpers *)
@@ -1073,7 +1073,7 @@ Lemma tfsCurr_next_ent e e' a :
   tfsCurrStateEnt e' \/ tfsBcStateEnt e'.
 Proof.
   intros S T.
-  exact (tfsCurr_next_ent_lift tfsCurrState tfsBcState _ _ _ tfsCurr_next_ent_aux S T).
+  exact (tfsCurr_next_ent_lift tfsCurrState tfsBcState _ _ _ tfsCurr_next S T).
 Qed.
 
 (** From tfsStart, the overlap component reads the current mode and moves to tfsNext with
@@ -1094,7 +1094,7 @@ Qed.
 (* begin helpers for tfsBc_next_ent *)
 (** Process-level forward tracking from the tfsBc state
 (uses the #fwd-track-lift-ent support from tfsCurr_next_ent).*)
-Lemma tfsBc_next_ent_aux p p' b :
+Local Lemma tfsBc_next p p' b :
   p -PA- b -PA> p' -> tfsBcState p -> tfsBcState p' \/ tfsListenState p'.
 Proof. tfsCurr_next_ent_fwd_tac. Qed.
 (* end helpers *)
@@ -1104,13 +1104,13 @@ Lemma tfsBc_next_ent e e' a :
   tfsBcStateEnt e' \/ tfsListenStateEnt e'.
 Proof.
   intros S T.
-  exact (tfsCurr_next_ent_lift tfsBcState tfsListenState _ _ _ tfsBc_next_ent_aux S T).
+  exact (tfsCurr_next_ent_lift tfsBcState tfsListenState _ _ _ tfsBc_next S T).
 Qed.
 
 (* begin helpers for tfsListen_next_ent *)
 (** Process-level forward tracking from the tfsListen state
 (uses the #fwd-track-lift-ent support from tfsCurr_next_ent).*)
-Lemma tfsListen_next_ent_aux p p' b :
+Local Lemma tfsListen_next p p' b :
   p -PA- b -PA> p' -> tfsListenState p -> tfsListenState p' \/ dormantState p'.
 Proof. tfsCurr_next_ent_fwd_tac. Qed.
 (* end helpers *)
@@ -1120,7 +1120,7 @@ Lemma tfsListen_next_ent e e' a :
   tfsListenStateEnt e' \/ dormantStateEnt e'.
 Proof.
   intros S T.
-  exact (tfsCurr_next_ent_lift tfsListenState dormantState _ _ _ tfsListen_next_ent_aux S T).
+  exact (tfsCurr_next_ent_lift tfsListenState dormantState _ _ _ tfsListen_next S T).
 Qed.
 
 (*- LOCAL TIDY*)

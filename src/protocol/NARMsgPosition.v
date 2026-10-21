@@ -73,17 +73,19 @@ Theorem sent_outgoing (n : Network) (v : list BaseType) (t : Time) (i : nat)
 (*If an entity is nextSince m t, then <m, l0> was sent exactly t time units ago for some l0.*)
 (* begin helpers for fst_sent *)
 (*ovWait m' t' x y can input on abort.*)
-Lemma fst_sent_aux0 p m t x y : ovWaitState m t x y p -> discActEnabled p (chanAbort *?).
+Local Lemma ovWait_abort_in p m t x y : ovWaitState m t x y p -> discActEnabled p (chanAbort *?).
   activation_tac. Qed.
 
 (*No process is both ovReady and ovWait: ovWait can input on abort but ovReady can't.*)
-Lemma fst_sent_aux1 p m t l m' t' x y : ovReadyState m t l p -> ovWaitState m' t' x y p -> False.
-  intros U V. apply fst_sent_aux0 in V. eapply bisim_dae in V;[ | apply U].
+Local Lemma ovReady_not_ovWait p m t l m' t' x y :
+  ovReadyState m t l p -> ovWaitState m' t' x y p -> False.
+  intros U V. apply ovWait_abort_in in V. eapply bisim_dae in V;[ | apply U].
   inversion V. unfold ovReady in H. repeat invert_trans_rich. Qed.
 
-Lemma fst_sent_aux2 q m t l m' t' x y : ovReadyStateProt m t l q -> ovWaitStateProt m' t' x y q -> False.
+Local Lemma ovReady_not_ovWait_prot q m t l m' t' x y :
+  ovReadyStateProt m t l q -> ovWaitStateProt m' t' x y q -> False.
   intros U V. inversion U; subst. inversion V; subst.
-  eapply fst_sent_aux1; eassumption. Qed.
+  eapply ovReady_not_ovWait; eassumption. Qed.
 (* end helpers *)
 
 Theorem fst_sent (n : Network) (m : Mode) (t : Time) (i : nat)
@@ -97,13 +99,15 @@ Proof.
   destruct e as [q l1 h k]. destruct e' as [q' l1' h' k'].
   lets L : link_net_ent_disc w E2 E2'. destruct L as [EQ | [a' ST]].
   (*The entity can't be unchanged, because ovReady and ovWait are exclusive.*)
-  inversion EQ; subst. inversion E1; inversion E1'; subst. false. eapply fst_sent_aux2; eassumption.
+  inversion EQ; subst. inversion E1; inversion E1'; subst. false.
+  eapply ovReady_not_ovWait_prot; eassumption.
   (*Tracking yields that the software component outputs <m, l> on outProc and the interface
   inputs it, with the mode state and position unchanged.*)
   lets T : ovReady_ovWait_track_ent E1 E1' ST. destruct T as [T1 [T2 [T3 [T4 T5]]]]. subst.
   lets PP : stepEnt_disc_pres_pos ST. simpl in PP. subst.
   (*The software term has changed, so the network action is a tau.*)
-  assert (q <> q') as NE. intro. subst. inversion E1; inversion E1'; subst. eapply fst_sent_aux2; eassumption.
+  assert (q <> q') as NE. intro. subst. inversion E1; inversion E1'; subst.
+  eapply ovReady_not_ovWait_prot; eassumption.
   lets TAU : procNeq_tau_net E2 E2' w NE. subst.
   exists l1'. eapply sentBase; eassumption.
   (*In the inductive cases, we simply apply the inductive hypothesis and

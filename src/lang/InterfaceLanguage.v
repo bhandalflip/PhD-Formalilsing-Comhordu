@@ -365,7 +365,7 @@ Qed.
 
 (* begin helpers for timeSplit_notifList *)
 From Stdlib Require Import Lra.
-Lemma timeSplit_notifList_aux : forall l a l'', l -nl- a -nl> l'' ->
+Local Lemma timeSplit_notifList_aux : forall l a l'', l -nl- a -nl> l'' ->
   forall d d' : Delay, a = atlDel (d +d+ d') ->
   exists l', l -nl- d -nl> l' /\ l' -nl- d' -nl> l''.
 Proof.
@@ -606,7 +606,7 @@ Lemma timeSplit_inter (h h'' : Interface) (d d' d'' : Delay) :
   split; constructor; eassumption. Qed.
 
 (*A notification list with a timed-out element can output that element.*)
-Lemma notif_timeout_enabled_aux v lnx :
+Local Lemma notifList_timeout_enabled v lnx :
   <( v, zeroTime )> _: notifList lnx ->
   exists lnx', lnx -nl- (v !!) -nl> lnx'.
   (*Proof: Lift a more general result on timed lists*)
@@ -623,7 +623,7 @@ Lemma notif_timeout_enabled v lix lox lnx :
   (*First thing is that we show the transition is possible on the
   notification list.*)
   assert (exists lnx', lnx -nl- (v !!) -nl> lnx') as EXL.
-  apply notif_timeout_enabled_aux; assumption. ex_flat.
+  apply notifList_timeout_enabled; assumption. ex_flat.
   eapply daeiOut. eapply stepIntFwdNotif. eassumption.
   Qed.
 

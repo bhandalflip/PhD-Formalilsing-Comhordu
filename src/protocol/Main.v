@@ -33,7 +33,7 @@ Require Import ComhCoq.protocol.ProtocolBridge.
 
 (**Used to exploit a symmetry in the following proof, essentially continues on the proof
 from where it is applied*)
-Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
+Local Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
   (i j : nat) (H : (i <> j)%nat) (H0 : e1 @ i .: n) (H1 : e2 @ j .: n)
   (x : Distance) (Heqx : x = mkDistance (dist2d e1 e2)) (mdc : Distance) (m1 : Mode)
   (Heqm1 : m1 = e1) (m2 : Mode) (Heqm2 : m2 = e2) (Heqmdc : mdc = minDistComp m1 m2)

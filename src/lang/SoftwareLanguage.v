@@ -393,8 +393,7 @@ Lemma stepDpApp_alt : forall (n : Name) (l2 : list Exp) (p' : ProcTerm) (a : Dis
   stepDiscProc (app n l2) a p'. intros. remember (def n). destruct p. eapply stepDpApp.
   rewrite <- Heqp. reflexivity. apply H. Qed.
 
-(** Helper for guarded_rect: induction on a bound for the ranks of the names a term
-applies outside a prefix, then on the term.*)
+(** guarded_rect for the terms that apply only names of rank below n outside a prefix.*)
 Local Lemma guarded_rect_aux (P : ProcTerm -> Type)
   (Hnil : P nilProc)
   (Hout : forall c l p, P (outPrefix c l p))
@@ -613,8 +612,8 @@ Ltac evalExp_evalExpFunTime_step := match goal with
 (** If a is in sort d' of p' and p transitions to p' by d, then a is in the sort
 d + d' of p.*)
 (* begin helpers for sortDeriv *)
-(** Helper for sortDeriv: the case of a guard that has been partially counted down.*)
-Lemma sortDeriv_aux (a : DiscAct) (d d' : Delay) (t : Time) (H : d <= t) e p :
+(** The case of sortDeriv for a guard that has been partially counted down.*)
+Local Lemma sortDeriv_delSub (a : DiscAct) (d d' : Delay) (t : Time) (H : d <= t) e p :
   evalExpFunTime e = Some t ->
   sort a d' ($< minusTime t d H >$ p) -> sort a (d +d+ d') ($< e >$ p).
   intros EV S. inversion S; subst. simpl in H4. injection H4. intro EQ.
@@ -636,7 +635,7 @@ Proof.
   assumption. apply IHstepTimedProc in H. eapply sortApp. apply H0.
   assumption. apply IHstepTimedProc in H. rewrite delTimeAddAssoc2.
   constructor; assumption.
-  eapply sortDeriv_aux; eassumption.
+  eapply sortDeriv_delSub; eassumption.
   inversion H. rewrite H0 in H5. inversion H5.
   (*Not sure what happened here - proof seems to have got corrupted:
   eapply sort_guard_eval_eq. apply H. rewrite H1.
@@ -649,7 +648,7 @@ Lemma sort_minus_guard a d' d t H p :
   (pos (delay d)) H))>$ p) ->
   sort a (d +d+ d') ($<eBase (baseTime t)>$ p).
 Proof.
-  apply sortDeriv_aux. destruct t. reflexivity. Qed.
+  apply sortDeriv_delSub. destruct t. reflexivity. Qed.
 
 Lemma evalExpFunTime_time t :
   evalExpFunTime (eBase (baseTime t)) = Some t.
@@ -2222,9 +2221,8 @@ Proof.
   - rewrite unfoldApp_body, namesProc_sub. exact M.
 Qed.
 
-(** Helper for reachableFrom_nameCallReachable: a discrete step leads from a term whose names are
-call-reachable from p0 to another.*)
-Local Lemma reachableFrom_nameCallReachable_aux p0 p a p' :
+(** A discrete step leads from a term whose names are call-reachable from p0 to another.*)
+Local Lemma nameCallReachable_disc_pres p0 p a p' :
   Forall (nameCallReachable p0) (namesProc p) -> p -PA- a -PA> p' ->
   Forall (nameCallReachable p0) (namesProc p').
 Proof.
@@ -2237,9 +2235,8 @@ Proof.
   unfold defBody in D. rewrite E in D. exact D.
 Qed.
 
-(** Helper for reachableFrom_nameCallReachable: a delay leads from a term whose names are
-call-reachable from p0 to another.*)
-Local Lemma reachableFrom_nameCallReachable_aux2 p0 p d p' :
+(** A delay leads from a term whose names are call-reachable from p0 to another.*)
+Local Lemma nameCallReachable_del_pres p0 p d p' :
   Forall (nameCallReachable p0) (namesProc p) -> p -PD- d -PD> p' ->
   Forall (nameCallReachable p0) (namesProc p').
 Proof.
@@ -2259,8 +2256,8 @@ Lemma reachableFrom_nameCallReachable p0 p : reachableFrom p0 p ->
 Proof.
   apply (reachableFrom_invariant (fun q => Forall (nameCallReachable p0) (namesProc q)));
     [apply nameCallReachable_base | | ].
-  - intros q q' a F S. exact (reachableFrom_nameCallReachable_aux p0 q a q' F S).
-  - intros q q' d F S. exact (reachableFrom_nameCallReachable_aux2 p0 q d q' F S).
+  - intros q q' a F S. exact (nameCallReachable_disc_pres p0 q a q' F S).
+  - intros q q' d F S. exact (nameCallReachable_del_pres p0 q d q' F S).
 Qed.
 
 (*********Channels*********)
@@ -2318,11 +2315,10 @@ Proof.
   revert s. induction p; intro s; simpl; try rewrite IHp; try rewrite IHp1, IHp2; reflexivity.
 Qed.
 
-(** Helper for prefixChans_reachableFrom: a discrete step acts on a channel and direction that
-P allows, and leads to a term whose prefixes P allows, when P allows the prefixes of the term,
-the term's names are call-reachable from p0, and P allows the prefixes of the definition of
-every such name.*)
-Local Lemma prefixChans_reachableFrom_aux (P : Channel * Direction -> Prop) p0 p a p' :
+(** A discrete step acts on a channel and direction that P allows, and leads to a term whose
+prefixes P allows, when P allows the prefixes of the term, the term's names are call-reachable
+from p0, and P allows the prefixes of the definition of every such name.*)
+Local Lemma prefixChans_disc_pres (P : Channel * Direction -> Prop) p0 p a p' :
   (forall n, nameCallReachable p0 n -> Forall P (prefixChans (defBody n))) ->
   Forall (nameCallReachable p0) (namesProc p) -> Forall P (prefixChans p) ->
   p -PA- a -PA> p' -> Forall P (prefixChans p') /\ forall cd, actChan a = Some cd -> P cd.
@@ -2351,10 +2347,10 @@ Proof.
   - apply IH; assumption.
 Qed.
 
-(** Helper for prefixChans_reachableFrom: a delay leads to a term whose prefixes P allows, when
-P allows the prefixes of the term, the term's names are call-reachable from p0, and P allows the
-prefixes of the definition of every such name.*)
-Local Lemma prefixChans_reachableFrom_aux2 (P : Channel * Direction -> Prop) p0 p d p' :
+(** A delay leads to a term whose prefixes P allows, when P allows the prefixes of the term, the
+term's names are call-reachable from p0, and P allows the prefixes of the definition of every
+such name.*)
+Local Lemma prefixChans_del_pres (P : Channel * Direction -> Prop) p0 p d p' :
   (forall n, nameCallReachable p0 n -> Forall P (prefixChans (defBody n))) ->
   Forall (nameCallReachable p0) (namesProc p) -> Forall P (prefixChans p) ->
   p -PD- d -PD> p' -> Forall P (prefixChans p').
@@ -2380,11 +2376,11 @@ Proof.
   intros F0 D R S E.
   assert (F : forall q, reachableFrom p0 q -> Forall P (prefixChans q)).
   { intros q Rq. induction Rq as [ | q q' b Rq IH T | q q' d Rq IH T]; [exact F0 | | ].
-    - exact (proj1 (prefixChans_reachableFrom_aux P p0 q b q' D
+    - exact (proj1 (prefixChans_disc_pres P p0 q b q' D
         (reachableFrom_nameCallReachable _ _ Rq) IH T)).
-    - exact (prefixChans_reachableFrom_aux2 P p0 q d q' D
+    - exact (prefixChans_del_pres P p0 q d q' D
         (reachableFrom_nameCallReachable _ _ Rq) IH T). }
-  exact (proj2 (prefixChans_reachableFrom_aux P p0 p a p' D
+  exact (proj2 (prefixChans_disc_pres P p0 p a p' D
     (reachableFrom_nameCallReachable _ _ R) (F p R) S) cd E).
 Qed.
 

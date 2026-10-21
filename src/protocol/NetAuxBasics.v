@@ -652,7 +652,7 @@ delay by d' - d.*)
 the entity in question being preserved.*)
 (* begin helpers for switchCurr_switchListen_net_link *)
 (** No process is bisimilar to both switchCurr and switchListen.*)
-Lemma switchCurr_switchListen_net_link_aux2 (p : ProcTerm) :
+Local Lemma switchCurr_not_switchListen (p : ProcTerm) :
   switchCurrState p -> switchListenState p -> False.
 Proof.
   intros S1 S2. lets D : switchCurr_mCurr_out S1.
@@ -663,31 +663,31 @@ Qed.
 (** If a triple whose overlap component is switchCurr performs a visible action that
 switchCurr cannot perform, and the derivative's overlap component is switchListen,
 then we have a contradiction.*)
-Lemma switchCurr_switchListen_net_link_aux3 (p1 p2 p3 q1 q2 q3 : ProcTerm) (a : DiscAct) :
+Local Lemma switchCurr_switchListen_triple_act (p1 p2 p3 q1 q2 q3 : ProcTerm) (a : DiscAct) :
   switchCurrState p2 -> switchListenState q2 ->
   p1 $||$ p2 $||$ p3 -PA- a -PA> q1 $||$ q2 $||$ q3 -> a <> tauAct ->
   (forall q, switchCurr -PA- a -PA> q -> False) -> False.
 Proof.
   intros S1 S2 T NT NSC. inversion T; subst; try (apply NT; reflexivity).
-  - eapply switchCurr_switchListen_net_link_aux2; eassumption.
+  - eapply switchCurr_not_switchListen; eassumption.
   - match goal with [H : p2 $||$ p3 -PA- a -PA> q2 $||$ q3 |- _] =>
       inversion H; subst; try (apply NT; reflexivity) end.
     + match goal with [H : p2 -PA- a -PA> q2 |- _] =>
         lets BM : bisim_disc_match S1 H end.
       destruct BM as [q BM]. eapply NSC. eassumption.
-    + eapply switchCurr_switchListen_net_link_aux2; eassumption.
+    + eapply switchCurr_not_switchListen; eassumption.
 Qed.
 
 (** A silent entity step from a switchCurr entity to a switchListen entity preserves
 the interface.*)
-Lemma switchCurr_switchListen_net_link_aux4 (p1 p2 p3 q1 q2 q3 : ProcTerm)
+Local Lemma switchCurr_switchListen_tau_inter (p1 p2 p3 q1 q2 q3 : ProcTerm)
   (l l' : Position) (h h' : Interface) (k k' : ModeState) :
   switchCurrState p2 -> switchListenState q2 ->
   [|p1 $||$ p2 $||$ p3, l, h, k|] -EA- aeTau ->> [|q1 $||$ q2 $||$ q3, l', h', k'|] ->
   h = h'.
 Proof.
   intros S1 S2 T. inversion T; subst; try reflexivity; exfalso;
-  (eapply switchCurr_switchListen_net_link_aux3;
+  (eapply switchCurr_switchListen_triple_act;
     [ apply S1 | apply S2 | eassumption | discriminate
     | intros q TQ; unfold switchCurr in TQ; invert_disc_prefixes ]).
 Qed.
@@ -711,17 +711,17 @@ Proof.
     lets PE : stepDiscNet_nonTau_pres_proc STEP E E';
     [ discriminate | ];
     simpl in PE; inversion PE; subst;
-    eapply switchCurr_switchListen_net_link_aux2; eassumption.
+    eapply switchCurr_not_switchListen; eassumption.
   (*Silent action.*)
   split; [reflexivity | ].
   destruct (tauLink _ _ STEP) as [j [e0 [e0' [E0 [E0' [T R]]]]]].
   destruct (Nat.eq_dec j i) as [EQ | NEQ].
   - subst j.
     lets EA : entInNetUnique E0 E. lets EB : entInNetUnique E0' E'.
-    subst e0 e0'. simpl. eapply switchCurr_switchListen_net_link_aux4; eassumption.
+    subst e0 e0'. simpl. eapply switchCurr_switchListen_tau_inter; eassumption.
   - lets E1 : R NEQ E'.
     lets EQ : entInNetUnique E E1. inversion EQ; subst.
-    exfalso. eapply switchCurr_switchListen_net_link_aux2; eassumption.
+    exfalso. eapply switchCurr_not_switchListen; eassumption.
 Qed.
 (**Proof: Lift some EA::intercomponent & maybe some linking theorems
 OR

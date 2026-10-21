@@ -1650,7 +1650,7 @@ Qed.
 (* begin helpers for sleeping_not_bcWait *)
 (** The sleeping process can never input on the position channel, so it is not bisimilar to
 any process that can.*)
-Local Lemma sleeping_not_bcWait_aux1 q q' v :
+Local Lemma sleeping_pos_in_not q q' v :
   sleeping ~p~ q -> q -PA- chanPos ;? v -PA> q' -> False.
 Proof.
   intros S T. destruct (bisim_step_disc _ _ _ _ (bisim_symm _ _ S) T) as [p' [Sp _]].
@@ -1658,7 +1658,7 @@ Proof.
 Qed.
 
 (** The sleeping process delays only to itself.*)
-Local Lemma sleeping_not_bcWait_aux2 d s : sleeping -PD- d -PD> s -> s = sleeping.
+Local Lemma del_self_sleeping d s : sleeping -PD- d -PD> s -> s = sleeping.
 Proof. revert d s. unfold sleeping. del_self_tac. Qed.
 (* end helpers *)
 
@@ -1667,16 +1667,16 @@ on the position channel.*)
 Lemma sleeping_not_bcWait (m : Mode) (x : Time) : sleeping ~p~ bcWait m x -> False.
 Proof.
   intro B. destruct (bcWait_pos_read m x) as [[_ [q S]] | [d [q [_ [TD [q' S]]]]]].
-  - eapply sleeping_not_bcWait_aux1; [exact B | exact S].
+  - eapply sleeping_pos_in_not; [exact B | exact S].
   - destruct (bisim_step_del _ _ _ _ (bisim_symm _ _ B) TD) as [s [TS BS]].
-    apply sleeping_not_bcWait_aux2 in TS. subst s.
-    eapply sleeping_not_bcWait_aux1; [apply bisim_symm; exact BS | exact S].
+    apply del_self_sleeping in TS. subst s.
+    eapply sleeping_pos_in_not; [apply bisim_symm; exact BS | exact S].
 Qed.
 
 (* begin helpers for bcWait_bisim_inj *)
 (** Of two bisimilar waits, neither has the shorter timer: when the shorter one has run out,
 that side reads its position and the other cannot.*)
-Local Lemma bcWait_bisim_inj_aux1 (m1 m2 : Mode) (t1 t2 : Time) :
+Local Lemma bcWait_bisim_timer_le (m1 m2 : Mode) (t1 t2 : Time) :
   bcWait m1 t1 ~p~ bcWait m2 t2 -> t2 <= t1.
 Proof.
   intro B. destruct (Rle_or_lt t2 t1) as [LE | LT]; [exact LE | exfalso].
@@ -1698,7 +1698,7 @@ Qed.
 
 (** Two bisimilar waits whose timers have run out are for the same mode: each reads its
 position and then offers its mode on outProc, and the other has to match.*)
-Local Lemma bcWait_bisim_inj_aux2 (m1 m2 : Mode) (e1 e2 : Exp) :
+Local Lemma bcWait_bisim_mode_zero (m1 m2 : Mode) (e1 e2 : Exp) :
   evalExpFunTime e1 = Some zeroTime -> evalExpFunTime e2 = Some zeroTime ->
   bcWait m1 e1 ~p~ bcWait m2 e2 -> m1 = m2.
 Proof.
@@ -1719,12 +1719,12 @@ Proof.
   intro B.
   assert (EQ : t1 = t2).
   { apply timeEqR. apply Rle_antisym.
-    - exact (bcWait_bisim_inj_aux1 _ _ _ _ (bisim_symm _ _ B)).
-    - exact (bcWait_bisim_inj_aux1 _ _ _ _ B). }
+    - exact (bcWait_bisim_timer_le _ _ _ _ (bisim_symm _ _ B)).
+    - exact (bcWait_bisim_timer_le _ _ _ _ B). }
   subst t2. split; [ | reflexivity].
   destruct (bcWait_pos_read m1 t1) as [[Z _] | [d [q [EQ [TD _]]]]].
   - (* the timers are zero already *)
-    eapply bcWait_bisim_inj_aux2; [ | | exact B]; unfold liftTimeExp;
+    eapply bcWait_bisim_mode_zero; [ | | exact B]; unfold liftTimeExp;
       rewrite evalExpFunTime_time; f_equal; apply timeEqR; simpl; exact Z.
   - (* run the timers out first *)
     destruct (bisim_step_del _ _ _ _ B TD) as [q2 [TD2 BQ]].
@@ -1732,7 +1732,7 @@ Proof.
       destruct (bcWait_del_cases _ _ _ _ TD2) as [[t' [H' [E' E2]]] | [[t' [E' [LTd' _]]] | [E' _]]];
       unfold liftTimeExp in E, E'; rewrite evalExpFunTime_time in E, E';
       try discriminate; injection E as E; injection E' as E'; subst t t'; simpl in *; try lra.
-    subst q q2. eapply bcWait_bisim_inj_aux2; [ | | exact BQ]; unfold liftTimeExp;
+    subst q q2. eapply bcWait_bisim_mode_zero; [ | | exact BQ]; unfold liftTimeExp;
       rewrite evalExpFunTime_time; f_equal; apply timeEqR; simpl; lra.
 Qed.
 
