@@ -20,10 +20,8 @@
 - **Never declare an instance of `ComhModel`**, not even `concrete_model`. Rocq would then supply it silently where a result is meant to hold for every model.
 - `replace` can't find the model by itself when its first term isn't in the goal. Name the model there, as in `@speedMax Model`.
 
-## Markers and conventions
+## Conventions
 
-- `Admitted (* UPGRADE-BROKEN *)` marks a proof that broke in a toolchain upgrade and couldn't be fixed on the spot.
-- Trailing labels such as `Admitted (*4*)`, `(*R*)`, `(*D- foo*)` and `(*#tag*)` are the 2015 triage labels; see [`doc/archive/README.md`](../doc/archive/README.md). Remove a label together with its `Admitted` when the proof lands.
 - Read the `(*Proof: …*)` sketch comments before proving. Keep them.
 - Write an intro pattern with a space after its bracket, as `[ | x]`: `[|` is a token of the entity notation `[| p, l, h, k |]`, so `[|x]` fails to parse once `EntityLanguage` is imported.
 - **Helper lemmas** go immediately before the lemma that first needs them. Mark them `Local`: that, not the name, is what says a result is auxiliary.

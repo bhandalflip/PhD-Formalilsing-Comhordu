@@ -6,4 +6,3 @@
   - A tactic that needs nothing from the section goes above it.
   - A tactic that needs the section's lemmas or notations goes inside the section if more than one proof there uses it, and after the section if more than one proof in later files uses it. Both is fine, and the two copies may differ, because uses outside the section may need a slightly different tactic.
   - A tactic with only one use isn't worth defining. Write that proof without it.
-- Give an `Admitted` lemma inside a section a `Proof using` line. Without one it depends on every instance in the section, including `GuardedDefs`.
