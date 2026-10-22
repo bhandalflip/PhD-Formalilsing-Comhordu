@@ -12,7 +12,7 @@
 
 ## Plan
 
-- [ ] 🧑 **1. Analyse.** `safety` means little if the model can stop time, or allows only traces whose delays add up to a finite time: such a model is safe trivially. The thesis sets Zeno behaviour aside instead, because safety is about finite traces (Section 8.2.4, p.186). Analyse this, and if a result that time can always pass should accompany `safety`, plan the steps that prove it.
+- [ ] 🧑 **1. Analyse.** `safety` means little if the model can stop time, or allows only traces whose delays add up to a finite time: such a model is safe trivially. The thesis sets Zeno behaviour aside instead, because safety is about finite traces (Section 8.2.4, p.186). Analyse this, and if a result that time can always pass should accompany `safety`, plan the steps that prove it. `progressSoft` in the language, and `protocolGuarded`, `delApp` and the facts about what a protocol component does next, are kept for this, though `safety` doesn't use them.
 
 ## Final phase
 

@@ -12,7 +12,7 @@
 
 ## Plan
 
-- [ ] 🧑 **1. Analyse.** `safety` would say little if networks were safe whatever software their entities run. The [2015 plan](../archive/2015-05-08-coq-project-plan.pdf) lists a proof that, without the protocol, an unsafe state is reachable as a future extension (§5), since it would show that the protocol is needed. `safety` would also say little if the protocol never let an entity leave a fail-safe mode, because a fail-safe mode needs no distance from any other. Analyse both, and plan the steps that prove what is worth proving.
+- [ ] 🧑 **1. Analyse.** `safety` would say little if networks were safe whatever software their entities run. The [2015 plan](../archive/2015-05-08-coq-project-plan.pdf) lists a proof that, without the protocol, an unsafe state is reachable as a future extension (§5), since it would show that the protocol is needed. The thesis says that such a state is reachable, but leaves out the construction (p.104). `safety` would also say little if the protocol never let an entity leave a fail-safe mode, because a fail-safe mode needs no distance from any other. The thesis's UPPAAL model checks the like: that an entity can reach a state that isn't fail-safe (Remark 3.6, p.55). Analyse both, and plan the steps that prove what is worth proving.
   - The language takes the process that every entity starts from as a parameter, so the first proof can choose any process.
   - `concrete_model_nondegenerate` in [`src/model/ModelConsistency.v`](../../src/model/ModelConsistency.v) gives a model with a mode that isn't fail-safe and needs a positive distance from itself.
 
