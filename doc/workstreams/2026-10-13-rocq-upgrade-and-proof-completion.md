@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Started** | 2026-10-13 |
-| **Status** | 🧑 Phase 5: the last rules about admits in review |
+| **Status** | 🧑 Phase 5: picking a name for `BaseType` |
 | **Branch** | One per PR |
 | **Goal** | Port the Comhordú formalisation to **Rocq 9.2.0**, then close every assumption under `safety` that can be closed, and write up the ones that can't. |
 | **Supersedes** | [2015 project plan](../archive/2015-05-08-coq-project-plan.pdf). What was carried over is in [`doc/archive/README.md`](../archive/README.md). |
@@ -95,6 +95,7 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 - [x] 🤖 **Delete `parStructPres` and `parStructPres2`** in `lang/SoftwareLanguage.v`: pair-shaped, unused since step 16, and instances of `parAll_disc_weak` and `parAll_del_inv`. ✅ 2026-10-22. Both are gone. With approval, so is `stepProcRefl`, which only they used, since the standard library has it as `clos_refl`. So are five rules about `Admitted` lemmas, since none is left. `safety` still rests on no unproved result. [#24](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/24), [#25](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/25) and [#26](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/26).
 - [ ] 🧑 **Rename `BaseType`** in `lang/LanguageFoundations.v` to say what it is, a base value, now that `ValType` names the type of one. A mechanical rename of 145 uses in 15 files.
 - [ ] 🧑 **Restate unfoldings as `unfoldApp`.** Seven lemmas in `lang/SoftwareLanguage.v`, `stepDpApp_alt` and the six `…AppAuto…` ones, spell out `subProcTerm (listsToSub (fst (def h)) l) (snd (def h))`, which is `unfoldApp h l`. Restate them with `unfoldApp h l`, and update the two tactics in `ProtAuxResults.v` that match the long form.
+- [ ] 🤖 **Rename `bisimulation` to `bisimilar`** in `lang/ProcEquiv.v`. `bisimulation p q` says that p and q are bisimilar, while a bisimulation is a relation that shows it. The notation `p ~p~ q` stays, so 22 uses of the name in 4 files change.
 - [ ] 🧑 _Placeholder: anything else the first pass couldn't decide._
 - [ ] 🧑 **Rewrite the README**, last, since it tells the outcome of every other step. Keep it short, cut anything else, and link to the thesis corrections and remarks rather than repeat them.
   - The story: the thesis (2014), its proof partly encoded in Coq, the [2015 plan](../archive/2015-05-08-coq-project-plan.pdf) to finish it, and now a full proof in Rocq, with general results about the language.
@@ -103,6 +104,7 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 
 ## Log
 
+- **2026-10-22:** New step in the final phase: rename `bisimulation` to `bisimilar`, the standard name for what it states.
 - **2026-10-22:** Steps 33 to 35 and the study of calls and steps each move to a workstream of their own, a stub for now, since they go beyond the upgrade, proof completion and tidy-up that this workstream is for.
 - **2026-10-22:** Step 32 makes the model a class rather than a `Module Type`, as the [ADR](../adr/2026-10-22-make-the-model-a-class.md) records. The README step's advice now says to give a system's model as a value of the class.
 - **2026-10-21:** From the review of step 30: progress is measured by the unproved results that `safety` rests on, not by every assumption, since the model axioms are deliberate and shown consistent. The rule is in the top-level `AGENTS.md`, and `make assumptions` leads with them. New step 31 weakens `modeTransTime_bound` to what the thesis assumes, and old steps 31–34 are now 32–35. Whether a result that time can always pass should accompany `safety` gets a workstream of its own, a stub for now. A last step rewrites the README.
