@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Started** | 2026-10-13 |
-| **Status** | 🧑 Phase 5: the `parStructPres` deletion in review |
+| **Status** | 🧑 Phase 5: the `stepProcRefl` deletion in review |
 | **Branch** | One per PR |
 | **Goal** | Port the Comhordú formalisation to **Rocq 9.2.0**, then close every assumption under `safety` that can be closed, and write up the ones that can't. |
 | **Supersedes** | [2015 project plan](../archive/2015-05-08-coq-project-plan.pdf). What was carried over is in [`doc/archive/README.md`](../archive/README.md). |

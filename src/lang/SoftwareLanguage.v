@@ -347,15 +347,6 @@ Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : 
 
 Open Scope R_scope.
 
-(** Two processes are related if either they are equal or if there is a transition
-linking them.*)
-Inductive stepProcRefl : ProcTerm -> ProcTerm -> Prop :=
-  | stprRefl : forall p : ProcTerm, stepProcRefl p p
-  | stprTrans : forall (p1 p2 : ProcTerm) (a : Act),
-    p1 -P- a -P> p2 -> stepProcRefl p1 p2.
-
-Notation "p1 -P=> p2" := (stepProcRefl p1 p2) (at level 50).
-
 (**A process p is timed action enabled for the delay d iff
 there is some process p' such that p transitions to p' via d.*)
 Inductive timedActEnabled (p : ProcTerm) (d : Delay) : Prop :=
@@ -2471,7 +2462,6 @@ Definition entChanAct (b : DiscAct) : Prop :=
 
 End Results.
 
-Notation "p1 -P=> p2" := (stepProcRefl p1 p2) (at level 50).
 Notation "d %; p" := (minGuard d p).
 
 (** Repeatedly inverts a discrete step from nilProc, an output or input prefix, a sum, a
