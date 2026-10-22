@@ -13,6 +13,13 @@
 - **Don't add** `Axiom`, `Parameter`, `Conjecture`, `Hypothesis`/`Variable` outside a section, `Admitted`, `admit`, or the LibTactics `skip`.
 - **Extra logical axioms:** the stdlib's classical logic, functional extensionality and proof irrelevance (already in the trust base) are allowed. Any newly used one must be listed in the PR and the report.
 
+## The model
+
+- **Every file outside `lib/` takes the model in a section**, with `Context {Model : ComhModel}.` after its imports, so that its results hold for every model. When the section closes, Rocq adds the model as an argument to each result that uses it, and later files fill it in by themselves.
+- **Rocq drops a section's tactics and notations when it closes.** Define a tactic that later files use outside the section: above it if it names nothing from its own file, else below it. Restate after the section each notation that later files use. Open a scope inside a section with `#[global] Open Scope`.
+- **Never declare an instance of `ComhModel`**, not even `concrete_model`. Rocq would then supply it silently where a result is meant to hold for every model.
+- `replace` can't find the model by itself when its first term isn't in the goal. Name the model there, as in `@speedMax Model`.
+
 ## Markers and conventions
 
 - `Admitted (* UPGRADE-BROKEN *)` marks a proof that broke in a toolchain upgrade and couldn't be fixed on the spot.

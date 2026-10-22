@@ -16,7 +16,7 @@ Require ComhCoq.lib.Extras.LibTactics.
 From Stdlib Require Import Lra.
 
 Section ProcEquiv.
-Context {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
+Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
 
 (********************** Bisimulation **********************)
 

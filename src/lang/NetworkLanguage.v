@@ -24,7 +24,7 @@ Reserved Notation "n1 -NA- a -NA> n2" (left associativity, at level 50).
 Reserved Notation "n1 -ND- d -ND> n2" (left associativity, at level 50).
 
 Section NetworkLanguage.
-Context {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
+Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
 
 
 (***************Network syntax stuff*********************)
@@ -403,7 +403,7 @@ Theorem boundedMovement : forall (e e' : Entity) (d : Delay),
   cut (dist_euc (dx + x) (dy + y) (0 + x) (0 + y) <= d * speedMax).
   repeat rewrite Rplus_0_l. intros. assumption.
   rewrite <- dist_eucAddPres. rewrite Rmult_comm.
-  replace (nonneg speedMax * nonneg (time (delToTime d))) with
+  replace (nonneg (@speedMax Model) * nonneg (time (delToTime d))) with
   (nonneg speedMax * pos (delay d)) in H12. apply H12. destruct d.
   destruct delay. reflexivity. apply Rplus_comm. Qed.
 
@@ -1295,9 +1295,9 @@ Qed.
 
 End NetworkLanguage.
 
-Arguments reachNetInit {PNames PDefs p0}.
-Arguments reachNetDisc {PNames PDefs p0}.
-Arguments reachNetDel {PNames PDefs p0}.
+Arguments reachNetInit {Model PNames PDefs p0}.
+Arguments reachNetDisc {Model PNames PDefs p0}.
+Arguments reachNetDel {Model PNames PDefs p0}.
 
 (** A section's notations and tactics end with it. So that later files can use them, the
 notations are declared again here, and the tactics are declared here.*)

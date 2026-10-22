@@ -30,6 +30,9 @@ Require Import ComhCoq.protocol.ProtocolBridge.
 
 Open Scope R_scope.
 
+Section NARMsgPosition.
+Context {Model : ComhModel}.
+
 (* If an entity has sent a message v t time units ago, and that time is less than the 
 message latency, then said message is in the output queue of the interface component 
 with timestamp mL - t.*)
@@ -302,3 +305,5 @@ Theorem fst_delivered (n : Network) (m : Mode) (t : Time) (i : nat)
   exists l0 x0 x.
   (*The rest follows from assumptions.*)
   split; assumption. Qed.
+
+End NARMsgPosition.

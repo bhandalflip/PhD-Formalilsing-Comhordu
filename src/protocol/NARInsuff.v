@@ -33,6 +33,9 @@ Require Import ComhCoq.protocol.ProtocolBridge.
  
 (*TIDY*)
 
+Section NARInsuff.
+Context {Model : ComhModel}.
+
 (*TOGO: NARMisc*)
 Lemma tfs_state_rel i n (p : reachableProtNet n) :
   tfsStateNet i n -> exists m t, tfs m t i n p.
@@ -575,7 +578,7 @@ Theorem instant_insuff_abort (n : Network) (m : Mode) (l l0 : Position)
   (*Discrete inductive case: Apply I.H. to previous state, yielding incomingNetNotif
   <r, m, l> 0 i n \/ notifAbortPath m r i n.*)
   dependent destruction H1. false. eapply Rlt_not_le. apply H4. simpl. timeNonneg.
-  lets IHdisc : IHdelivered H0 H1 H3. reflexivity.
+  lets IHdisc : IHdelivered H0 H1 H3; try reflexivity.
   (*Now we do a case analysis on this disjunction. First off we have
   incomingNetNotif <r, m, l> 0 i n. We can show then by (insuff_incomingNet_abort) that our
   goal holds in the next state.*)
@@ -777,7 +780,7 @@ Theorem instant_insuff_bad (n : Network) (m : Mode) (l l0 : Position)
   (*OK, now we're at a case where the previous state is currSince,
   so we can apply I.H. to previous state, yielding
   incomingNetNotif <r, m, l> 0 i n \/ notifAbortPath m r i n \/ tfs 0.*)
-  lets IH : IHdelivered NFS H0 H1 H3. reflexivity.
+  lets IH : IHdelivered NFS H0 H1 H3; try reflexivity.
   (*We then break the IH into its three cases and prove each separately.*)
   lets IHC : IH H1. clear IH. rename IHC into IH. elimOr3 IH IH.
   (*First, there's the semi-preservation of incomingNetNotif,zeroTime by a discrete
@@ -952,3 +955,4 @@ Theorem insuff_react (n : Network) (m : Mode) (l l0 : Position)
                                       -------tfs-------
   *)
 
+End NARInsuff.

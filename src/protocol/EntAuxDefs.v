@@ -23,6 +23,9 @@ Require Import ComhCoq.protocol.ProtocolBridge.
 
 (******** Simple Lifted Predicates ********) 
 
+Section EntAuxDefs.
+Context {Model : ComhModel}.
+
 (*Broadcast*)
 Definition bcWaitStateEnt (m : Mode) (x : Time) : Entity -> Prop :=
 liftProcEnt (bcWaitStateProt m x).
@@ -132,6 +135,8 @@ Inductive notifAbortPathEnt : Entity -> Prop :=
   | napCuok p l h k m' : currOKStateProt m' p -> nextModeMState k = Some m' ->
     notifAbortPathEnt ([|p, l, h, k|])
   | napAbort p l h k : abortOvlpStateProt p -> notifAbortPathEnt ([|p, l, h, k|]).
+
+End EntAuxDefs.
 
 (***************************** Misc *****************************)
 

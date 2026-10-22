@@ -21,6 +21,11 @@ Require Import ComhCoq.lib.StandardResults.
 modeTransTime, have been defined in comhbasics. These will be used for the
 init rule, whereby a mode transition is initialised.*)
 
+Reserved Notation "m -ms- a -ms> m'" (at level 75).
+
+Section ModeStateLanguage.
+Context {Model : ComhModel}.
+
 (** Syntax: a mode state is either a single stable mode, or the transition from one mode
 to another, with a certain amount of time remaining until the transition times out and
 the mode switch can be finalised.*)
@@ -70,8 +75,6 @@ Notation "c .? m" := (amIn c m) (at level 30).
 Notation "c .! m" := (amOut c m) (at level 30).
 Notation "c @! " := (amOutEmp c) (at level 30).
 Notation "c @? " := (amInEmp c) (at level 30).
-
-Reserved Notation "m -ms- a -ms> m'" (at level 75).
 
 (** The semantics of the mode state language.*)
 Inductive stepModeState : ModeState -> ActModeState -> ModeState -> Prop :=
@@ -300,3 +303,14 @@ Proof.
                             | match goal with [d0 : Delay |- _] =>
                                 pose proof (cond_pos (delay d0)) end; lra ] ] ] end.
 Qed.
+
+End ModeStateLanguage.
+
+(** A section's notations end with it. So that later files can use them, they are declared
+again here.*)
+Notation "<| m , m' , t |>" := (transState m m' t) (at level 30).
+Notation "c .? m" := (amIn c m) (at level 30).
+Notation "c .! m" := (amOut c m) (at level 30).
+Notation "c @! " := (amOutEmp c) (at level 30).
+Notation "c @? " := (amInEmp c) (at level 30).
+Notation "m -ms- a -ms> m'" := (stepModeState m a m').

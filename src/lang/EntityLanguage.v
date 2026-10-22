@@ -22,7 +22,7 @@ Reserved Notation "e1 -EA- a ->> e2" (left associativity, at level 50).
 Reserved Notation "e1 -ED- a ->> e2" (left associativity, at level 50).
 
 Section EntityLanguage.
-Context {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
+Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
 
 (***************Messages*********************)
 

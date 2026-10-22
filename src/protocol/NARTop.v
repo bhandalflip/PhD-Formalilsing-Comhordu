@@ -42,6 +42,9 @@ Require Import ComhCoq.protocol.NARNonFS_currSince.
 Require Import ComhCoq.protocol.NAROvlpTime.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
+Section NARTop.
+Context {Model : ComhModel}.
+
 (* Let's say we can show that a network is currSince m t i n, then we can show
 that the time parameter to this relation is always greater than mL + max AN trans,
 which is the lower bound for the pre-sent interval.*)
@@ -1113,3 +1116,5 @@ Theorem pre_del_suff (n : Network) (m : Mode) (t : Time)
   apply C1. assumption. Qed.
   (*So we must accept that the broadcast range was sufficient. This concludes the proof of
   all our sub-goals.*)
+
+End NARTop.

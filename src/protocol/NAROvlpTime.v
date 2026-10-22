@@ -31,6 +31,8 @@ Require Import ComhCoq.protocol.NetAuxDefs.
 Require Import ComhCoq.protocol.NARMisc.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
+Section NAROvlpTime.
+Context {Model : ComhModel}.
 
 (*If an entity is pending then it cannot delay.*)
 Theorem pending_urgent (n n' : Network) (d : Delay) (i : nat) (p : reachableProtNet n) :
@@ -510,3 +512,5 @@ Proof.
   intros NS SC. destruct (nextSince_timers_above _ _ _ _ _ NS) as [_ [_ [_ HC]]].
   pose proof (HC SC). pose proof (cond_pos (delay waitSurplus)). lra.
 Qed.
+
+End NAROvlpTime.

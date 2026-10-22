@@ -26,7 +26,7 @@ Class ProcNames := {
   eqDecName : eqDec Name }.
 
 Section Syntax.
-Context {PNames : ProcNames}.
+Context {Model : ComhModel} {PNames : ProcNames}.
 
 (**The set of process terms, which may have free variables in them.*)
 Inductive ProcTerm : Type :=
@@ -115,11 +115,11 @@ Notation "( a , b )" := (pair a b).
 (**The definition relation. It maps every name to a list of variables and a process
 term. The meaning of def n = (xs, p) is that n applied to xs is defined to be p.
 A protocol supplies it.*)
-Class ProcDefs {PNames : ProcNames} := {
+Class ProcDefs {Model : ComhModel} {PNames : ProcNames} := {
   def : Name -> (list Var * ProcTerm) }.
 
 Section Semantics.
-Context {PNames : ProcNames} {PDefs : ProcDefs}.
+Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs}.
 
 (*******************Discrete Semantics*******************)
 
@@ -331,7 +331,7 @@ Notation "p1 -P- a -P> p2" := (stepProc p1 a p2) (left associativity, at level 5
 input or output prefix. Equivalently, the names can be ranked so that a definition only
 calls lower-ranked names outside a prefix. This generalises the guardedness of Remark 4.2
 in the thesis, which asks that every name in a definition sit under a prefix.*)
-Class GuardedDefs {PNames : ProcNames} {PDefs : ProcDefs} := {
+Class GuardedDefs {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} := {
   rank : Name -> nat;
   rank_unguarded : forall h h', In h' (unguardedNames (defBody h)) ->
     (rank h' < rank h)%nat }.
@@ -343,7 +343,7 @@ Local Ltac Forall_app_split := repeat match goal with
   [H : Forall _ (_ ++ _) |- _] => apply Forall_app in H; destruct H end.
 
 Section Results.
-Context {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
+Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : GuardedDefs}.
 
 Open Scope R_scope.
 

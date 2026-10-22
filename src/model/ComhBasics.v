@@ -1,8 +1,9 @@
 (** This file was written by Colm Bhandal, PhD student, Foundations and Methods group,
 School of Computer Science and Statistics, Trinity College, Dublin, Ireland.*)
 
-(** Various constants relating to the comhordu model are assumed here. Also some basic notions
-are defined here such as the notion of a network of entities.*)
+(** The Comhordú model, as a class whose fields are the constants that any system using the
+protocol supplies, and some basic notions defined from them, such as when a coverage is
+sufficient for a mode.*)
 
 Require Import ComhCoq.lib.Extras.LibTactics.
 From Stdlib Require Import Reals Arith Lia.
@@ -12,35 +13,88 @@ Require Import ComhCoq.lib.GenBasics.
 
 (*********Comh Related Stuff********)
 
-(** The time it takes for an entity to be notified of a message delivery area.*)
-Axiom adaptNotif : Time.
+Open Scope R_scope.
 
-(** The time between initiating the sending of a message and its actual delivery.*)
-Axiom msgLatency : Time.
+(** The Comhordú model of the thesis (§3.3, p.41): the parameters that any system using the
+protocol supplies, and the constraints they must meet. Every result about the protocol
+holds for every instance.*)
+Class ComhModel := {
+  (** The time it takes for an entity to be notified of a message delivery area.*)
+  adaptNotif : Time;
+  (** The time between initiating the sending of a message and its actual delivery.*)
+  msgLatency : Time;
+  (**We assume a maximum speed at which entities may travel.*)
+  speedMax : nonnegreal;
+  (** The set of all modes.*)
+  Mode : Type;
+  (** A subset of the modes are fail safe.*)
+  failSafe : Mode -> Prop;
+  (** A mode is either fail safe or it isn't.*)
+  fsDecMode : forall (m : Mode), decidable (failSafe m);
+  (** Equality on modes is decidable.*)
+  eqDecMode : eqDec Mode;
+  (** The mode transition relation, which says whether one mode can transition
+  to another or not.*)
+  modeTransRel : Mode -> Mode -> Prop;
+  (** The mode transition relation is assumed to be decidable.*)
+  modeTransRelDec : forall (m1 m2 : Mode),
+    {modeTransRel m1 m2} + {~modeTransRel m1 m2};
+  (** modeTransTime m1 m2 gives the time it takes to transition from
+  m1 to m2. Note that this function takes two modes and a proof that one
+  transitions to the other and then returns the transition time.*)
+  modeTransTime : forall (m1 m2 : Mode), modeTransRel m1 m2 -> Time;
+  (** We assume that every mode transitions to some fail safe mode,
+  and this function simply arbitrarily picks one such fail safe mode.*)
+  failSafeSucc : Mode -> Mode;
+  (** This is the assumption that failSafeSucc m is indeed fail safe for all m.*)
+  failSafeSuccFS : forall (m : Mode), failSafe (failSafeSucc m);
+  (*The fail safe successor is actually a successor.*)
+  failSafeSucc_successor : forall m, modeTransRel m (failSafeSucc m);
+  (** trans m is the worst case time it takes for an entity in a mode m
+  to reach a failsafe mode.*)
+  trans : Mode -> Time;
+  (** An upper bound on trans m over all m: transMax is an upper bound on
+  the time it takes any entity to reach a failsafe mode.*)
+  transMax : Time;
+  (**A little extra positive time that ensures we wait beyond the boundary*)
+  waitSurplus : Delay;
+  (** transMax is an upper bound on trans m for all m.*)
+  transMaxBound : forall m : Mode, trans m <= transMax;
+  (** The minimum distance of compatibiltiy function is assumed to exist.
+  It tells us the minimum distance by which two modes must be separated in
+  order for them to be compatible. If two entities in these modes are
+  separated by a distance greater than or equal to this distance,
+  then they are compatible.*)
+  minDistComp : Mode -> Mode -> Distance;
+  (** The minimum distance of compatibility function is symmetric.*)
+  minDistCompSymmetric : forall (m1 m2 : Mode), minDistComp m1 m2 = minDistComp m2 m1;
+  (** For a given mode m, maxMinDistComp m is an upper bound on the set
+  minDistComp m m' taken over all other modes m'. We do not enforce that this
+  is the least such upper bound, though this would be the sensible interpretation.*)
+  maxMinDistComp : Mode -> Distance;
+  (** The maxMinDistComp is an upper bound on the minDistComp for all other modes*)
+  maxMinDistCompBound : forall m m' : Mode, minDistComp m m' <= maxMinDistComp m;
+  (** The minimum distance of compatibility function returns 0 if either
+  of its arguments are fail safe. Note we only choose the left argument here,
+  but the choice is irrelevant since the function is symmetric.*)
+  minDistCompFS : forall (m1 m2 : Mode),
+    failSafe m1 -> minDistComp m1 m2 = (mkDistance zeroNonneg);
+  (** period m is the time between successive broadcasts from an entity in mode m.*)
+  period : Mode -> Time;
+  msgLatency_positive : 0 < msgLatency;
+  period_positive : forall m : Mode, 0 < period m;
+  (** To rule out a trivial system, we assume the maximum speed is above 0.*)
+  speedMax_pos : 0 < speedMax;
+  adaptNotif_positive : 0 < adaptNotif;
+  (** trans m bounds the time to transition from m to any fail-safe successor
+  (Definition 5.2, p.107).*)
+  modeTransTime_bound : forall (m mF : Mode) (p : modeTransRel m mF),
+    failSafe mF -> modeTransTime m mF p <= trans m }.
 
-(**We assume a maximum speed at which entities may travel.*)
-Axiom speedMax : nonnegreal.
-
-(** The set of all modes.*)
-Axiom Mode : Type.
-
-(** A subset of the modes are fail safe.*)
-Axiom failSafe : Mode -> Prop.
-
-(** A mode is either fail safe or it isn't.*)
-Axiom fsDecMode : forall (m : Mode), decidable (failSafe m).
-
-(** Equality on modes is decidable.*)
-Axiom eqDecMode : eqDec Mode.
-
-(** The mode transition relation, which says whether one mode can transition
-to another or not.*)
-Axiom modeTransRel : Mode -> Mode -> Prop.
 Notation "m1 -mtr-> m2" := (modeTransRel m1 m2) (at level 39).
 
-(** The mode transition relation is assumed to be decidable.*)
-Axiom modeTransRelDec : forall (m1 m2 : Mode),
-  {m1 -mtr-> m2} + {~m1 -mtr-> m2}.
+Section ComhBasics.
+Context {Model : ComhModel}.
 
 (** Mode transition relation as a boolean function.*)
 Definition modeTransRelBool (m1 m2 : Mode) : bool :=
@@ -49,33 +103,6 @@ Definition modeTransRelBool (m1 m2 : Mode) : bool :=
 (** Mode transition relation as an option type*)
 Definition modeTransRelOpt (m1 m2 : Mode) : option (m1 -mtr-> m2) :=
   decToOption (modeTransRelDec m1 m2).
-
-(** modeTransTime m1 m2 gives the time it takes to transition from
-m1 to m2. Note that this function takes two modes and a proof that one
-transitions to the other and then returns the transition time.*)
-Axiom modeTransTime : forall (m1 m2 : Mode),
-  m1 -mtr-> m2 -> Time.
-
-(** We assume that every mode transitions to some fail safe mode,
-and this function simply arbitrarily picks one such fail safe mode.*)
-Axiom failSafeSucc : Mode -> Mode.
-
-(** This is the assumption that failSafeSucc m is indeed fail safe for all m.*)
-Axiom failSafeSuccFS : forall (m : Mode), failSafe (failSafeSucc m).
-
-(*The fail safe successor is actually a successor.*)
-Axiom failSafeSucc_successor : forall m, m -mtr-> failSafeSucc m.
-
-(** trans m is the worst case time it takes for an entity in a mode m
-to reach a failsafe mode.*)
-Axiom trans : Mode -> Time.
-
-(** An upper bound on trans m over all m: transMax is an upper bound on
-the time it takes any entity to reach a failsafe mode.*)
-Axiom transMax : Time.
-
-(**A little extra positive time that ensures we wait beyond the boundary*)
-Axiom waitSurplus : Delay.
 
 (** The wait time between two modes m1 and m2 is the maximum between two different
 values. The first is the mode transition time, denoting the physical time it takes
@@ -90,58 +117,9 @@ Definition waitTime (m1 m2 : Mode) (p : m1 -mtr-> m2) : Time :=
   timeMax (modeTransTime m1 m2 p)
   (msgLatency +t+ (timeMax adaptNotif transMax) +t+ waitSurplus).
 
-Open Scope R_scope.
-
-(** transMax is an upper bound on trans m for all m.*)
-Axiom transMaxBound : forall m : Mode,
-  trans m <= transMax.
-
-(** The minimum distance of compatibiltiy function is assumed to exist.
-It tells us the minimum distance by which two modes must be separated in
-order for them to be compatible. If two entities in these modes are
-separated by a distance greater than or equal to this distance,
-then they are compatible.*)
-Axiom minDistComp : Mode -> Mode -> Distance.
-
-(** The minimum distance of compatibility function is symmetric.*)
-Axiom minDistCompSymmetric : forall (m1 m2 : Mode),
-  minDistComp m1 m2 = minDistComp m2 m1.
-
-(** For a given mode m, maxMinDistComp m is an upper bound on the set
-minDistComp m m' taken over all other modes m'. We do not enforce that this
-is the least such upper bound, though this would be the sensible interpretation.*)
-Axiom maxMinDistComp : Mode -> Distance.
-
-(** The maxMinDistComp is an upper bound on the minDistComp for all other modes*)
-Axiom maxMinDistCompBound : forall m m' : Mode,
-  minDistComp m m' <= maxMinDistComp m.
-
-(** The minimum distance of compatibility function returns 0 if either
-of its arguments are fail safe. Note we only choose the left argument here,
-but the choice is irrelevant since the function is symmetric.*)
-Axiom minDistCompFS : forall (m1 m2 : Mode),
-  failSafe m1 -> minDistComp m1 m2 = (mkDistance zeroNonneg).
-
-(** period m is the time between successive broadcasts from an entity in mode m.*)
-Axiom period : Mode -> Time.
-
-Axiom msgLatency_positive : 0 < msgLatency.
-
-Axiom period_positive : forall m : Mode, 0 < period m.
-
-(** To rule out a trivial system, we assume the maximum speed is above 0.*)
-Axiom speedMax_pos: 0 < speedMax.
-
 Lemma speedMax_nonneg : 0 <= speedMax.
   (*Proof: follows from speedMax_pos*)
   apply Rlt_le. apply speedMax_pos. Qed.
-
-Axiom adaptNotif_positive : 0 < adaptNotif.
-
-(** trans m bounds the time to transition from m to any fail-safe successor
-(Definition 5.2, p.107).*)
-Axiom modeTransTime_bound : forall (m mF : Mode) (p : m -mtr-> mF),
-  failSafe mF -> modeTransTime m mF p <= trans m.
 
 (** The coverage r is sufficient for an entity broadcasting in mode m.*)
 Definition sufficient (m : Mode) (r : Distance) : Prop :=
@@ -253,5 +231,6 @@ Lemma possIncDist_positive m1 m2 : 0 < possIncDist m1 m2.
   apply Rlt_le_trans with (r2 := adaptNotif). apply adaptNotif_positive.
   rewrite <- Rplus_0_r at 1. rewrite <- Rplus_0_r at 1.
   repeat (apply Rplus_le_compat); try timeNonneg.
-  apply Rmax_l. Qed. 
-  
+  apply Rmax_l. Qed.
+
+End ComhBasics.

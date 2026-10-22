@@ -20,6 +20,9 @@ Require Import ComhCoq.protocol.ProtocolBridge.
 
 (*Broadcast*)
 
+Section ProtAuxDefs.
+Context {Model : ComhModel}.
+
 Definition bcWaitState (m : Mode) (x : Time) (p : ProcTerm) : Prop := 
     p ~p~ (bcWait m x).
 
@@ -258,3 +261,5 @@ Inductive reachableProt : ProcTerm -> Prop :=
   p -PA- a -PA> p' -> reachableProt p'
   | reachprDel (p p' : ProcTerm) (d : Delay) : reachableProt p ->
   p -PD- d -PD> p' -> reachableProt p'.
+
+End ProtAuxDefs.

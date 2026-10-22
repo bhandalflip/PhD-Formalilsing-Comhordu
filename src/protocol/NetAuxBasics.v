@@ -25,6 +25,8 @@ Require Import ComhCoq.protocol.ProtAuxResults.
 Require Import ComhCoq.protocol.EntAuxDefs.
 Require Import ComhCoq.protocol.EntAuxResults.
 Require Import ComhCoq.lib.GenTacs.
+From Stdlib Require Import Classical_Prop.
+From Stdlib Require Import Classical.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
 (*IDEA: MIGRATE SOME OF THE CONTENTS OF THE FILE OVER VARIUOS NAB (NET-AUX-BASICS)
@@ -37,6 +39,28 @@ HUB RELAYING THE CONTENTS OF THOSE FILES. WHY? IT'S GETTING JOLLY BIG!*)
 process as the seed: Definitions 6.1 and 6.2 (p.133).*)
 Notation initialProtNet := (initialNet procProtocol).
 Notation reachableProtNet := (reachableNet procProtocol).
+
+(** Takes H : X_Net i n apart, for a network state predicate lifted from a predicate on one
+component: E : [|p1 $||$ p2 $||$ p3, l, h, k|] @ i .: n is the entity, and H becomes the
+component's predicate.*)
+Ltac net_state_destr H p1 p2 p3 l h k E :=
+  let e := fresh "e" in let P := fresh "P" in let p := fresh "p" in
+  let H' := fresh H in
+  destruct H as [e P E]; inversion P as [p l h k H]; subst e; clear P;
+  inversion H as [p1 p2 p3 H']; subst p; clear H; rename H' into H.
+
+(** Proves a network state predicate of the entity E : [|p1 $||$ p2 $||$ p3, l, h, k|] @ i .: n,
+leaving the component's predicate as the goal.*)
+Ltac net_state_intro E :=
+  eapply lenWitness; [ | exact E]; constructor; constructor.
+
+Ltac netState_auto_pre := match goal with [U : [|_, _, _, _|] = _,
+  U1 : _ $||$ _ $||$ _ = _ |- _] =>
+  eapply lenWitness;[ | eassumption];
+  rewrite <- U; eapply lifpe; rewrite <- U1 end; constructor.
+
+Section NetAuxBasics.
+Context {Model : ComhModel}.
 
 (** In a reachable network, every entity's software is reachable from the protocol process,
 and so is a protocol triple.*)
@@ -99,27 +123,6 @@ Proof.
   destruct (net_del_comps_fwd _ _ _ _ _ _ _ _ _ D E) as [p1' [qs' [l' [h' [k' [E' F]]]]]].
   positions_inv. do 6 eexists. split; [exact E' | ]. repeat split; assumption.
 Qed.
-
-(** Takes H : X_Net i n apart, for a network state predicate lifted from a predicate on one
-component: E : [|p1 $||$ p2 $||$ p3, l, h, k|] @ i .: n is the entity, and H becomes the
-component's predicate.*)
-Ltac net_state_destr H p1 p2 p3 l h k E :=
-  let e := fresh "e" in let P := fresh "P" in let p := fresh "p" in
-  let H' := fresh H in
-  destruct H as [e P E]; inversion P as [p l h k H]; subst e; clear P;
-  inversion H as [p1 p2 p3 H']; subst p; clear H; rename H' into H.
-
-(** From H : X_Net i n and the entity E : [|p1 $||$ p2 $||$ p3, l, h, k|] @ i .: n, the
-component's predicate, as H.*)
-Ltac net_state_ent H E :=
-  let H' := fresh H in lets H' : liftEntNet_ent H E; clear H;
-  inversion H' as [? ? ? ? H]; subst; clear H';
-  let H'' := fresh H in inversion H as [? ? ? H'']; subst; clear H; rename H'' into H.
-
-(** Proves a network state predicate of the entity E : [|p1 $||$ p2 $||$ p3, l, h, k|] @ i .: n,
-leaving the component's predicate as the goal.*)
-Ltac net_state_intro E :=
-  eapply lenWitness; [ | exact E]; constructor; constructor.
 
 (********************************* Lifting Protocol Predicates *********************************)
 
@@ -215,7 +218,6 @@ Proof.
 Qed.
 
 (* begin helpers for tfsStateNet_dec *)
-From Stdlib Require Import Classical_Prop.
 (* end helpers *)
 
 Lemma tfsStateNet_dec : forall (i : nat) (n : Network), decidable (tfsStateNet i n).
@@ -580,11 +582,6 @@ Proof.
 Qed.
 (*Proof: fwd_track_net_tac badOvlp_next_ent*)
 
-Ltac netState_auto_pre := match goal with [U : [|_, _, _, _|] = _,
-  U1 : _ $||$ _ $||$ _ = _ |- _] =>
-  eapply lenWitness;[ | eassumption];
-  rewrite <- U; eapply lifpe; rewrite <- U1 end; constructor.
-
 (** Assume a network state predicate as the goal, and enough information in the
 hypothesis to prove it: an entInNet, an equality between that entity and its
 various components, and an equality between a process triple and the process of
@@ -704,29 +701,6 @@ Proof.
 Qed.
 (**Proof: Well, a backwards delay preservation would give us bcWaitState m x' i n for some x'. But forward tracking would then give us that
 in the derivative state the second parameter is x' - d. So x = x' - d and so x' = x + d, as required.*)
-
-(** Looks for an initial network in the hypotheses and also an entity in
-that network and adds the hypothesis that the entity in question is initial.*)
-Ltac initNet_ent_tac := let U0 := fresh in
-  match goal with [U : initialProtNet ?n,
-  U1 : ?e @ ?i .: ?n |- _] => lets U0 : initialNet_ent U U1 end.
-
-(**Tactic for contradiction between initialProtNet and some state predicate.
-Basically what it does is get the goal to the stage where there is a
-hypothesis that says <...>State dormant/sleeping/listening, which is
-immediately solvable by inversion because none of these initial processes
-match the state predicate in quesion.*)
-Ltac initNet_contra U :=
-  let e := fresh "e" in let U1 := fresh U in let U2 := fresh U in
-  destruct U as [e U1 U2]; initNet_ent_tac;
-  match goal with [U4 : initialEnt _ e |- _] => inversion U4; subst e end;
-  inversion U1; subst;
-  match goal with [U6 : _ procProtocol |- _] => inversion U6 end; subst;
-  match goal with
-  | [U8 : context[dormant] |- _] => inversion U8
-  | [U8 : context[sleeping] |- _] => inversion U8
-  | [U8 : context[listening] |- _] => inversion U8
-  end.
 
 
 Lemma initial_not_bcWait_net (n : Network) (m : Mode) (x : Time) (i : nat) :
@@ -1110,7 +1084,6 @@ Conjecture transGuard_disc_pres : forall (n n' : Network)
 (**Proof: Obvious: discrete action preserves guard on mode state, immediate from mode state semantics*)
 
 (* begin helpers for currModeNet_dec *)
-From Stdlib Require Import Classical.
 (* end helpers *)
 
 Lemma currModeNet_dec : forall (m : Mode) (i : nat) (n : Network),
@@ -1510,5 +1483,39 @@ Ltac reach_net_prot_tac :=
   let RPT := fresh "RPT" in
   lets RNP : reachable_net_prot RN EIN;
   lets RPT : reachableProt_triple RNP end.
+
+End NetAuxBasics.
+
+(** A section's tactics end with it. So that later files can use them, they are declared here.*)
+
+(** From H : X_Net i n and the entity E : [|p1 $||$ p2 $||$ p3, l, h, k|] @ i .: n, the
+component's predicate, as H.*)
+Ltac net_state_ent H E :=
+  let H' := fresh H in lets H' : liftEntNet_ent H E; clear H;
+  inversion H' as [? ? ? ? H]; subst; clear H';
+  let H'' := fresh H in inversion H as [? ? ? H'']; subst; clear H; rename H'' into H.
+
+(** Looks for an initial network in the hypotheses and also an entity in
+that network and adds the hypothesis that the entity in question is initial.*)
+Ltac initNet_ent_tac := let U0 := fresh in
+  match goal with [U : initialProtNet ?n,
+  U1 : ?e @ ?i .: ?n |- _] => lets U0 : initialNet_ent U U1 end.
+
+(**Tactic for contradiction between initialProtNet and some state predicate.
+Basically what it does is get the goal to the stage where there is a
+hypothesis that says <...>State dormant/sleeping/listening, which is
+immediately solvable by inversion because none of these initial processes
+match the state predicate in quesion.*)
+Ltac initNet_contra U :=
+  let e := fresh "e" in let U1 := fresh U in let U2 := fresh U in
+  destruct U as [e U1 U2]; initNet_ent_tac;
+  match goal with [U4 : initialEnt _ e |- _] => inversion U4; subst e end;
+  inversion U1; subst;
+  match goal with [U6 : _ procProtocol |- _] => inversion U6 end; subst;
+  match goal with
+  | [U8 : context[dormant] |- _] => inversion U8
+  | [U8 : context[sleeping] |- _] => inversion U8
+  | [U8 : context[listening] |- _] => inversion U8
+  end.
 
 (*-LOCAL TIDY*)

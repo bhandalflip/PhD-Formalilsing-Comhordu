@@ -25,6 +25,28 @@ Require Import ComhCoq.protocol.ProtocolBridge.
 
 (***************************** Misc *****************************)
 
+(** Takes an entity state predicate H apart, for a predicate lifted from one component:
+the entity becomes [|p1 $||$ p2 $||$ p3, l, h, k|] and H the component's predicate.*)
+Ltac ent_state_destr H p1 p2 p3 l h k :=
+  let p := fresh "p" in let H' := fresh H in
+  inversion H as [p l h k H']; subst; clear H;
+  let H'' := fresh H in inversion H' as [p1 p2 p3 H'']; subst; clear H'; rename H'' into H.
+
+(** From H : X_Ent [|p1 $||$ p2 $||$ p3, l, h, k|], the component's predicate, as H.*)
+Ltac ent_state_comp H :=
+  let H' := fresh H in inversion H as [? ? ? ? H']; subst; clear H;
+  let H'' := fresh H in inversion H' as [? ? ? H'']; subst; clear H'; rename H'' into H.
+
+(** From A : p ~p~ X and B : p ~p~ Y, for two named states X and Y of a component that differ
+on a channel, a contradiction.*)
+Ltac ov_disj A B :=
+  let BT := fresh "BT" in
+  pose proof (bisim_trans _ _ _ (bisim_symm _ _ A) B) as BT;
+  prot_outProc_in_not_body; refute_by_chan BT.
+
+Section EntAuxResults.
+Context {Model : ComhModel}.
+
 (** The software of a reachable entity is reachable from the protocol process.*)
 Lemma reachable_ent_prot p l h k : reachableProtEnt ([| p, l, h, k |]) ->
   reachableProt p.
@@ -96,18 +118,6 @@ Proof.
   destruct (stepAt_nth_error_eq _ _ _ _ St) as [y [y' [Ny [Ny' Y]]]].
   assert (y = x) by congruence. assert (y' = x') by congruence. subst. exact Y.
 Qed.
-
-(** Takes an entity state predicate H apart, for a predicate lifted from one component:
-the entity becomes [|p1 $||$ p2 $||$ p3, l, h, k|] and H the component's predicate.*)
-Ltac ent_state_destr H p1 p2 p3 l h k :=
-  let p := fresh "p" in let H' := fresh H in
-  inversion H as [p l h k H']; subst; clear H;
-  let H'' := fresh H in inversion H' as [p1 p2 p3 H'']; subst; clear H'; rename H'' into H.
-
-(** From H : X_Ent [|p1 $||$ p2 $||$ p3, l, h, k|], the component's predicate, as H.*)
-Ltac ent_state_comp H :=
-  let H' := fresh H in inversion H as [? ? ? ? H']; subst; clear H;
-  let H'' := fresh H in inversion H' as [? ? ? H'']; subst; clear H'; rename H'' into H.
 
 (***************************** Lifted tracking *****************************)
 
@@ -330,13 +340,6 @@ Proof.
   destruct (currMode_switch_states_ent _ _ _ R S (fun X => NE (eq_sym X)))
     as [[A _] | [A _]]; contradiction.
 Qed.
-
-(** From A : p ~p~ X and B : p ~p~ Y, for two named states X and Y of a component that differ
-on a channel, a contradiction.*)
-Ltac ov_disj A B :=
-  let BT := fresh "BT" in
-  pose proof (bisim_trans _ _ _ (bisim_symm _ _ A) B) as BT;
-  prot_outProc_in_not_body; refute_by_chan BT.
 
 (** In a reachable entity, an overlap component in init m, ovWait m, ovReady m or switchBc m is
 changing to mode m: m is the mode state's next mode. Whatever ovWait's timers, its position
@@ -2124,5 +2127,7 @@ Proof.
   intros S T.
   exact (tfsCurr_next_ent_lift tfsListenState dormantState _ _ _ tfsListen_next S T).
 Qed.
+
+End EntAuxResults.
 
 (*- LOCAL TIDY*)

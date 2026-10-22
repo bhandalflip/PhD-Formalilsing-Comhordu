@@ -198,6 +198,216 @@ Ltac activation_tac := activation_pre_tac; activation_post_tac.
 
 (*** Results ***)
 
+(** Unfolds the simple state predicates into bisimilarities. *)
+Ltac prot_outProc_in_not_unfold :=
+  unfold bcWaitState, sleepingState, bcReadyState, dormantState, ovWaitState,
+    ovReadyState, switchBcState, switchCurrState, switchListenState,
+    tfsStartState, tfsNextState, tfsCurrState, tfsBcState, tfsListenState,
+    initState, ovAbortState, listeningState, rangeBadState, currOKState,
+    abortOvlpState, badOvlpState, currCompState, pausedState, gotMsgState,
+    gotRangeState, currEqState, nextEqState, currPincCheckState,
+    nextPincCheckState in *.
+
+(** Unfolds the bodies of the protocol component processes. *)
+Ltac prot_outProc_in_not_body :=
+  unfold bcWait, sleeping, bcReady, dormant, init, ovWait, ovReady, switchBc,
+    switchCurr, switchListen, tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen,
+    ovAbort, listening, checkRange, rangeBad, currEq, badOvlp, currOK, nextEq,
+    abortOvlp, gotMsg, gotRange, currPincCheck, currComp, nextPincCheck,
+    paused in *.
+
+(** Anti-activation: given p ~p~ q and p -a-> p', transfer the transition to
+    the concrete body q and refute it by brute-force inversion. *)
+Ltac prot_outProc_in_not_contra :=
+  prot_outProc_in_not_unfold;
+  match goal with
+  | [B : ?p ~p~ ?q, TR : ?p -PA- ?a -PA> ?p' |- _] =>
+    let q' := fresh "q'" in let TR' := fresh "TR'" in
+    destruct (bisim_disc_match _ _ _ _ B TR) as [q' TR'];
+    prot_outProc_in_not_body; solve [invert_disc_prefixes]
+  end.
+
+(** Unfolds the applications and the bodies of the protocol's processes.*)
+Ltac unfold_def_cbn := cbn [unfoldApp def protocolDefs protocolDef fst snd listsToSub
+  liftVarList liftExpList subProcTerm subExp subBoolExp listSub map liftNameProc
+  listBaselistExp bcWait sleeping bcReady dormant init ovWait ovReady switchBc switchCurr
+  switchListen tfsStart tfsNext tfsCurr tfsBc tfsListen ovAbort listening checkRange
+  rangeBad currEq badOvlp currOK nextEq abortOvlp gotMsg gotRange currPincCheck currComp
+  nextPincCheck paused].
+
+(** Rewrites a goal [app N args ~p~ T] into [body[args/vars] ~p~ T], with the substitution
+computed away.*)
+Ltac unfold_app_bisim := eapply bisim_trans; [apply app_bisim | ]; unfold_def_cbn; clean_proc.
+
+(** Closes [p ~p~ X] from [B : p ~p~ q], where q is X, an application whose unfolding is X,
+or nilProc.*)
+Ltac shape_body B := solve [eapply bisim_trans; [exact B | ];
+  first [apply bisim_refl | unfold_app_bisim; apply bisim_refl]].
+
+(** From [H : p ~p~ X] and [T : p -PA- a -PA> p'], the matching step of X and its derivative
+q with [B : p' ~p~ q]; then inverts the step on X's body, makes the input explicit and
+computes the substitution in B.*)
+Ltac shape_step_pre B :=
+  match goal with [H : ?p ~p~ _, T : ?p -PA- _ -PA> _ |- _] =>
+    let q := fresh "q" in let TQ := fresh "TQ" in
+    destruct (bisim_step_disc _ _ _ _ H T) as [q [TQ B]]; clear H T end;
+  prot_outProc_in_not_body; invert_disc_prefixes; explicit_typed_input; clean_proc_hyp B.
+
+(** From [B : p ~p~ (b $> P) $+$ (!~ b $> Q)], in either order, the branch b selects:
+[B : p ~p~ P], [p ~p~ Q], or [p ~p~ nilProc] when b is ill formed.*)
+Ltac resolve_cond B :=
+  let E := fresh "E" in let B2 := fresh B in
+  match type of B with
+  | _ ~p~ (!~ ?b $> ?Q) $+$ (?b $> ?P) =>
+    lets B2 : bisim_trans B (choice_bisim_symm (!~ b $> Q) (b $> P)); clear B; rename B2 into B
+  | _ => idtac end;
+  match type of B with _ ~p~ (?b $> ?P) $+$ (!~ ?b $> ?Q) =>
+    destruct (evalBoolExpFun b) as [ [ | ] | ] eqn:E;
+    [ lets B2 : bisim_trans B (if_then_bisim_true b P Q (evalBoolExpFunRel _ _ E))
+    | lets B2 : bisim_trans B (if_then_bisim_false b P Q (evalBoolExpFunRel _ _ E))
+    | lets B2 : bisim_trans B (if_then_bisim_none b P Q E)];
+    clear B E; rename B2 into B
+  end.
+
+(** Unfolds the application on the right of B, computing the substitution away.*)
+Ltac unfold_app_hyp B :=
+  let B2 := fresh B in
+  pose proof (bisim_trans _ _ _ B (app_bisim _ _)) as B2; clear B; rename B2 into B;
+  gen_app_intro unfold_def_cbn B; clean_proc_hyp B.
+
+(** Solves [forall d q, X -PD- d -PD> q -> q = X] for a named state X without timers.*)
+Ltac del_self_body := prot_outProc_in_not_body; del_self_tac.
+
+(** Repeatedly inverts a delay of nilProc, a prefix, a sum or a delay guard.*)
+Ltac invert_del_prefixes := repeat match goal with
+  | [H : nilProc -PD- _ -PD> _ |- _] => inversion H; clear H; subst
+  | [H : outPrefix _ _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
+  | [H : inPrefix _ _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
+  | [H : sum _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
+  | [H : del _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
+  end.
+
+(** Closes [q ~p~ X e1 .. en] where q is X's body after a delay: each timer is the same, has
+counted down, or has run out, in which case it is bisimilar to a zero timer.*)
+Ltac del_timers_bisim := repeat apply choice_bisim_context;
+  first [apply bisim_refl
+    | apply bisim_symm; apply (del_zero_bisim (liftTimeExp zeroTime)); reflexivity].
+
+(** Searches a sum of prefixes and zero timers for a step with the goal's action. An input
+whose values are left open takes a value of each variable's type, a mode from the context.*)
+Ltac step_search := first [ apply stepDpIn; typed_vals
+  | match goal with [ |- inPrefix _ ?xs _ -PA- _ -PA> _ ] =>
+      let vs := typed_witness xs in apply (stepDpIn _ vs xs); typed_vals end
+  | solve [apply stepDpOut; repeat constructor]
+  | apply stepDpTimeOut; [step_search | reflexivity]
+  | apply stepDpChoiceL; step_search
+  | apply stepDpChoiceR; step_search ].
+
+(** A step of an application N(args) with the goal's action, found by unfolding it.*)
+Ltac app_step := eapply stepDpApp; [reflexivity | ]; clean_proc; step_search.
+
+(** Unfolds the application on the left of B, computing the substitution away.*)
+Ltac unfold_app_hyp_l B :=
+  let B2 := fresh B in
+  pose proof (bisim_trans _ _ _ (bisim_symm _ _ (app_bisim _ _)) B) as B2; clear B;
+  rename B2 into B; gen_app_intro unfold_def_cbn B; clean_proc_hyp B.
+
+(** Refutes [BT : q ~p~ X], for bodies q and X with no application outside a prefix, by an
+action one of them can do on a channel the other does not mention (step_chans). Each
+channel is tried as a witness, in each direction.*)
+Ltac chan_witness q c S :=
+  first [ assert (S : exists v q', q -PA- c ;? v -PA> q') by (do 2 eexists; step_search)
+        | assert (S : exists v q', q -PA- c ;! v -PA> q') by (do 2 eexists; step_search) ];
+  let v := fresh "v" in let q' := fresh "q'" in destruct S as [v [q' S]].
+
+(** Closes the goal from I : In cd l, computed to a disjunction of equalities, for a concrete
+list l that does not hold cd.*)
+Ltac chan_notin I := solve [decompose [or] I; first [discriminate | contradiction]].
+
+Ltac refute_one q BT c :=
+  let S := fresh "S" in let r := fresh "r" in let R := fresh "R" in let I := fresh "I" in
+  chan_witness q c S;
+  destruct (bisim_disc_match _ _ _ _ BT S) as [r R];
+  pose proof (step_chans _ _ _ R) as I; specialize (I eq_refl); specialize (I _ eq_refl);
+  simpl in I; chan_notin I.
+
+Ltac refute_with_chans q BT cs :=
+  lazymatch cs with
+  | ?c :: ?cs' => first [ refute_one q BT c | refute_with_chans q BT cs' ]
+  end.
+
+Ltac refute_by_chan BT :=
+  let cs := constr:(chanAN :: chanMStableRead :: chanMStableWrite :: chanMCurrRead
+    :: chanMCurrWrite :: chanMNextRead :: chanMNextWrite :: chanPos
+    :: chanOutProc :: chanInProc :: chanIOEnv :: chanTrans :: chanWake :: chanPause
+    :: chanUnpause :: chanBad :: chanAbort :: nil) in
+  match type of BT with ?q ~p~ ?X =>
+    first [ refute_with_chans q BT cs
+          | let BT' := fresh "BT" in pose proof (bisim_symm _ _ BT) as BT';
+            refute_with_chans X BT' cs ] end.
+
+(** Inverts the output lists of the steps found so far, so that the values output are the
+values the prefixes hold.*)
+Ltac output_values := repeat match goal with
+  | [H : evalExpLists (liftExpList _) _ |- _] => unfold liftExpList in H
+  | [H : evalExpLists (_ :: _) _ |- _] => inversion H; subst; clear H
+  | [H : evalExpLists [] _ |- _] => inversion H; subst; clear H
+  | [H : evalExp (eBase _) _ |- _] => inversion H; subst; clear H end.
+
+(** Refutes [B : ovWait m e2 e3 e4 ~p~ Z] for a named overlap state Z other than ovWait, by
+a channel one side uses and the other does not.*)
+Ltac ovWait_bisim_contra B :=
+  unfold ovWait, dormant, init, ovReady, switchBc, switchCurr, switchListen, ovAbort,
+    tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen, liftNameProc in B; refute_by_chan B.
+
+(** Writes every triple of components in H as an n-ary composition.*)
+Ltac triple_parAll H :=
+  repeat match type of H with context [?p1 $||$ ?p2 $||$ ?p3] =>
+    change (p1 $||$ p2 $||$ p3) with (parAll p1 [p2, p3]) in H end.
+
+(** Turns a position in the three components into the named component: inverts the stepAt
+and Forall2 facts an n-ary result gives on the three-element lists, computes the triple a
+derived composition is, and closes the cases where two positions meant to differ coincide.*)
+Ltac triple_pos :=
+  positions_inv;
+  repeat match goal with [E : _ = parAll _ _ |- _] =>
+    cbn [parAll] in E; inversion E; subst; clear E end;
+  try match goal with [N : ?x <> ?x |- _] => exfalso; exact (N eq_refl) end.
+
+(** Inverts a step H of a triple on an action other than tau: exactly one component steps.*)
+Ltac triple_disc_nonTau H :=
+  triple_parAll H; apply parAll_disc_nonTau in H; [ | discriminate];
+  destruct H as [? [? [? [? H]]]]; triple_pos.
+
+(** From a discrete step H of a triple, each component is unchanged or steps.*)
+Ltac triple_disc_weak H :=
+  triple_parAll H; apply parAll_disc_weak in H;
+  destruct H as [? [? [? H]]]; triple_pos.
+
+(** Inverts a delay H of a triple into the delays of its components.*)
+Ltac triple_del_inv H :=
+  triple_parAll H; apply parAll_del_inv in H;
+  destruct H as [? [? [? H]]]; triple_pos.
+
+(** Asserts Q : the target of a step or delay H of a triple is a triple.*)
+Ltac triple_shape H Q :=
+  match type of H with
+  | _ $||$ _ $||$ _ -PA- _ -PA> ?p' =>
+    assert (Q : exists q1 q2 q3, p' = q1 $||$ q2 $||$ q3) by
+      (triple_disc_weak H; do 3 eexists; reflexivity)
+  | _ $||$ _ $||$ _ -PD- _ -PD> ?p' =>
+    assert (Q : exists q1 q2 q3, p' = q1 $||$ q2 $||$ q3) by
+      (triple_del_inv H; do 3 eexists; reflexivity)
+  end.
+
+(** From a discrete step H between triples, W : the first, second or third component is
+unchanged or does some action.*)
+Ltac link_partripdiscW_tac H W G :=
+  assert (W : G); [triple_disc_weak H; assumption | ].
+
+Section ProtAuxResults.
+Context {Model : ComhModel}.
+
 Lemma bcReady_outProc_out m l p :
   bcReadyState m l p -> discActEnabled p (chanOutProc ;! [baseMode m, basePosition l]).
   activation_tac. Qed.
@@ -314,34 +524,7 @@ Lemma tfsListen_unpause_out_sort d p : tfsListenState p -> sort (chanUnpause *!)
 and show that none of the cases generated match any of the cases for the state predicate.*)
 (**A listener process cannot output on the channel outProc.*)
 (* begin helpers for listener_outProc_out_not *)
-(** Unfolds the simple state predicates into bisimilarities. *)
-Ltac prot_outProc_in_not_unfold :=
-  unfold bcWaitState, sleepingState, bcReadyState, dormantState, ovWaitState,
-    ovReadyState, switchBcState, switchCurrState, switchListenState,
-    tfsStartState, tfsNextState, tfsCurrState, tfsBcState, tfsListenState,
-    initState, ovAbortState, listeningState, rangeBadState, currOKState,
-    abortOvlpState, badOvlpState, currCompState, pausedState, gotMsgState,
-    gotRangeState, currEqState, nextEqState, currPincCheckState,
-    nextPincCheckState in *.
 
-(** Unfolds the bodies of the protocol component processes. *)
-Ltac prot_outProc_in_not_body :=
-  unfold bcWait, sleeping, bcReady, dormant, init, ovWait, ovReady, switchBc,
-    switchCurr, switchListen, tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen,
-    ovAbort, listening, checkRange, rangeBad, currEq, badOvlp, currOK, nextEq,
-    abortOvlp, gotMsg, gotRange, currPincCheck, currComp, nextPincCheck,
-    paused in *.
-
-(** Anti-activation: given p ~p~ q and p -a-> p', transfer the transition to
-    the concrete body q and refute it by brute-force inversion. *)
-Ltac prot_outProc_in_not_contra :=
-  prot_outProc_in_not_unfold;
-  match goal with
-  | [B : ?p ~p~ ?q, TR : ?p -PA- ?a -PA> ?p' |- _] =>
-    let q' := fresh "q'" in let TR' := fresh "TR'" in
-    destruct (bisim_disc_match _ _ _ _ B TR) as [q' TR'];
-    prot_outProc_in_not_body; solve [invert_disc_prefixes]
-  end.
 (* end helpers *)
 
 (****************** Component shapes ******************)
@@ -389,54 +572,6 @@ Inductive listenerShape (p : ProcTerm) : Prop :=
 
 (*** Tactics ***)
 
-(** Unfolds the applications and the bodies of the protocol's processes.*)
-Ltac unfold_def_cbn := cbn [unfoldApp def protocolDefs protocolDef fst snd listsToSub
-  liftVarList liftExpList subProcTerm subExp subBoolExp listSub map liftNameProc
-  listBaselistExp bcWait sleeping bcReady dormant init ovWait ovReady switchBc switchCurr
-  switchListen tfsStart tfsNext tfsCurr tfsBc tfsListen ovAbort listening checkRange
-  rangeBad currEq badOvlp currOK nextEq abortOvlp gotMsg gotRange currPincCheck currComp
-  nextPincCheck paused].
-
-(** Rewrites a goal [app N args ~p~ T] into [body[args/vars] ~p~ T], with the substitution
-computed away.*)
-Ltac unfold_app_bisim := eapply bisim_trans; [apply app_bisim | ]; unfold_def_cbn; clean_proc.
-
-(** Closes [p ~p~ X] from [B : p ~p~ q], where q is X, an application whose unfolding is X,
-or nilProc.*)
-Ltac shape_body B := solve [eapply bisim_trans; [exact B | ];
-  first [apply bisim_refl | unfold_app_bisim; apply bisim_refl]].
-
-(** From [H : p ~p~ X] and [T : p -PA- a -PA> p'], the matching step of X and its derivative
-q with [B : p' ~p~ q]; then inverts the step on X's body, makes the input explicit and
-computes the substitution in B.*)
-Ltac shape_step_pre B :=
-  match goal with [H : ?p ~p~ _, T : ?p -PA- _ -PA> _ |- _] =>
-    let q := fresh "q" in let TQ := fresh "TQ" in
-    destruct (bisim_step_disc _ _ _ _ H T) as [q [TQ B]]; clear H T end;
-  prot_outProc_in_not_body; invert_disc_prefixes; explicit_typed_input; clean_proc_hyp B.
-
-(** From [B : p ~p~ (b $> P) $+$ (!~ b $> Q)], in either order, the branch b selects:
-[B : p ~p~ P], [p ~p~ Q], or [p ~p~ nilProc] when b is ill formed.*)
-Ltac resolve_cond B :=
-  let E := fresh "E" in let B2 := fresh B in
-  match type of B with
-  | _ ~p~ (!~ ?b $> ?Q) $+$ (?b $> ?P) =>
-    lets B2 : bisim_trans B (choice_bisim_symm (!~ b $> Q) (b $> P)); clear B; rename B2 into B
-  | _ => idtac end;
-  match type of B with _ ~p~ (?b $> ?P) $+$ (!~ ?b $> ?Q) =>
-    destruct (evalBoolExpFun b) as [ [ | ] | ] eqn:E;
-    [ lets B2 : bisim_trans B (if_then_bisim_true b P Q (evalBoolExpFunRel _ _ E))
-    | lets B2 : bisim_trans B (if_then_bisim_false b P Q (evalBoolExpFunRel _ _ E))
-    | lets B2 : bisim_trans B (if_then_bisim_none b P Q E)];
-    clear B E; rename B2 into B
-  end.
-
-(** Unfolds the application on the right of B, computing the substitution away.*)
-Ltac unfold_app_hyp B :=
-  let B2 := fresh B in
-  pose proof (bisim_trans _ _ _ B (app_bisim _ _)) as B2; clear B; rename B2 into B;
-  gen_app_intro unfold_def_cbn B; clean_proc_hyp B.
-
 Ltac broadcast_shape_of B := first [
     eapply shSleeping; shape_body B | eapply shBcWait; shape_body B
   | eapply shBcReady; shape_body B ].
@@ -458,24 +593,6 @@ Ltac listener_shape_of B := first [
   | eapply shGotRange; shape_body B | eapply shCurrComp; shape_body B
   | eapply shPaused; shape_body B
   | unfold_app_hyp B; resolve_cond B; listener_shape_of B ].
-
-(** Solves [forall d q, X -PD- d -PD> q -> q = X] for a named state X without timers.*)
-Ltac del_self_body := prot_outProc_in_not_body; del_self_tac.
-
-(** Repeatedly inverts a delay of nilProc, a prefix, a sum or a delay guard.*)
-Ltac invert_del_prefixes := repeat match goal with
-  | [H : nilProc -PD- _ -PD> _ |- _] => inversion H; clear H; subst
-  | [H : outPrefix _ _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
-  | [H : inPrefix _ _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
-  | [H : sum _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
-  | [H : del _ _ -PD- _ -PD> _ |- _] => inversion H; clear H; subst
-  end.
-
-(** Closes [q ~p~ X e1 .. en] where q is X's body after a delay: each timer is the same, has
-counted down, or has run out, in which case it is bisimilar to a zero timer.*)
-Ltac del_timers_bisim := repeat apply choice_bisim_context;
-  first [apply bisim_refl
-    | apply bisim_symm; apply (del_zero_bisim (liftTimeExp zeroTime)); reflexivity].
 
 (*** The shapes are preserved ***)
 
@@ -716,58 +833,7 @@ converts the required amount of arguments to existentials.*)
 
 (*** Back tracking ***)
 
-(** Searches a sum of prefixes and zero timers for a step with the goal's action. An input
-whose values are left open takes a value of each variable's type, a mode from the context.*)
-Ltac step_search := first [ apply stepDpIn; typed_vals
-  | match goal with [ |- inPrefix _ ?xs _ -PA- _ -PA> _ ] =>
-      let vs := typed_witness xs in apply (stepDpIn _ vs xs); typed_vals end
-  | solve [apply stepDpOut; repeat constructor]
-  | apply stepDpTimeOut; [step_search | reflexivity]
-  | apply stepDpChoiceL; step_search
-  | apply stepDpChoiceR; step_search ].
-
-(** A step of an application N(args) with the goal's action, found by unfolding it.*)
-Ltac app_step := eapply stepDpApp; [reflexivity | ]; clean_proc; step_search.
-
-(** Unfolds the application on the left of B, computing the substitution away.*)
-Ltac unfold_app_hyp_l B :=
-  let B2 := fresh B in
-  pose proof (bisim_trans _ _ _ (bisim_symm _ _ (app_bisim _ _)) B) as B2; clear B;
-  rename B2 into B; gen_app_intro unfold_def_cbn B; clean_proc_hyp B.
-
-(** Refutes [BT : q ~p~ X], for bodies q and X with no application outside a prefix, by an
-action one of them can do on a channel the other does not mention (step_chans). Each
-channel is tried as a witness, in each direction.*)
-Ltac chan_witness q c S :=
-  first [ assert (S : exists v q', q -PA- c ;? v -PA> q') by (do 2 eexists; step_search)
-        | assert (S : exists v q', q -PA- c ;! v -PA> q') by (do 2 eexists; step_search) ];
-  let v := fresh "v" in let q' := fresh "q'" in destruct S as [v [q' S]].
-
-(** Closes the goal from I : In cd l, computed to a disjunction of equalities, for a concrete
-list l that does not hold cd.*)
-Ltac chan_notin I := solve [decompose [or] I; first [discriminate | contradiction]].
-
-Ltac refute_one q BT c :=
-  let S := fresh "S" in let r := fresh "r" in let R := fresh "R" in let I := fresh "I" in
-  chan_witness q c S;
-  destruct (bisim_disc_match _ _ _ _ BT S) as [r R];
-  pose proof (step_chans _ _ _ R) as I; specialize (I eq_refl); specialize (I _ eq_refl);
-  simpl in I; chan_notin I.
-
-Ltac refute_with_chans q BT cs :=
-  lazymatch cs with
-  | ?c :: ?cs' => first [ refute_one q BT c | refute_with_chans q BT cs' ]
-  end.
-
-Ltac refute_by_chan BT :=
-  let cs := constr:(chanAN :: chanMStableRead :: chanMStableWrite :: chanMCurrRead
-    :: chanMCurrWrite :: chanMNextRead :: chanMNextWrite :: chanPos
-    :: chanOutProc :: chanInProc :: chanIOEnv :: chanTrans :: chanWake :: chanPause
-    :: chanUnpause :: chanBad :: chanAbort :: nil) in
-  match type of BT with ?q ~p~ ?X =>
-    first [ refute_with_chans q BT cs
-          | let BT' := fresh "BT" in pose proof (bisim_symm _ _ BT) as BT';
-            refute_with_chans X BT' cs ] end.
+End ProtAuxResults.
 
 (** Pre-processing for a back-tracking result, with [TR : p -PA- a -PA> p'],
 [O : overlapState p] and [SP : p' ~p~ X] in the context. For each shape of p, the matching
@@ -786,18 +852,13 @@ Ltac backtrack_shape SP :=
     try solve [refute_by_chan BT]
   end.
 
+Section ProtAuxResults.
+Context {Model : ComhModel}.
+
 (** Asserts S : q -PA- act -PA> q' for the source q of BT, a body or an application, and the
 derivative q' the search finds.*)
 Ltac bt_step BT act S := match type of BT with ?q ~p~ _ =>
   eassert (S : q -PA- act -PA> _) by first [step_search | app_step] end.
-
-(** Inverts the output lists of the steps found so far, so that the values output are the
-values the prefixes hold.*)
-Ltac output_values := repeat match goal with
-  | [H : evalExpLists (liftExpList _) _ |- _] => unfold liftExpList in H
-  | [H : evalExpLists (_ :: _) _ |- _] => inversion H; subst; clear H
-  | [H : evalExpLists [] _ |- _] => inversion H; subst; clear H
-  | [H : evalExp (eBase _) _ |- _] => inversion H; subst; clear H end.
 
 (** After a step into tfsStart, the overlap component was dormant or waiting: both take a
 bad message there.*)
@@ -2154,12 +2215,6 @@ Qed.
 
 (*** Backward delay tracking ***)
 
-(** Refutes [B : ovWait m e2 e3 e4 ~p~ Z] for a named overlap state Z other than ovWait, by
-a channel one side uses and the other does not.*)
-Ltac ovWait_bisim_contra B :=
-  unfold ovWait, dormant, init, ovReady, switchBc, switchCurr, switchListen, ovAbort,
-    tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen, liftNameProc in B; refute_by_chan B.
-
 (** Every overlap state but ovWait delays only to itself, and ovWait delays to an ovWait. So
 an overlap component that delays into a state Z that no ovWait is bisimilar to was in Z
 before the delay.*)
@@ -2400,66 +2455,11 @@ n-ary composition parAll apply to it once the triple is written as parAll p1 [p2
 one tactic, triple_pos, turns the positions those results speak of back into the three
 components. The tactics after it rebuild the triple-shaped facts the proofs below use.*)
 
-(** Writes every triple of components in H as an n-ary composition.*)
-Ltac triple_parAll H :=
-  repeat match type of H with context [?p1 $||$ ?p2 $||$ ?p3] =>
-    change (p1 $||$ p2 $||$ p3) with (parAll p1 [p2, p3]) in H end.
-
-(** Turns a position in the three components into the named component: inverts the stepAt
-and Forall2 facts an n-ary result gives on the three-element lists, computes the triple a
-derived composition is, and closes the cases where two positions meant to differ coincide.*)
-Ltac triple_pos :=
-  positions_inv;
-  repeat match goal with [E : _ = parAll _ _ |- _] =>
-    cbn [parAll] in E; inversion E; subst; clear E end;
-  try match goal with [N : ?x <> ?x |- _] => exfalso; exact (N eq_refl) end.
-
 (** Inverts a discrete step H of a triple into its cases: one component steps, or two
 synchronise.*)
 Ltac triple_disc_inv H :=
   triple_parAll H; apply parAll_disc_inv in H;
   destruct H as [? [? [? [[? H] | [? [? [? [? [? [? [? [H ?]]]]]]]]]]]]; triple_pos.
-
-(** Inverts a step H of a triple on an action other than tau: exactly one component steps.*)
-Ltac triple_disc_nonTau H :=
-  triple_parAll H; apply parAll_disc_nonTau in H; [ | discriminate];
-  destruct H as [? [? [? [? H]]]]; triple_pos.
-
-(** From a discrete step H of a triple, each component is unchanged or steps.*)
-Ltac triple_disc_weak H :=
-  triple_parAll H; apply parAll_disc_weak in H;
-  destruct H as [? [? [? H]]]; triple_pos.
-
-(** Inverts a delay H of a triple into the delays of its components.*)
-Ltac triple_del_inv H :=
-  triple_parAll H; apply parAll_del_inv in H;
-  destruct H as [? [? [? H]]]; triple_pos.
-
-(** Asserts Q : the target of a step or delay H of a triple is a triple.*)
-Ltac triple_shape H Q :=
-  match type of H with
-  | _ $||$ _ $||$ _ -PA- _ -PA> ?p' =>
-    assert (Q : exists q1 q2 q3, p' = q1 $||$ q2 $||$ q3) by
-      (triple_disc_weak H; do 3 eexists; reflexivity)
-  | _ $||$ _ $||$ _ -PD- _ -PD> ?p' =>
-    assert (Q : exists q1 q2 q3, p' = q1 $||$ q2 $||$ q3) by
-      (triple_del_inv H; do 3 eexists; reflexivity)
-  end.
-
-Ltac link_partripdiscex_tac U p1' p2' p3' :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?a -PA> ?p' |- _] =>
-  let Q1 := fresh in triple_shape H Q1;
-  let U1 := fresh U in decompEx3 Q1 p1' p2' p3' U1
-  end.
-
-Ltac link_partripdiscex_tac2 p1' p2' p3' :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?a -PA> ?p' |- _] =>
-  let Q1 := fresh in triple_shape H Q1;
-  let U1 := fresh in decompEx3 Q1 p1' p2' p3' U1;
-  rewrite U1 in H; clear U1
-  end.
 
 Ltac link_partripdelex_tac U p1' p2' p3' :=
   match goal with
@@ -2476,19 +2476,6 @@ Ltac link_partripdelex_tac2 p1' p2' p3' :=
   rewrite U1 in H; clear U1
   end.
 
-(** An output of a triple is an output of one component, the other two unchanged; the
-three cases become goals, with the facts of each flattened into U names.*)
-Ltac link_partripout_tac U :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?c ;! ?v -PA> ?p1' $||$ ?p2' $||$ ?p3' |- _] =>
-  let H1 := fresh in
-  assert (H1 : p1 -PA- c ;! v -PA> p1' /\ p2 = p2' /\ p3 = p3' \/
-    p2 -PA- c ;! v -PA> p2' /\ p1 = p1' /\ p3 = p3' \/
-    p3 -PA- c ;! v -PA> p3' /\ p1 = p1' /\ p2 = p2') by
-    (triple_disc_nonTau H; eauto 7);
-  let H2 := fresh in elimOr3 H1 H2; andflat U
-  end.
-
 (** The same for an input.*)
 Ltac link_partripin_tac U :=
   match goal with
@@ -2501,44 +2488,10 @@ Ltac link_partripin_tac U :=
   let H2 := fresh in elimOr3 H1 H2; andflat U
   end.
 
-(** From a discrete step H between triples, W : the first, second or third component is
-unchanged or does some action.*)
-Ltac link_partripdiscW_tac H W G :=
-  assert (W : G); [triple_disc_weak H; assumption | ].
 Ltac link_partripdiscW1_tac H W :=
   match type of H with ?p1 $||$ _ $||$ _ -PA- _ -PA> ?p1' $||$ _ $||$ _ =>
     link_partripdiscW_tac H W (p1 = p1' \/ exists b, p1 -PA- b -PA> p1') end.
-Ltac link_partripdiscW2_tac H W :=
-  match type of H with _ $||$ ?p2 $||$ _ -PA- _ -PA> _ $||$ ?p2' $||$ _ =>
-    link_partripdiscW_tac H W (p2 = p2' \/ exists b, p2 -PA- b -PA> p2') end.
-Ltac link_partripdiscW3_tac H W :=
-  match type of H with _ $||$ _ $||$ ?p3 -PA- _ -PA> _ $||$ _ $||$ ?p3' =>
-    link_partripdiscW_tac H W (p3 = p3' \/ exists b, p3 -PA- b -PA> p3') end.
 
-(** The triple is enabled on an action its broadcast, overlap or listener component is
-enabled on.*)
-Ltac dae_component pos :=
-  match goal with [ |- discActEnabled (?p1 $||$ ?p2 $||$ ?p3) _ ] =>
-    change (p1 $||$ p2 $||$ p3) with (parAll p1 [p2, p3]);
-    eapply parAll_dae_intro; [pos | ] end.
-Ltac dae_broadcast := dae_component ltac:(left; reflexivity).
-Ltac dae_overlap := dae_component ltac:(right; left; reflexivity).
-Ltac dae_listener := dae_component ltac:(right; right; left; reflexivity).
-
-(** The position of a component q among p1, p2 and p3.*)
-Ltac triple_index p1 p2 p3 q :=
-  lazymatch q with p1 => constr:(0%nat) | p2 => constr:(1%nat) | p3 => constr:(2%nat) end.
-
-(** Closes the goal from a delay DP of a triple, D1 : one component is enabled on an action
-and D2 : another is enabled on its complement.*)
-Ltac triple_del_sync_not DP D1 D2 :=
-  match type of DP with ?p1 $||$ ?p2 $||$ ?p3 -PD- _ -PD> _ =>
-  match type of D1 with discActEnabled ?qi _ =>
-  match type of D2 with discActEnabled ?qj _ =>
-    let i := triple_index p1 p2 p3 qi in let j := triple_index p1 p2 p3 qj in
-    exact (parAll_del_sync_not p1 [p2, p3] _ _ i j _ _ _ DP ltac:(discriminate)
-      eq_refl eq_refl D1 D2 ltac:(discriminate))
-  end end end.
 
 (* begin helpers for link_reach_triple_tau *)
 Lemma link_reach_triple_tau_bc p p' :
@@ -2663,12 +2616,6 @@ Proof.
   intro R. apply reachableProt_reachableFrom in R.
   exact (oneWayUsage_reachableFrom _ _ _ _ protocol_correctChannelUsage R).
 Qed.
-
-Ltac reachprot U :=
-  match goal with
-  [H : reachableProt ?p |- _] => let U1 := fresh U in
-  lets U1 : reachableProt_triple H
-  end.
 
 (****************** Brute Force ******************)
 (*I think these can be solved by inversion on the complex state predicate
@@ -2924,3 +2871,77 @@ Proof.
   (* But listening is a sum of input prefixes: no output on abort. *)
   unfold listening in Q. invert_disc_prefixes.
 Qed.
+
+End ProtAuxResults.
+
+(** A section's tactics end with it. So that later files can use them, they are declared here.*)
+
+Ltac link_partripdiscex_tac U p1' p2' p3' :=
+  match goal with
+  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?a -PA> ?p' |- _] =>
+  let Q1 := fresh in triple_shape H Q1;
+  let U1 := fresh U in decompEx3 Q1 p1' p2' p3' U1
+  end.
+
+Ltac link_partripdiscex_tac2 p1' p2' p3' :=
+  match goal with
+  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?a -PA> ?p' |- _] =>
+  let Q1 := fresh in triple_shape H Q1;
+  let U1 := fresh in decompEx3 Q1 p1' p2' p3' U1;
+  rewrite U1 in H; clear U1
+  end.
+
+(** An output of a triple is an output of one component, the other two unchanged; the
+three cases become goals, with the facts of each flattened into U names.*)
+Ltac link_partripout_tac U :=
+  match goal with
+  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?c ;! ?v -PA> ?p1' $||$ ?p2' $||$ ?p3' |- _] =>
+  let H1 := fresh in
+  assert (H1 : p1 -PA- c ;! v -PA> p1' /\ p2 = p2' /\ p3 = p3' \/
+    p2 -PA- c ;! v -PA> p2' /\ p1 = p1' /\ p3 = p3' \/
+    p3 -PA- c ;! v -PA> p3' /\ p1 = p1' /\ p2 = p2') by
+    (triple_disc_nonTau H; eauto 7);
+  let H2 := fresh in elimOr3 H1 H2; andflat U
+  end.
+
+Ltac link_partripdiscW2_tac H W :=
+  match type of H with _ $||$ ?p2 $||$ _ -PA- _ -PA> _ $||$ ?p2' $||$ _ =>
+    link_partripdiscW_tac H W (p2 = p2' \/ exists b, p2 -PA- b -PA> p2') end.
+
+Ltac link_partripdiscW3_tac H W :=
+  match type of H with _ $||$ _ $||$ ?p3 -PA- _ -PA> _ $||$ _ $||$ ?p3' =>
+    link_partripdiscW_tac H W (p3 = p3' \/ exists b, p3 -PA- b -PA> p3') end.
+
+(** The triple is enabled on an action its broadcast, overlap or listener component is
+enabled on.*)
+Ltac dae_component pos :=
+  match goal with [ |- discActEnabled (?p1 $||$ ?p2 $||$ ?p3) _ ] =>
+    change (p1 $||$ p2 $||$ p3) with (parAll p1 [p2, p3]);
+    eapply parAll_dae_intro; [pos | ] end.
+
+Ltac dae_broadcast := dae_component ltac:(left; reflexivity).
+
+Ltac dae_overlap := dae_component ltac:(right; left; reflexivity).
+
+Ltac dae_listener := dae_component ltac:(right; right; left; reflexivity).
+
+(** The position of a component q among p1, p2 and p3.*)
+Ltac triple_index p1 p2 p3 q :=
+  lazymatch q with p1 => constr:(0%nat) | p2 => constr:(1%nat) | p3 => constr:(2%nat) end.
+
+(** Closes the goal from a delay DP of a triple, D1 : one component is enabled on an action
+and D2 : another is enabled on its complement.*)
+Ltac triple_del_sync_not DP D1 D2 :=
+  match type of DP with ?p1 $||$ ?p2 $||$ ?p3 -PD- _ -PD> _ =>
+  match type of D1 with discActEnabled ?qi _ =>
+  match type of D2 with discActEnabled ?qj _ =>
+    let i := triple_index p1 p2 p3 qi in let j := triple_index p1 p2 p3 qj in
+    exact (parAll_del_sync_not p1 [p2, p3] _ _ i j _ _ _ DP ltac:(discriminate)
+      eq_refl eq_refl D1 D2 ltac:(discriminate))
+  end end end.
+
+Ltac reachprot U :=
+  match goal with
+  [H : reachableProt ?p |- _] => let U1 := fresh U in
+  lets U1 : reachableProt_triple H
+  end.

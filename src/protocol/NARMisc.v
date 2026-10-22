@@ -47,6 +47,9 @@ Ltac state_disj_paused_notifAbort_bisim_contra RS PU :=
   lets D : bisim_dae RS PU; state_disj_paused_notifAbort_dae_contra D.
 (* end helpers *)
 
+Section NARMisc.
+Context {Model : ComhModel}.
+
 Lemma state_disj_paused_notifAbort i n :
   pausedStateNet i n -> notifAbortPathNet i n -> False.
 Proof.
@@ -1226,5 +1229,7 @@ Proof.
   econstructor; [ | apply H2]. constructor. constructor.
   eapply nexsOvrSt. eassumption.
 Qed.
+
+End NARMisc.
 
 (*-LOCAL TIDY*)

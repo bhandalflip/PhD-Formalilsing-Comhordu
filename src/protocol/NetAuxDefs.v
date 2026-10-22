@@ -21,6 +21,9 @@ Require Import ComhCoq.protocol.EntAuxDefs.
 Require Import ComhCoq.protocol.NetAuxBasics.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
+Section NetAuxDefs.
+Context {Model : ComhModel}.
+
 (*tfs m t i n p says that the entity i in the network n has been transitioning
 to a fail safe mode from the mode m for a time of t. Transitioning to fail safe
 is a standard definition which takes as a base case a certain state and records
@@ -167,5 +170,7 @@ Who cares if this is strictly the "Defs" file.*)
 >Destruct path predicate to get all the possible state predicates on listener, and in each
 case, state_pred_elim_net gets rid of these by contradiction
 *)
+
+End NetAuxDefs.
 
 (*-LOCAL TIDY*)

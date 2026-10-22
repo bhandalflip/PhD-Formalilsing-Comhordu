@@ -14,9 +14,12 @@ From Stdlib Require Export List.
 From Stdlib Require Export Logic.FunctionalExtensionality.
 Require Import ComhCoq.lib.GenBasics.
 Require Import ComhCoq.model.ComhBasics.
+From Stdlib Require Import Bool.
 
 Open Scope nat_scope.
 
+Section LanguageFoundations.
+Context {Model : ComhModel}.
 
 (** The types of the values of the language: a mode, a time, a position, a distance, a
 delay or a non-negative real. Each is the type of the base values built with the matching
@@ -274,7 +277,7 @@ Definition resetSub (s : Subst) (lv : list Var) (v : Var) : Exp :=
   | false => s v
   end.
 
-Open Scope R_scope.
+#[global] Open Scope R_scope.
 
 (** Evaluates certain base values (Delay, Time, Distance, Nonneg) to nonnegative reals.
 Used to "normalise" the types of things so that +, - and * can be computed over
@@ -680,7 +683,6 @@ Proof.
     reflexivity.
 Qed.
 
-From Stdlib Require Import Bool.
 
 (**The boolean expression function is sound with respect to the relation.*)
 Theorem evalBoolExpFunRel : forall (e : BoolExp) (b : bool),
@@ -882,23 +884,6 @@ Coercion liftVarList (v : Var) : list Var := [v].
 (** Lift an expression to a list of expressions.*)
 Coercion liftExpList (e : Exp) : list Exp := [e].
 
-(** Makes a typed input explicit: from [H : typedVals xs vs], with xs an explicit list of
-variables of known types and vs a variable, replaces vs by one value per variable, each a
-constructor of its variable's type applied to a fresh name.*)
-Ltac explicit_typed_input := repeat match goal with
-  | [H : typedVals (liftVarList _) _ |- _] => unfold liftVarList in H
-  | [H : typedVals [] ?vs |- _] => is_var vs; apply typedVals_nil_inv in H; subst vs
-  | [H : typedVals (?x :: ?xs) ?vs |- _] => is_var vs;
-    let v := fresh "v" in let vs' := fresh "vs" in let E := fresh "E" in
-    let T := fresh "T" in let H' := fresh "H" in
-    destruct (typedVals_cons_inv _ _ _ H) as [v [vs' [E [T H']]]]; clear H; subst vs;
-    destruct v; try discriminate T; clear T
-  end.
-
-(** Solves [typedVals xs vs] for explicit lists of variables and values.*)
-Ltac typed_vals := solve [unfold typedVals; try unfold liftVarList;
-  repeat (constructor; [reflexivity | ]); constructor].
-
 
 (**Lift a time to an exp.*)
 Coercion liftTimeExp (t : Time) : Exp := eBase (baseTime t).
@@ -907,7 +892,6 @@ Coercion liftTimeExp (t : Time) : Exp := eBase (baseTime t).
 Definition liftListVarExp (l : list Var) : list Exp :=
   map eVar l.
 
-From Stdlib Require Import Logic.FunctionalExtensionality.
 
 (** The substitution of l -> liftListVarExp l is equal to the identity substitution.*)
 Lemma listSubRefl : forall (l : list Var),
@@ -2604,64 +2588,6 @@ Lemma resetSub_eq s v : (resetSub s [v]) v = v. unfold resetSub.
   rewrite inVarList_out in Heqb. apply False_ind. apply Heqb.
   apply in_eq. Qed.
 
-(** Replace a single true varEqDec*)
-Ltac varEqDec_true := let U := fresh in
-  match goal with [ |- context[varEqDec ?x ?x]] => 
-    remember (varEqDec x x) as U;
-    match goal with [U1 : U = varEqDec x x |- _] =>
-      clear U1; destruct U;[
-      match goal with [U2 : x = x |- _] =>
-        clear U2
-      end |
-      match goal with [U2 : x <> x |- _] =>
-        contradiction U2; reflexivity
-      end]
-    end
-  end.
-
-(** Replace a single false varEqDec. The tactic will fail if it matches an x and a y
-that aren't obviously false by inversion.*)
-Ltac varEqDec_false := let U := fresh in
-  match goal with [ |- context[varEqDec ?x ?y]] => 
-    remember (varEqDec x y) as U;
-    match goal with [U1 : U = varEqDec x y |- _] =>
-      clear U1; destruct U;[
-      match goal with [U2 : x = y |- _] =>
-        inversion U2
-      end |
-      match goal with [U2 : x <> y |- _] =>
-        clear U2
-      end]
-    end
-  end.
-
-(** Gets rid of lingering occurrences of resetSub in the goal.*)
-Ltac remove_resets := simpl; repeat rewrite resetPreservesId;
-  unfold idSubst; simpl; unfold liftVarList; unfold resetSub;
-  simpl; unfold varEq; repeat varEqDec_true; repeat varEqDec_false.
-
-(** Gets rid of lingering occurrences of update in the goal.*)
-Ltac remove_updates := repeat (repeat rewrite updateAppEq;
-  repeat (rewrite updateAppNeq;[ | solve [neq_inversion]]));
-  unfold idSubst.
-
-(** Gets rid of lingering occurrences of resetSub in the hypothesis. Tactic will
-halt as soon as it encounters a resetSub that can't be eliminated, so doesn't
-necessarily remove ALL possible resets from all hypotheses.*)
-Ltac remove_resets_hyp U := generalize dependent U; remove_resets; intro U.
-
-(** Gets rid of lingering occurrences of resetSub in the hypothesis.*)
-Ltac remove_updates_hyp U := generalize dependent U; remove_updates; intro U.
-
-(** Performs some simplifications to goal like removing updates and resets.*)
-Ltac clean_proc := simpl; remove_resets; remove_updates.
-
-(** If there's one hypothesis U (usually without any dependencies), this tactic
-generalises it, applys some tactic t, and then re-assumed the hypothesis into the
-hypotheses.*)
-Ltac gen_app_intro t U := generalize dependent U; t; intro U.
-
-Ltac clean_proc_hyp U := gen_app_intro clean_proc U.
  
 (**If an expression evaluates to some b, then applying a substitution to this expression
 leaves it unchanged. The intuition is that evaluation entails no free variables.*)
@@ -2732,5 +2658,99 @@ Ltac baseEq := match goal with [|- ?x = ?y] =>
   | _ => (progress repeat f_equal); baseEq
   end
   end.
+
+End LanguageFoundations.
+
+(** A section's notations and tactics end with it. So that later files can use them, the
+notations are declared again here, and the tactics are declared here.*)
+Notation "e |_| b" := (evalExp e b) (at level 50).
+Notation "E1 (-) E2" := (eSubtract E1 E2) (at level 30).
+Notation "E1 (+) E2" := (eAdd E1 E2) (at level 30).
+Notation "E1 (.) E2" := (eMult E1 E2) (at level 29).
+Notation "e1 =b= e2" := (bEqual e1 e2) (at level 20).
+Notation "| e1 , e2 |" := (eDist e1 e2) (at level 30).
+Notation "!~ b" := (bNot b) (at level 25).
+Notation "c *?" := (inAct c []) (at level 30).
+Notation "c *!" := (outAct c []) (at level 30).
+Notation "c ;? v" := (inAct c v) (at level 30).
+Notation "c ;! v" := (outAct c v) (at level 30).
+Notation "a ^" := (complement a) (at level 25).
+Notation "( a , b )" := (pair a b).
+
+(** Makes a typed input explicit: from [H : typedVals xs vs], with xs an explicit list of
+variables of known types and vs a variable, replaces vs by one value per variable, each a
+constructor of its variable's type applied to a fresh name.*)
+Ltac explicit_typed_input := repeat match goal with
+  | [H : typedVals (liftVarList _) _ |- _] => unfold liftVarList in H
+  | [H : typedVals [] ?vs |- _] => is_var vs; apply typedVals_nil_inv in H; subst vs
+  | [H : typedVals (?x :: ?xs) ?vs |- _] => is_var vs;
+    let v := fresh "v" in let vs' := fresh "vs" in let E := fresh "E" in
+    let T := fresh "T" in let H' := fresh "H" in
+    destruct (typedVals_cons_inv _ _ _ H) as [v [vs' [E [T H']]]]; clear H; subst vs;
+    destruct v; try discriminate T; clear T
+  end.
+
+(** Solves [typedVals xs vs] for explicit lists of variables and values.*)
+Ltac typed_vals := solve [unfold typedVals; try unfold liftVarList;
+  repeat (constructor; [reflexivity | ]); constructor].
+
+(** Replace a single true varEqDec*)
+Ltac varEqDec_true := let U := fresh in
+  match goal with [ |- context[varEqDec ?x ?x]] => 
+    remember (varEqDec x x) as U;
+    match goal with [U1 : U = varEqDec x x |- _] =>
+      clear U1; destruct U;[
+      match goal with [U2 : x = x |- _] =>
+        clear U2
+      end |
+      match goal with [U2 : x <> x |- _] =>
+        contradiction U2; reflexivity
+      end]
+    end
+  end.
+
+(** Replace a single false varEqDec. The tactic will fail if it matches an x and a y
+that aren't obviously false by inversion.*)
+Ltac varEqDec_false := let U := fresh in
+  match goal with [ |- context[varEqDec ?x ?y]] => 
+    remember (varEqDec x y) as U;
+    match goal with [U1 : U = varEqDec x y |- _] =>
+      clear U1; destruct U;[
+      match goal with [U2 : x = y |- _] =>
+        inversion U2
+      end |
+      match goal with [U2 : x <> y |- _] =>
+        clear U2
+      end]
+    end
+  end.
+
+(** Gets rid of lingering occurrences of resetSub in the goal.*)
+Ltac remove_resets := simpl; repeat rewrite resetPreservesId;
+  unfold idSubst; simpl; unfold liftVarList; unfold resetSub;
+  simpl; unfold varEq; repeat varEqDec_true; repeat varEqDec_false.
+
+(** Gets rid of lingering occurrences of update in the goal.*)
+Ltac remove_updates := repeat (repeat rewrite updateAppEq;
+  repeat (rewrite updateAppNeq;[ | solve [neq_inversion]]));
+  unfold idSubst.
+
+(** Gets rid of lingering occurrences of resetSub in the hypothesis. Tactic will
+halt as soon as it encounters a resetSub that can't be eliminated, so doesn't
+necessarily remove ALL possible resets from all hypotheses.*)
+Ltac remove_resets_hyp U := generalize dependent U; remove_resets; intro U.
+
+(** Gets rid of lingering occurrences of resetSub in the hypothesis.*)
+Ltac remove_updates_hyp U := generalize dependent U; remove_updates; intro U.
+
+(** Performs some simplifications to goal like removing updates and resets.*)
+Ltac clean_proc := simpl; remove_resets; remove_updates.
+
+(** If there's one hypothesis U (usually without any dependencies), this tactic
+generalises it, applys some tactic t, and then re-assumed the hypothesis into the
+hypotheses.*)
+Ltac gen_app_intro t U := generalize dependent U; t; intro U.
+
+Ltac clean_proc_hyp U := gen_app_intro clean_proc U.
 
 (*-LOCAL TIDY*)

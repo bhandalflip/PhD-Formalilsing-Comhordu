@@ -31,6 +31,9 @@ Require Import ComhCoq.protocol.NARIncomp.
 Require Import ComhCoq.protocol.NARTop.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
+Section Main.
+Context {Model : ComhModel}.
+
 (**Used to exploit a symmetry in the following proof, essentially continues on the proof
 from where it is applied*)
 Local Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
@@ -161,7 +164,8 @@ actions as per our transition semantics, then we end up with a network which is 
 itself is defined elsewhere, but basically means that all pairs of entities in the network are
 separated by a sufficient distance to ensure that they are not incompatible according to their
 respective modes. The sufficiency of the distance in question is in turn decided by parameters
-of the specific system in question*) 
+of the specific system in question. The result holds for every choice of those parameters
+that meets the assumptions of the model, [ComhModel].*)
 Theorem safety (n : Network) : reachableProtNet n -> safe n.
   (*So our assumption is that there exists some initial reachable network in which there is
   some pair of entities that are separated by a distance less than the minimum distance
@@ -209,3 +213,5 @@ Theorem safety (n : Network) : reachableProtNet n -> safe n.
   rewrite distSymmetric in Heqx'. rewrite minDistCompSymmetric in Heqmdc.
   eapply safety_aux;eassumption.
   (**Proof is then continued by the auxiliary result safety_aux*) Qed.
+
+End Main.

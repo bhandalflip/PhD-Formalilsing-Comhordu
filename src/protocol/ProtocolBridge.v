@@ -18,6 +18,9 @@ From Stdlib Require Import Lia.
 
 (******************Guardedness*******************)
 
+Section ProtocolBridge.
+Context {Model : ComhModel}.
+
 (** A rank for each process name. Only the decision states call other processes outside
 an input or output prefix, and the processes they call have a lower rank.*)
 Definition protocolRank (n : ProtocolName) : nat :=
@@ -41,7 +44,7 @@ Qed.
 
 (******************Protocol-specific language facts*******************)
 
-Open Scope R_scope.
+#[global] Open Scope R_scope.
 
 (** A single step of the full automation tactic for "eventually discrete guarded sum" terms.*)
 Ltac taeAutoSing := match goal with
@@ -91,3 +94,5 @@ Proof.
     unfold prefixesOneWay; cbn; repeat apply Forall_cons; try apply Forall_nil;
     split; intro E; cbn in E; first [reflexivity | discriminate E].
 Qed.
+
+End ProtocolBridge.

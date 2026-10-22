@@ -3,9 +3,9 @@
 
 Runs `Print Assumptions safety` against the compiled project (run `make` first) and leads with
 the unproved results it rests on (Admitted / Conjecture), the measure of what is left to prove.
-The model axioms (ComhBasics) are deliberate and shown consistent in ModelConsistency.v, so they
-and the standard-library axioms come after, as counts. Also counts every `Admitted` /
-`Conjecture` in src/, whether or not `safety` uses it.
+`safety` takes the model as a parameter, so the model's assumptions are not among them; the
+standard-library axioms come after, as a count. Also counts every `Admitted` / `Conjecture` in
+src/, whether or not `safety` uses it.
 
 Usage: python3 helper-scripts/summarise_assumptions.py   (from the repository root)
 """
@@ -65,12 +65,10 @@ def source_counts():
 
 def main():
     names = print_assumptions()
-    model, std, unproved = [], [], []
+    std, unproved = [], []
     for n in names:
         mod = n.split(".")[0]
-        if mod == "ComhBasics":
-            model.append(n)
-        elif mod in ("ClassicalDedekindReals", "ProofIrrelevance", "FunctionalExtensionality",
+        if mod in ("ClassicalDedekindReals", "ProofIrrelevance", "FunctionalExtensionality",
                      "Eqdep", "Classical_Prop", "ClassicalEpsilon", "IndefiniteDescription",
                      "Description", "ClassicalUniqueChoice", "PropExtensionality", "JMeq"):
             std.append(n)
@@ -87,8 +85,7 @@ def main():
         print(f"- `{f}`: " + ", ".join(f"`{x}`" for x in sorted(byfile[f])))
     if unproved:
         print()
-    print(f"It also rests on {len(model)} model axioms, which are deliberate and shown consistent "
-          f"in `ModelConsistency.v`, and on {len(std)} standard-library axioms.\n")
+    print(f"It holds for every model, and also rests on {len(std)} standard-library axioms.\n")
     print(f"Whole codebase: **{sum(admitted.values())}** `Admitted`, "
           f"**{sum(conjectures.values())}** `Conjecture`.\n")
     print("<details><summary>Everything it rests on</summary>\n\n```")

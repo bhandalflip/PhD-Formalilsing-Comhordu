@@ -29,6 +29,9 @@ Require Import ComhCoq.protocol.NARMisc.
 Require Import ComhCoq.protocol.NAROvlpTime.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
+Section NARNonFS_currSince.
+Context {Model : ComhModel}.
+
 Lemma ovWait_nextSinceState_net m t x y i n : 
   ovWaitStateNet m t x y i n -> nextSinceStateNet i n.
 Proof.
@@ -490,3 +493,5 @@ Theorem nonFS_currSince (m : Mode) (i : nat) (n : Network)
   (*And now as our existential we take t + d*. And by the delay constructor of
   currSince, we're done.*)
   exists (t +dt+ d). constructor. assumption. Qed.
+
+End NARNonFS_currSince.

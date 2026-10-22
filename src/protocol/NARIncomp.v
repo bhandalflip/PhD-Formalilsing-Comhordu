@@ -29,6 +29,8 @@ Require Import ComhCoq.protocol.NetAuxDefs.
 Require Import ComhCoq.protocol.NARMisc.
 Require Import ComhCoq.protocol.ProtocolBridge.
 
+Section NARIncomp.
+Context {Model : ComhModel}.
 
 (*If any entity has an incomingNet message of a mode and a position, the network can't
 delay.*)
@@ -527,3 +529,5 @@ Proof.
         assert (T2 : 0 <= t2) by timeNonneg. clear - T2. destruct d as [[dd DP]].
         simpl in *. lra.
 Qed.
+
+End NARIncomp.

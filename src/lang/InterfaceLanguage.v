@@ -8,8 +8,18 @@ Require Import ComhCoq.lib.GenBasics.
 Require Import ComhCoq.model.ComhBasics.
 Require Import ComhCoq.lib.GenTacs.
 Require Import ComhCoq.lib.StandardResults.
+From Stdlib Require Import Lra.
 
 (***************** Timed lists *****************)
+
+Reserved Notation "l -tl- a -tl> l'" (at level 75).
+Reserved Notation "l -il- a -il> l'" (at level 75).
+Reserved Notation "l -ol- a -ol> l'" (at level 75).
+Reserved Notation "l -nl- a -nl> l'" (at level 75).
+Reserved Notation "i -i- a -i> i'" (at level 75).
+
+Section InterfaceLanguage.
+Context {Model : ComhModel}.
 
 (** A timed element is a vector of base values, along with a timestamp.*)
 Record TimedEl : Type := mkTimedEl
@@ -39,8 +49,6 @@ Inductive ActTimedList :=
 
 Notation "v ?? " := (atlIn v) (at level 30).
 Notation "v !! " := (atlOut v) (at level 30).
-
-Reserved Notation "l -tl- a -tl> l'" (at level 75). 
 
 (** The operational semantics for timed lists. Note that the law "buff" will have
 to be defined separately for each of the sub-type lists individually,
@@ -103,10 +111,6 @@ Lemma timedList_timeout_enabled v l :
   introz U. induction l; inversion U. subst.
   exists l. constructor. apply IHl in H.
   ex_flat. eexists. eapply stepTlFwd. eassumption. Qed.
-
-(* begin helpers for timedList_del_le *)
-From Stdlib Require Import Lra.
-(* end helpers *)
 
 Lemma timedList_del_le l l' d v t q :
    l -tl- atlDel d -tl> l' -> <( v, t )> _: l ->
@@ -171,10 +175,6 @@ a wrapper. Each will then diverege in their extension of the semantics of timed 
 lifting the timed list relation and then adding some new laws specific to the type of list
 (input, output or notification).*)
 
-Reserved Notation "l -il- a -il> l'" (at level 75). 
-Reserved Notation "l -ol- a -ol> l'" (at level 75). 
-Reserved Notation "l -nl- a -nl> l'" (at level 75). 
-
 (** Syntactially, an input list is essentially a timed list.*)
 Record InputList : Type := mkInputList {inList : TimedList}.
 
@@ -198,7 +198,7 @@ Inductive stepInputList : InputList -> ActTimedList -> InputList -> Prop :=
     l -tl- a -tl> l' -> mkInputList l -il- a -il> mkInputList l'
   where "l -il- a -il> l'" := (stepInputList l a l').
 
-Open Scope nat_scope.
+#[global] Open Scope nat_scope.
 
 (** The size of a list is non-increasing for an input list.*)
 Lemma delNonIncSizeIL : forall (l l' : InputList) (d : Delay),
@@ -263,7 +263,7 @@ Inductive stepNotifList : NotifList -> ActTimedList -> NotifList -> Prop :=
     l -tl- a -tl> l' -> mkNotifList l -nl- a -nl> mkNotifList l'
   where "l -nl- a -nl> l'" := (stepNotifList l a l').
 
-  Open Scope R_scope.
+  #[global] Open Scope R_scope.
 
 Lemma notifList_del_le ln ln' d v t q :
   ln -nl- atlDel d -nl> ln' -> <( v, t )> _: notifList ln ->
@@ -322,7 +322,6 @@ Proof.
 Qed.
 
 (* begin helpers for timeSplit_inputList *)
-From Stdlib Require Import Lra.
 (** Time splitting for plain timed lists: a delay by d +d+ d' can be split
 into a delay by d followed by a delay by d'.*)
 Lemma timeSplit_inputList_tl : forall l a l'', l -tl- a -tl> l'' ->
@@ -364,7 +363,6 @@ Proof.
 Qed.
 
 (* begin helpers for timeSplit_notifList *)
-From Stdlib Require Import Lra.
 Local Lemma timeSplit_notifList_aux : forall l a l'', l -nl- a -nl> l'' ->
   forall d d' : Delay, a = atlDel (d +d+ d') ->
   exists l', l -nl- d -nl> l' /\ l' -nl- d' -nl> l''.
@@ -443,8 +441,6 @@ Notation "c !I!" := (aiOut c []) (at level 30).
 Notation "c {? v" := (aiIn c v) (at level 30).
 Notation "c {! v" := (aiOut c v) (at level 30).
 Notation "c _! v !_ r" := (aiOutCov c v r) (at level 30).
-
-Reserved Notation "i -i- a -i> i'" (at level 75).
 
 (** The semantics for the interface.*)
 Inductive stepInter : Interface -> ActInter -> Interface -> Prop :=
@@ -649,5 +645,22 @@ Proof.
   - simpl. right. assumption.
   - match goal with [Ht : _ -tl- _ -tl> _ |- _] => inversion Ht end.
 Qed.
+
+End InterfaceLanguage.
+
+(** A section's notations end with it. So that later files can use them, they are declared
+again here.*)
+Notation "<( m , t )>" := (mkTimedEl m t) (at level 40).
+Notation "v ?? " := (atlIn v) (at level 30).
+Notation "v !! " := (atlOut v) (at level 30).
+Notation "c !I!" := (aiOut c []) (at level 30).
+Notation "c {? v" := (aiIn c v) (at level 30).
+Notation "c {! v" := (aiOut c v) (at level 30).
+Notation "c _! v !_ r" := (aiOutCov c v r) (at level 30).
+Notation "l -tl- a -tl> l'" := (stepTimedList l a l').
+Notation "l -il- a -il> l'" := (stepInputList l a l').
+Notation "l -ol- a -ol> l'" := (stepOutputList l a l').
+Notation "l -nl- a -nl> l'" := (stepNotifList l a l').
+Notation "i -i- a -i> i'" := (stepInter i a i').
 
 (*-LOCAL TIDY*)

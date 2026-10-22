@@ -12,6 +12,8 @@ Require Import ComhCoq.lib.GenBasics.
 Require Import ComhCoq.model.ComhBasics.
 Require Import ComhCoq.lang.SoftwareLanguage.
 
+Section Protocol.
+Context {Model : ComhModel}.
 
 (**Names for defining parametrised processes.*)
 Inductive ProtocolName := bcWaitN | sleepingN | bcReadyN | dormantN | initN | 
@@ -171,3 +173,5 @@ none here i.e. procProtocol is not on the right hand side of any of the def
 equations. Hence there is no need to use the def relation, which in any case would
 have made for more cumbersome developments later on.*)
 Definition procProtocol := sleeping $||$ dormant $||$ listening.
+
+End Protocol.
