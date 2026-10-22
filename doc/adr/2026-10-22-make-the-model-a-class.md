@@ -5,7 +5,7 @@ Status: 2026-10-22 accepted
 
 ## Context
 
-The Comhordú model is what any system that uses the protocol must supply: its modes and which of them are fail-safe, how one mode may change to another and how long that takes, the message latency, the maximum speed, the distances at which modes are compatible, and the constraints that relate them. It was stated as 28 global axioms. `safety` was proved from them, and a separate file built a concrete model that meets them, which showed that they are consistent. But Rocq could not link the two. `safety` was a theorem about the axioms, so nobody could apply it to that model, or to a real system's, and get a safety theorem for it that Rocq checks.
+The Comhordú model is what any system that uses the protocol must supply: its modes and which of them are fail-safe, whether one mode may change to another and how long that takes, the message latency, the maximum speed, the distances at which modes are compatible, and the constraints that relate them. It was stated as 28 global axioms. `safety` was proved from them, and a separate file built a concrete model that meets them, which showed that they are consistent. But Rocq could not link the two. `safety` was a theorem about the axioms, so nobody could apply it to that model, or to a real system's, and get a safety theorem for it that Rocq checks.
 
 ## Decision
 
