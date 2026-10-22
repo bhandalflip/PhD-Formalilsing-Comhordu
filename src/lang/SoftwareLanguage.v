@@ -720,30 +720,6 @@ Theorem sort_complete d a p :
   rewrite H. eapply sortDeriv. apply enabledInSort. apply U2. assumption.
   assumption. Qed.
 
-(*********Misc.*********)
-
-(** If a parallel construct delays to another process then the resulting process is
-itself a parallel construct, whose terms either match the original or are related
-to the original via a single transition.*)
-Theorem parStructPres : forall (p1 p2 p' : ProcTerm) (a : Act),
-  p1 $||$ p2 -P- a -P> p' -> exists p1', exists p2',
-  p' = p1' $||$ p2' /\ p1 -P=> p1' /\ p2 -P=> p2'. intros.
-  destruct p'; inversion H; inversion H0; exists p'1;
-  exists p'2; (split; [reflexivity | ]).
-  split; [eapply stprTrans; apply stepPDisc; apply H6 | eapply stprRefl].
-  split; [eapply stprRefl |eapply stprTrans; apply stepPDisc; apply H6 ].
-  split; eapply stprTrans; apply stepPDisc. apply H7. apply H9.
-  split; eapply stprTrans; apply stepPDisc. apply H7. apply H9.
-  split; eapply stprTrans; apply stepPTimed. apply H8. apply H9.
-  Qed.
-
-(** Parallel structural preservation for the reflexive transition relation.*)
-Theorem parStructPres2 : forall (p1 p2 p' : ProcTerm),
-  p1 $||$ p2 -P=> p' -> exists p1', exists p2',
-  p' = p1' $||$ p2' /\ p1 -P=> p1' /\ p2 -P=> p2'. intros.
-  inversion H. exists p1. exists p2. split. reflexivity.
-  split; constructor. eapply parStructPres. apply H0. Qed.
-
 
 
 
