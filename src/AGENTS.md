@@ -6,9 +6,8 @@
 
 ## Statements are frozen; proofs are not
 
-- **Never change the statement** of an existing `Lemma`, `Theorem`, `Conjecture`, `Definition`, `Inductive`, `Record` or `Fixpoint` without human approval, and never delete a definition or an unproved result. If one is false or mis-stated, leave it `Admitted` and write it up in a report (see `doc/reports/AGENTS.md`).
+- **Never change the statement** of an existing `Lemma`, `Theorem`, `Conjecture`, `Definition`, `Inductive`, `Record` or `Fixpoint` without human approval, and never delete a definition or an unproved result.
 - **Prefer one abstraction to many special cases.** The heuristic is mathematical elegance: a general result that makes several specific proofs a line each is worth more than the specific proofs. State it in the first folder that can, re-prove the specific results from it, and delete a proved result that nothing needs any more. Such deletions need no approval and are encouraged, as long as the statement of `safety` and what it rests on stay the same and the PR lists each deleted result with the one that replaced it.
-- **Prove as stated.** Replace `Admitted.` with a complete proof ending in `Qed.`. Turn a `Conjecture` into a `Lemma` with the same name and statement.
 - **When a statement turns out false**, and a human agrees to change it, keep its intent: add a well-formedness or well-typedness hypothesis that makes the original conclusion hold, where the language can express one, rather than weakening the conclusion. Weaken it only when no such hypothesis exists, and say so in the PR.
 - **Don't add** `Axiom`, `Parameter`, `Conjecture`, `Hypothesis`/`Variable` outside a section, `Admitted`, `admit`, or the LibTactics `skip`.
 - **Extra logical axioms:** the stdlib's classical logic, functional extensionality and proof irrelevance (already in the trust base) are allowed. Any newly used one must be listed in the PR and the report.
