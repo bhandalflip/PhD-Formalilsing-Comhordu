@@ -117,7 +117,7 @@ Also, at this later point, the time parameter will not have decreased- though it
 Sent can be seen as a means of encoding what happened in the past, a way of remembering some of the
 history that brought us to this state. The parameter p of type reachableProtNet n remembers the exact history
 up to this point. Sent is like a summary of this or a statistic over p.*)				 
-Inductive sent (v : list BaseType) : Time -> nat -> forall n : Network, reachableProtNet n -> Prop :=
+Inductive sent (v : list BaseValue) : Time -> nat -> forall n : Network, reachableProtNet n -> Prop :=
   | sentBase (i : nat) (n n' : Network) (p : reachableProtNet n) (w : n -NA- anTau -NA> n')
     (q q' : ProcTerm) (l : Position) (h h' : Interface) (k : ModeState) :
     [| q, l, h, k |] @ i .: n -> [| q', l, h', k |] @ i .: n' -> 
@@ -139,7 +139,7 @@ Inductive delivered (v : Message) : Time -> nat -> forall n : Network, reachable
     delivered v t i n p -> delivered v (t +dt+ d) i n' (reachNetDel n n' d p w).
 
 (*received v t i n p says that the message v was received t time units ago by the entity i in the network n.*)
-Inductive received (v : list BaseType) : Time -> nat -> forall n : Network, reachableProtNet n -> Prop :=
+Inductive received (v : list BaseValue) : Time -> nat -> forall n : Network, reachableProtNet n -> Prop :=
   | receivedBase (a : ActDiscNet) (i : nat) (n n' : Network) (p : reachableProtNet n)
   (w : n -NA- a -NA> n') (e e' : Entity) (l : Position) (r : Distance) :
     e @ i .: n -> e' @ i .: n' -> e -EA- (aeTagIn ([- v, l, r -])) ->> e' ->

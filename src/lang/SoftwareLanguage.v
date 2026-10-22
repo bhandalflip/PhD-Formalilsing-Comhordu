@@ -156,14 +156,14 @@ Definition durationSoft (a : Act) : Time :=
 of this relation iff the process p can perform the discrete action d and evolve
 to the process q.*)
 Inductive stepDiscProc : ProcTerm -> DiscAct -> ProcTerm -> Prop :=
-  | stepDpOut : forall (c : Channel) (l1 : list Exp) (l2 : list BaseType) (p : ProcTerm),
+  | stepDpOut : forall (c : Channel) (l1 : list Exp) (l2 : list BaseValue) (p : ProcTerm),
     evalExpLists l1 l2 -> stepDiscProc (outPrefix c l1 p) (outAct c l2) p
   (** If the base values l1 are typed for the variables l2, one value of each variable's
     type, then they can be input across the channel in question, and the resulting term is
     the guarded term with all occurrences of variables in the list l2 replaced by their
     base value counterparts in l1. The thesis defines the semantics only over well-typed
     processes (Remark 4.1, p.65); the typing premise is what makes that so here.*)
-  | stepDpIn : forall (c : Channel) (l1 : list BaseType) (l2 : list Var) (p : ProcTerm),
+  | stepDpIn : forall (c : Channel) (l1 : list BaseValue) (l2 : list Var) (p : ProcTerm),
     typedVals l2 l1 -> stepDiscProc (inPrefix c l2 p) (inAct c l1)
     (subProcTerm (listsToSub l2 (listBaselistExp l1)) p)
   | stepDpThen : forall (b : BoolExp) (p p' : ProcTerm) (d : DiscAct),
@@ -177,10 +177,10 @@ Inductive stepDiscProc : ProcTerm -> DiscAct -> ProcTerm -> Prop :=
     stepDiscProc p d p' -> stepDiscProc (parComp p q) d (parComp p' q)
   | stepDpParR : forall (q q' p : ProcTerm) (d : DiscAct),
     stepDiscProc q d q' -> stepDiscProc (parComp p q) d (parComp p q')
-  | stepDpSyncLR : forall (p p' q q' : ProcTerm) (c : Channel) (l : list BaseType),
+  | stepDpSyncLR : forall (p p' q q' : ProcTerm) (c : Channel) (l : list BaseValue),
     stepDiscProc p (outAct c l) p' -> stepDiscProc q (inAct c l) q' ->
     stepDiscProc (parComp p q) tauAct (parComp p' q')
-  | stepDpSyncRL : forall (p p' q q' : ProcTerm) (c : Channel) (l : list BaseType),
+  | stepDpSyncRL : forall (p p' q q' : ProcTerm) (c : Channel) (l : list BaseValue),
     stepDiscProc p (inAct c l) p' -> stepDiscProc q (outAct c l) q' ->
     stepDiscProc (parComp p q) tauAct (parComp p' q')
   | stepDpApp : forall (n : Name) (l1 : list Var) (l2 : list Exp) (p p' : ProcTerm) (d : DiscAct),
@@ -224,10 +224,10 @@ certain language properties.*)
 (**For every delay d and term t, approximates whether or not the action a can be performed
 within (but not including) d units of time by a derivative of t.*)
 Inductive sort : DiscAct -> Delay -> ProcTerm -> Prop :=
-  | sortOut : forall (c : Channel) (l1 : list Exp) (l2 : list BaseType)
+  | sortOut : forall (c : Channel) (l1 : list Exp) (l2 : list BaseValue)
     (p : ProcTerm) (d : Delay),
     evalExpLists l1 l2 -> sort (outAct c l2) d (outPrefix c l1 p)
-  | sortIn : forall (c : Channel) (l1 : list Var) (l2 : list BaseType)
+  | sortIn : forall (c : Channel) (l1 : list Var) (l2 : list BaseValue)
     (p : ProcTerm) (d : Delay), typedVals l1 l2 ->
     sort (inAct c l2) d (inPrefix c l1 p)
   | sortThen : forall (p : ProcTerm) (b : BoolExp) (a : DiscAct) (d : Delay),
@@ -555,18 +555,18 @@ Lemma enabledInSort : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
   assumption. eapply sortTimeOut. assumption. apply IHstepDiscProc.
   inversion H. inversion H3. eapply dae. apply H6. assumption. Qed.
 
-Lemma enabledInSort_in (c : Channel) (v : list BaseType) (d : Delay) (p : ProcTerm) :
+Lemma enabledInSort_in (c : Channel) (v : list BaseValue) (d : Delay) (p : ProcTerm) :
   discActEnabled p (c ;? v) -> sort (c ;? v) d p. intros. eapply enabledInSort.
   assumption. unfold not. intro. inversion H0. Qed.
 
-Lemma enabledInSort_out (c : Channel) (v : list BaseType) (d : Delay) (p : ProcTerm) :
+Lemma enabledInSort_out (c : Channel) (v : list BaseValue) (d : Delay) (p : ProcTerm) :
   discActEnabled p (c ;!v) -> sort (c ;! v) d p. intros. eapply enabledInSort.
   assumption. unfold not. intro. inversion H0. Qed.
 
 (** If we can prove sort a d p, then the action a is either an input of some vector
 or the output of some vector.*)
 Lemma sortInOrOut : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
-  sort a d p -> exists v : list BaseType, exists c : Channel,
+  sort a d p -> exists v : list BaseValue, exists c : Channel,
   a = c ;? v \/ a = c ;! v. intros. induction H; try apply IHsort.
   exists l2. exists c. right. reflexivity. exists l2. exists c. left.
   reflexivity. Qed. 
@@ -1168,7 +1168,7 @@ Combined with a similar computation for input channels, this will be used to
 construct a decision procedure as to whether processes can synchronise or not.*)
 Inductive outListProc : ProcTerm -> list ChanStamped -> Prop :=
   | outlNil : outListProc nilProc []
-  | outlOutEval (p : ProcTerm) (l : list Exp) (l' : list BaseType)
+  | outlOutEval (p : ProcTerm) (l : list Exp) (l' : list BaseValue)
     (c : Channel) : evalExpLists l l' -> outListProc (c $< l >$ ! p) [(c, map valTypeOf l')]
   | outlOutIll (p : ProcTerm) (l : list Exp) (c : Channel) :
     (forall l', ~evalExpLists l l') -> outListProc (c $< l >$ ! p) []
@@ -1492,7 +1492,7 @@ Theorem outListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   assumption. Qed.
 
 Theorem inListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
-  (v : list BaseType): inListProc p l -> (c, map valTypeOf v) _: l ->
+  (v : list BaseValue): inListProc p l -> (c, map valTypeOf v) _: l ->
   discActEnabled p (c ;? v). intros.
   induction H; try solve [inversion H0]. eapply dae.
   invertClear H0. invertClear H. apply stepDpIn. apply typedVals_map. congruence.
@@ -1515,7 +1515,7 @@ Theorem inListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
 (** If a process is enabled on an output action then there is a matching stamped
 channel in the output list of that process.*)
 Theorem enabledOutList (c : Channel) (p : ProcTerm) (l : list ChanStamped)
-  (v : list BaseType) :  outListProc p l -> discActEnabled p (c ;! v) ->
+  (v : list BaseValue) :  outListProc p l -> discActEnabled p (c ;! v) ->
   (c, map valTypeOf v) _: l. intros. invertClear H0. generalize dependent p'.
   induction H; intros; try solve [inversion H1]. inversion H1.
   rewrite (evalExpListsUnique _ _ _ H H7). constructor.
@@ -1533,7 +1533,7 @@ Theorem enabledOutList (c : Channel) (p : ProcTerm) (l : list ChanStamped)
 (** If a process is enabled on an input action then there is a matching stamped
 channel in the input list of that process.*)
 Theorem enabledInList (c : Channel) (p : ProcTerm) (l : list ChanStamped)
-  (v : list BaseType) : inListProc p l -> discActEnabled p (c ;? v) ->
+  (v : list BaseValue) : inListProc p l -> discActEnabled p (c ;? v) ->
   (c, map valTypeOf v) _: l. intros. invertClear H0. generalize dependent p'.
   induction H; intros; try solve [inversion H1]. inversion H1.
   apply typedVals_map in H6. rewrite H6. constructor. reflexivity.

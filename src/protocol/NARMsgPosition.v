@@ -36,7 +36,7 @@ Context {Model : ComhModel}.
 (* If an entity has sent a message v t time units ago, and that time is less than the 
 message latency, then said message is in the output queue of the interface component 
 with timestamp mL - t.*)
-Theorem sent_outgoing (n : Network) (v : list BaseType) (t : Time) (i : nat)
+Theorem sent_outgoing (n : Network) (v : list BaseValue) (t : Time) (i : nat)
   (p : reachableProtNet n) :
   sent v t i n p -> forall q : t < msgLatency,
   outgoing v (minusTime msgLatency t (Rlt_le t msgLatency q)) i n.
@@ -122,7 +122,7 @@ Proof.
 
 (* If an entity has sent a message v mL time units ago, then said message is in the output
 queue of the interface component with timestamp 0 or it has been delivered 0 time units ago.*)
-Theorem sent_out_del (n : Network) (v : list BaseType) (i : nat)
+Theorem sent_out_del (n : Network) (v : list BaseValue) (i : nat)
   (p : reachableProtNet n) : sent v msgLatency i n p ->
   outgoing v zeroTime i n \/
   exists r l, delivered ([-v, l, r-]) zeroTime i n p.
@@ -169,7 +169,7 @@ Theorem sent_out_del (n : Network) (v : list BaseType) (i : nat)
 (* If an entity has sent a message v t time units ago, and that time is greater than the
 message latency, then said message was delivered to some radius, and the delivery time
 is less than the time of sending by the amount message latency.*)
-Theorem sent_delivered (n : Network) (v : list BaseType) (t : Time) (i : nat)
+Theorem sent_delivered (n : Network) (v : list BaseValue) (t : Time) (i : nat)
   (p : reachableProtNet n) : sent v t i n p -> forall q : msgLatency < t,
   exists r l,
   delivered ([-v, l, r-]) (minusTime t msgLatency (Rlt_le msgLatency t q)) i n p.

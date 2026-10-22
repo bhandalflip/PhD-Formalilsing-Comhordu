@@ -353,7 +353,7 @@ Theorem nextSince_rel_state (n : Network) (m : Mode) (t : Time) (i : nat)
 (*Let's say two entities e1 and e2 are separated by a distance x. If e1 has delivered
 message v to radius r t time units ago, and x + 2*Smax*t <= r, then e2 has received v t time
 units ago.*)
-Theorem delivered_received (n : Network) (v : list BaseType) (t : Time) (r x : Distance)
+Theorem delivered_received (n : Network) (v : list BaseValue) (t : Time) (r x : Distance)
   (i j : nat) (p : reachableProtNet n) (l : Position) :
   delivered ([-v, l, r-]) t i n p -> i <> j ->
   distNet i j n x -> x + 2*speedMax*t <= r -> received v t j n p.
@@ -572,7 +572,7 @@ Qed.
 a discrete transition, then in the resultant network, v is either still timed out and outgoing
 or it has just been delivered from l in this instant.*)
 Theorem outgoing_timeout_disc (n n' : Network) (a : ActDiscNet) (i : nat)
-  (p : reachableProtNet n) (w : n -NA- a -NA> n') (v : list BaseType) (l : Position) :
+  (p : reachableProtNet n) (w : n -NA- a -NA> n') (v : list BaseValue) (l : Position) :
   inPosNet l i n -> outgoing v zeroTime i n ->
   outgoing v zeroTime i n' \/
   exists r, delivered ([-v, l, r-]) zeroTime i n' (reachNetDisc n n' a p w).

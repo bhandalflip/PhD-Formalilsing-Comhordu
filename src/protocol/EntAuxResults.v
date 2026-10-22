@@ -1209,7 +1209,7 @@ Proof.
 Qed.
 
 (** If an entity inputs a message then that message is incoming.*)
-Lemma input_incomingEnt (v : list BaseType) (e e' : Entity) (l : Position) (r : Distance) :
+Lemma input_incomingEnt (v : list BaseValue) (e e' : Entity) (l : Position) (r : Distance) :
   e -EA- ([-v, l, r-]) #? ->> e' -> incomingEnt v e'.
   (*Proof: Obvious from the definition of incoming.*)
   introz U. inversion U. constructor. inversion H5.

@@ -1157,7 +1157,7 @@ Proof.
 Qed.
 
 (** An overlap component bisimilar to ovReady v u lv has a mode as v and a position as lv.*)
-Local Lemma overlap_ovReady_typed (p : ProcTerm) (v lv : BaseType) (u : Exp) :
+Local Lemma overlap_ovReady_typed (p : ProcTerm) (v lv : BaseValue) (u : Exp) :
   overlapState p -> p ~p~ ovReady v u lv ->
   exists (mm : Mode) (lp : Position), v = baseMode mm /\ lv = basePosition lp.
 Proof.

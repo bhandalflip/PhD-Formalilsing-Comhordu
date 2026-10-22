@@ -23,7 +23,7 @@ Context {Model : ComhModel}.
 
 (** The types of the values of the language: a mode, a time, a position, a distance, a
 delay or a non-negative real. Each is the type of the base values built with the matching
-constructor of BaseType below.*)
+constructor of BaseValue below.*)
 Inductive ValType : Type :=
   vtMode | vtTime | vtPosition | vtDistance | vtDelay | vtNonneg.
 
@@ -51,18 +51,18 @@ Lemma eqDecVar : eqDec Var. unfold eqDec. destruct x1 as [t n], x2 as [t' n'].
     [subst n'; left; reflexivity | right; intro H; apply NE; inversion H; reflexivity].
   Qed.
 
-(** BaseType type elements are either a mode, a time, a position, a distance or a delay.
+(** A base value is a mode, a time, a position, a distance, a delay or a non-negative real.
 We use coercions to reduce constructor verbosity.*)
-Inductive BaseType : Type:=
-  | baseMode :> Mode -> BaseType
-  | baseTime :> Time -> BaseType
-  | basePosition :> Position -> BaseType
-  | baseDistance :> Distance -> BaseType
-  | baseDelay :> Delay -> BaseType
-  | baseNonneg :> nonnegreal -> BaseType.
+Inductive BaseValue : Type:=
+  | baseMode :> Mode -> BaseValue
+  | baseTime :> Time -> BaseValue
+  | basePosition :> Position -> BaseValue
+  | baseDistance :> Distance -> BaseValue
+  | baseDelay :> Delay -> BaseValue
+  | baseNonneg :> nonnegreal -> BaseValue.
 
-(** Equality on the base type is decidable.*)
-Lemma eqDecBase : eqDec BaseType. unfold eqDec. unfold decidable.
+(** Equality on base values is decidable.*)
+Lemma eqDecBase : eqDec BaseValue. unfold eqDec. unfold decidable.
   intros. destruct x1, x2; try solve [right; unfold not; intros; inversion H].
   addHyp (eqDecMode m m0). invertClear H. rewrite H0. left. reflexivity.
   right. unfold not. intros. apply H0. invertClear H. reflexivity.
@@ -78,7 +78,7 @@ Lemma eqDecBase : eqDec BaseType. unfold eqDec. unfold decidable.
   right. unfold not. intros. apply H0. invertClear H. reflexivity. Qed.
 
 (** The type of a base value.*)
-Definition valTypeOf (b : BaseType) : ValType :=
+Definition valTypeOf (b : BaseValue) : ValType :=
   match b with
   | baseMode _ => vtMode
   | baseTime _ => vtTime
@@ -104,7 +104,7 @@ Lemma valTypeOf_distance b : valTypeOf b = vtDistance -> exists r, b = baseDista
 (** The values vs are typed for the variables xs: there is one value per variable, and each
 value has its variable's type. An input binds its variables only to such values, so a
 process never holds a time where it expects a mode.*)
-Definition typedVals (xs : list Var) (vs : list BaseType) : Prop :=
+Definition typedVals (xs : list Var) (vs : list BaseValue) : Prop :=
   Forall2 (fun x v => valTypeOf v = varType x) xs vs.
 
 (** Typed values are exactly the value lists whose types are the variables' types.*)
@@ -136,7 +136,7 @@ Lemma typedVals_cons_inv x xs vs : typedVals (x :: xs) vs ->
 (** A simple expression language over the base types.*)
 Inductive Exp : Type :=
   | eVar :> Var -> Exp
-  | eBase :> BaseType -> Exp
+  | eBase :> BaseValue -> Exp
   | eSubtract : Exp -> Exp -> Exp
   | eAdd : Exp -> Exp -> Exp
   | eMult : Exp -> Exp -> Exp
@@ -282,7 +282,7 @@ Definition resetSub (s : Subst) (lv : list Var) (v : Var) : Exp :=
 (** Evaluates certain base values (Delay, Time, Distance, Nonneg) to nonnegative reals.
 Used to "normalise" the types of things so that +, - and * can be computed over
 expressions.*)
-Inductive evalBaseNonneg : BaseType -> nonnegreal -> Prop :=
+Inductive evalBaseNonneg : BaseValue -> nonnegreal -> Prop :=
   | ebnDel r : evalBaseNonneg (baseDelay (mkDelay r)) (posToNonneg r)
   | ebnTime r : evalBaseNonneg (baseTime (mkTime r)) r
   | ebnDistance r : evalBaseNonneg (baseDistance (mkDistance r)) r
@@ -294,7 +294,7 @@ Lemma evalBaseNonneg_unique b r1 r2 :
   inversion H; inversion H0; inversion H3; subst;
   inversion H5; reflexivity. Qed.
 
-Definition evalBaseNonnegFun (b : BaseType) : option nonnegreal :=
+Definition evalBaseNonnegFun (b : BaseValue) : option nonnegreal :=
   match b with
   | baseDelay (mkDelay r) => Some (posToNonneg r)
   | baseTime (mkTime r) => Some r
@@ -315,15 +315,15 @@ Lemma evalBaseNonneg_fun_rel b r :
 
 (**Evaluation on terms of Exp. Note that only closed terms will actually evaluate to
 something. If we can prove evalExp e b then e evaluates to b.*)
-Inductive evalExp : Exp -> BaseType -> Prop :=
-  | evalBase : forall b : BaseType, evalExp (eBase b) b
-  | evalSub : forall (e1 e2 : Exp) (b1 b2 : BaseType) (r1 r2 : nonnegreal),
+Inductive evalExp : Exp -> BaseValue -> Prop :=
+  | evalBase : forall b : BaseValue, evalExp (eBase b) b
+  | evalSub : forall (e1 e2 : Exp) (b1 b2 : BaseValue) (r1 r2 : nonnegreal),
   evalExp e1 b1 -> evalExp e2 b2 -> b1 \_/ r1 -> b2 \_/ r2 ->
   evalExp (eSubtract e1 e2) (r1 -nn- r2)
-  | evalAdd : forall (e1 e2 : Exp) (b1 b2 : BaseType) (r1 r2 : nonnegreal),
+  | evalAdd : forall (e1 e2 : Exp) (b1 b2 : BaseValue) (r1 r2 : nonnegreal),
   evalExp e1 b1 -> evalExp e2 b2 -> b1 \_/ r1 -> b2 \_/ r2 ->
   evalExp (eAdd e1 e2) (r1 +nn+ r2)
-  | evalMult : forall (e1 e2 : Exp) (b1 b2 : BaseType) (r1 r2 : nonnegreal),
+  | evalMult : forall (e1 e2 : Exp) (b1 b2 : BaseValue) (r1 r2 : nonnegreal),
   evalExp e1 b1 -> evalExp e2 b2 -> b1 \_/ r1 -> b2 \_/ r2 ->
   evalExp (eMult e1 e2) (r1 *nn* r2)
   | evalWait : forall (e1 e2 : Exp) (m1 : Mode) (m2 : Mode)
@@ -351,7 +351,7 @@ proof that the two coincide is a separate issue! This function, due to its deali
 with the horrid option type, is quite ugly and hard to understand, but its advantage
 is its computability. Once it is linked to the relation via proofs, it can be left as
 an under the hood engine that "computes" the relation.*)
-Fixpoint evalExpFun (e : Exp) : option BaseType :=
+Fixpoint evalExpFun (e : Exp) : option BaseValue :=
   match e with
   | eVar v => None
   | eBase b => Some b
@@ -440,7 +440,7 @@ Ltac evalBaseNonneg_fun_rel_tac := repeat evalBaseNonneg_fun_rel_step.
 
 (** If e evaluates to b via the evaluation relation then it does so also by the evalution
 function.*)
-Theorem evalExpRelFun : forall (e : Exp) (b : BaseType),
+Theorem evalExpRelFun : forall (e : Exp) (b : BaseValue),
   evalExp e b -> evalExpFun e = Some b. intros.
   induction H; simpl; try rewrite IHevalExp;
   try rewrite IHevalExp1; try rewrite IHevalExp2;
@@ -452,7 +452,7 @@ Theorem evalExpRelFun : forall (e : Exp) (b : BaseType),
 
 (** If e evaluates to b via the evaluation function then it does so
 also by the evalution relation.*)
-Theorem evalExpFunRel : forall (e : Exp) (b : BaseType),
+Theorem evalExpFunRel : forall (e : Exp) (b : BaseValue),
   evalExpFun e = Some b -> evalExp e b. intros. generalize dependent b.
   induction e; intros. inversion H. inversion H. constructor. 
   (** Subtract case.*)
@@ -536,13 +536,13 @@ Qed.
 (**List the eval relation to work between lists of expressions and lists of values.
 l1 l2 is a member of this relation iff the ith element of l1 evaluates to the ith element
 of l2 for all i.*)
-Inductive evalExpLists : list Exp -> list BaseType -> Prop :=
+Inductive evalExpLists : list Exp -> list BaseValue -> Prop :=
   | evalElNil : evalExpLists [] []
-  | evalElCons : forall (e : Exp) (b : BaseType) (l1 : list Exp) (l2 : list BaseType),
+  | evalElCons : forall (e : Exp) (b : BaseValue) (l1 : list Exp) (l2 : list BaseValue),
     evalExp e b -> evalExpLists l1 l2 -> evalExpLists (e :: l1) (b :: l2).
 
 (**Convert a list of base values to a list of expressions.*)
-Definition listBaselistExp (l1 : list BaseType) : list Exp :=
+Definition listBaselistExp (l1 : list BaseValue) : list Exp :=
   map eBase l1.
 
 Inductive BoolExp : Type := 
@@ -583,16 +583,16 @@ Fixpoint subBoolExp (s : Subst) (b : BoolExp) : BoolExp :=
 to a boolean value. The distance in a threat test may be any non-negative number,
 whatever its type, as the time in a delay may.*)
 Inductive evalBoolExp : BoolExp -> bool -> Prop :=
-  | bevalSufficient : forall (e1 e2 : Exp) (m : Mode) (b : BaseType) (r : nonnegreal),
+  | bevalSufficient : forall (e1 e2 : Exp) (m : Mode) (b : BaseValue) (r : nonnegreal),
     evalExp e1 m -> evalExp e2 b -> b \_/ r ->
     evalBoolExp (bSufficient e1 e2) (suffBool m (mkDistance r))
   | bevalNot : forall (e : BoolExp) (b : bool),
     evalBoolExp e b -> evalBoolExp (bNot e) (negb b)
-  | bevalEqualTrue : forall (e1 e2 : Exp) (b : BaseType),
+  | bevalEqualTrue : forall (e1 e2 : Exp) (b : BaseValue),
     evalExp e1 b -> evalExp e2 b -> evalBoolExp (bEqual e1 e2) true
-  | bevalEqualFalse : forall (e1 e2 : Exp) (b1 b2 : BaseType),
+  | bevalEqualFalse : forall (e1 e2 : Exp) (b1 b2 : BaseValue),
     evalExp e1 b1 -> evalExp e2 b2 -> (b1 <> b2) -> evalBoolExp (bEqual e1 e2) false
-  | bevalPossInc : forall (e1 e2 e3 : Exp) (m1 m2 : Mode) (b : BaseType) (d : nonnegreal),
+  | bevalPossInc : forall (e1 e2 e3 : Exp) (m1 m2 : Mode) (b : BaseValue) (d : nonnegreal),
     evalExp e1 m1 -> evalExp e2 m2 -> evalExp e3 b -> b \_/ d ->
     evalBoolExp (bPossInc e1 e2 e3) (possIncBool m1 m2 (mkDistance d)).
 
@@ -661,7 +661,7 @@ Notation "!~ b" := (bNot b) (at level 25).
 
 (** The evaluation relation on expressions is a partial function i.e.
 every expression evaluates to at most one value.*)
-Theorem evalExpUnique : forall (e : Exp) (b1 b2 : BaseType),
+Theorem evalExpUnique : forall (e : Exp) (b1 b2 : BaseValue),
   evalExp e b1 -> evalExp e b2 -> b1 = b2. intros.
   apply evalExpRelFun in H. apply evalExpRelFun in H0.
   rewrite H in H0. inversion H0. reflexivity. Qed.
@@ -738,8 +738,8 @@ Theorem evalBoolExpTrueTot : forall (e : BoolExp),
 (**A discrete action is either an input of values on a channel, an output of
 values on a channel or a silent (tau) action.*)
 Inductive DiscAct :=
-  | inAct : Channel -> list BaseType -> DiscAct
-  | outAct : Channel -> list BaseType -> DiscAct
+  | inAct : Channel -> list BaseValue -> DiscAct
+  | outAct : Channel -> list BaseValue -> DiscAct
   | tauAct : DiscAct.
 Notation "c *?" := (inAct c []) (at level 30).
 Notation "c *!" := (outAct c []) (at level 30).
@@ -761,7 +761,7 @@ Lemma complementInvol (a : DiscAct) : a^^ = a. destruct a; reflexivity. Qed.
 Lemma complementNotTau (a : DiscAct) : a <> tauAct -> a^ <> tauAct.
   unfold not. intros. apply H. destruct a; inversion H0; reflexivity. Qed.
 
-Lemma evalExpRelFunEquiv (e : Exp) (b : BaseType) :
+Lemma evalExpRelFunEquiv (e : Exp) (b : BaseValue) :
   evalExp e b <-> evalExpFun e = Some b. split;
   [apply evalExpRelFun | apply evalExpFunRel]. Qed.
 
@@ -794,7 +794,7 @@ Lemma evalExp_evalExpFunTime (e : Exp) (t : Time) :
   repeat f_equal. symmetry. assumption. Qed.
 
 (** A list of expressions evaluates to at most one list of values.*)
-Lemma evalExpListsUnique (l : list Exp) (l1 l2 : list BaseType) :
+Lemma evalExpListsUnique (l : list Exp) (l1 l2 : list BaseValue) :
   evalExpLists l l1 -> evalExpLists l l2 -> l1 = l2.
   intro H. revert l2. induction H; intros l3 H3; inversion H3; subst.
   reflexivity. f_equal. eapply evalExpUnique; eassumption.
@@ -802,13 +802,13 @@ Lemma evalExpListsUnique (l : list Exp) (l1 l2 : list BaseType) :
 
 (** If one list evaluated to another, then the lengths
 match.*)
-Lemma evalExpListsLength (l : list Exp) : forall (l' : list BaseType),
+Lemma evalExpListsLength (l : list Exp) : forall (l' : list BaseValue),
   evalExpLists l l' -> length l = length l'. induction l; intros.
   inversion H. reflexivity. inversion H. simpl. f_equal.
   apply IHl. assumption. Qed.
 
 (** Evaluation on expressions is decidable.*)
-Lemma evalExpDec (e : Exp) (b : BaseType) : decidable (evalExp e b).
+Lemma evalExpDec (e : Exp) (b : BaseValue) : decidable (evalExp e b).
   remember (evalExpFun e). destruct o. addHyp (eqDecBase b b0).
   invertClear H. left. apply evalExpFunRel. rewrite H0. symmetry.
   assumption. right. unfold not. intros. apply evalExpRelFun in H.
@@ -817,7 +817,7 @@ Lemma evalExpDec (e : Exp) (b : BaseType) : decidable (evalExp e b).
   inversion Heqo. Qed.
 
 (** Evaluation on lists of expressions is decidable.*)
-Lemma evalExpListsDec (l : list Exp) (l' : list BaseType) :
+Lemma evalExpListsDec (l : list Exp) (l' : list BaseValue) :
   decidable (evalExpLists l l'). generalize dependent l'.
   induction l; intros; destruct l';
   try solve [right; unfold not; intro; inversion H].
@@ -828,14 +828,14 @@ Lemma evalExpListsDec (l : list Exp) (l' : list BaseType) :
   Qed.
 
 (** A functional version of eval exp for lists.*)
-Fixpoint evalExpListsFun (l : list Exp) : option (list BaseType) :=
+Fixpoint evalExpListsFun (l : list Exp) : option (list BaseValue) :=
   match l with
   | [] => Some []
-  | e :: l => optionMap2 (cons (A := BaseType)) (evalExpFun e) (evalExpListsFun l)
+  | e :: l => optionMap2 (cons (A := BaseValue)) (evalExpFun e) (evalExpListsFun l)
   end.
   
 (** The evaluation function on lists implies the relation.*)
-Theorem evalExpListsFunRel (l : list Exp) : forall (l' : list BaseType),
+Theorem evalExpListsFunRel (l : list Exp) : forall (l' : list BaseValue),
   evalExpListsFun l = Some l' -> evalExpLists l l'.
   induction l; intros; inversion H. constructor.
   remember (evalExpFun a). destruct o.
@@ -846,7 +846,7 @@ Theorem evalExpListsFunRel (l : list Exp) : forall (l' : list BaseType),
   unfold optionMap2 in H1. inversion H1. Qed.
   
 (** The evaluation relation on lists implies the function.*)
-Theorem evalExpListsRelFun (l : list Exp) : forall (l' : list BaseType),
+Theorem evalExpListsRelFun (l : list Exp) : forall (l' : list BaseValue),
   evalExpLists l l' -> evalExpListsFun l = Some l'. induction l; intros.
   inversion H. reflexivity. inversion H. simpl. unfold optionMap2.
   unfold option_map. remember (evalExpFun a). destruct o.
@@ -857,7 +857,7 @@ Theorem evalExpListsRelFun (l : list Exp) : forall (l' : list BaseType),
 
 (** l either evaluates to something or not.*)
 Lemma evalExpListsExDec (l : list Exp) :
-  {l' : list BaseType | (evalExpLists l l')} +
+  {l' : list BaseValue | (evalExpLists l l')} +
   {~exists l', (evalExpLists l l')}.
   remember (evalExpListsFun l). destruct o; [left | right].
   symmetry in Heqo. apply evalExpListsFunRel in Heqo. exists l0.
@@ -1592,7 +1592,7 @@ Lemma exclude_reset (l : list (Var * Exp)) (x : list Var) :
 the e1 is equal to the e2 with the substitution l applied.*)
 Inductive matchExp : Exp -> Exp -> list (Var * Exp) -> Prop :=
   | meVar (x : Var) (e : Exp) : matchExp e (eVar x) ([(x, e)])
-  | meBase (b : BaseType) : matchExp (eBase b) (eBase b) []
+  | meBase (b : BaseValue) : matchExp (eBase b) (eBase b) []
   | meSub (l l1 l2 : list (Var * Exp)) (e1 e2 e1' e2' : Exp) :
     matchExp e1 e1' l1 -> matchExp e2 e2' l2 -> lubBindList l l1 l2 ->
     matchExp (eSubtract e1 e2) (eSubtract e1' e2') l
@@ -1651,7 +1651,7 @@ Lemma decMatchExp (e1 e2 : Exp) :
   invertClear H2; exists l2; assumption ]
   | right; unfold not; intros; apply H; invertClear H0;
   invertClear H1; exists l1; assumption]).
-  (*Case: BaseType*)
+  (*Case: BaseValue*)
   addHyp (eqDecBase b b0). invertClear H. left. exists (@nil (Var*Exp)).
   rewrite H0. constructor. right. unfold not. intro. inversion H.
   apply H0. inversion H1. reflexivity.
@@ -2611,8 +2611,8 @@ Lemma evalExp_sub_unique_strong e b b' s : e |_| b -> subExp s e |_| b' -> b = b
   assumption. apply H. Qed.
 
 (** Repeatedly matches the goal to matching evaluations, creates the equality that the
-corresponding base type are equal, inverts this to unpackage the contents of the base
-types, and clear the original evaluations.*)
+corresponding base values are equal, inverts this to unpackage the contents of the base
+values, and clear the original evaluations.*)
 Ltac unique_exps := repeat let U := fresh in 
   match goal with
   | [ U1 : ?e1 |_| ?b1, U2 : ?e1 |_| ?b2 |- _] =>

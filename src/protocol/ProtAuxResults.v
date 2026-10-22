@@ -60,7 +60,7 @@ Ltac value_of_type t := lazymatch t with
 
 (** A list of values typed for the variables xs: one value of each variable's type.*)
 Ltac typed_witness xs := lazymatch xs with
-  | nil => constr:(@nil BaseType)
+  | nil => constr:(@nil BaseValue)
   | ?x :: ?xs' => let t := eval cbv in (varType x) in let v := value_of_type t in
     let vs := typed_witness xs' in constr:(v :: vs)
   end.
@@ -474,16 +474,16 @@ Lemma bcWait_trans_in p m x : bcWaitState m x p -> discActEnabled p (chanTrans *
 
 (** The same, for a broadcast component with any received values; see the component
 shapes below.*)
-Lemma bcWait_trans_in_shape (v : BaseType) (e : Exp) p : p ~p~ bcWait v e ->
+Lemma bcWait_trans_in_shape (v : BaseValue) (e : Exp) p : p ~p~ bcWait v e ->
   discActEnabled p (chanTrans *?). activation_tac. Qed.
 
-Lemma bcWait_wake_in_shape m (v : BaseType) (e : Exp) p : p ~p~ bcWait v e ->
+Lemma bcWait_wake_in_shape m (v : BaseValue) (e : Exp) p : p ~p~ bcWait v e ->
   discActEnabled p (chanWake ;? [baseMode m]). activation_tac. Qed.
 
-Lemma bcReady_outProc_out_shape (v1 v2 : BaseType) p : p ~p~ bcReady v1 v2 ->
+Lemma bcReady_outProc_out_shape (v1 v2 : BaseValue) p : p ~p~ bcReady v1 v2 ->
   discActEnabled p (chanOutProc ;! [v1, v2]). activation_tac. Qed.
 
-Lemma ovReady_outProc_out_shape (v1 : BaseType) (e2 : Exp) (v3 : BaseType) p :
+Lemma ovReady_outProc_out_shape (v1 : BaseValue) (e2 : Exp) (v3 : BaseValue) p :
   p ~p~ ovReady v1 e2 v3 -> discActEnabled p (chanOutProc ;! [v1, v3]).
   activation_tac. Qed.
 
@@ -683,11 +683,11 @@ Local Lemma suff_eval_some (m : Mode) (r : Distance) :
   evalBoolExpFun (bSufficient (eBase (baseMode m)) (eBase (baseDistance r))) <> None.
 Proof. destruct r as [r]. simpl. discriminate. Qed.
 
-Local Lemma equal_eval_some (b1 b2 : BaseType) :
+Local Lemma equal_eval_some (b1 b2 : BaseValue) :
   evalBoolExpFun (bEqual (eBase b1) (eBase b2)) <> None.
 Proof. simpl. destruct (eqDecBase b1 b2); discriminate. Qed.
 
-Local Lemma possInc_eval_some (m1 m2 : Mode) (e : Exp) (b : BaseType) (r : nonnegreal) :
+Local Lemma possInc_eval_some (m1 m2 : Mode) (e : Exp) (b : BaseValue) (r : nonnegreal) :
   evalExpFun e = Some b -> evalBaseNonnegFun b = Some r ->
   evalBoolExpFun (bPossInc (eBase (baseMode m1)) (eBase (baseMode m2)) e) <> None.
 Proof. intros Ee Eb. simpl. rewrite Ee, Eb. discriminate. Qed.
@@ -749,9 +749,9 @@ Lemma listenerState_shape_ranged p : listenerState p ->
   p ~p~ listening \/ (exists (m : Mode), p ~p~ rangeBad m) \/ p ~p~ badOvlp \/
   (exists (m : Mode), p ~p~ currOK m) \/ p ~p~ abortOvlp \/
   (exists (m : Mode) (l : Position), p ~p~ gotMsg m l) \/
-  (exists (m : Mode) (e : Exp) (b : BaseType) (r : nonnegreal),
+  (exists (m : Mode) (e : Exp) (b : BaseValue) (r : nonnegreal),
      p ~p~ gotRange m e /\ evalExpFun e = Some b /\ evalBaseNonnegFun b = Some r) \/
-  (exists (m : Mode) (e : Exp) (b : BaseType) (r : nonnegreal),
+  (exists (m : Mode) (e : Exp) (b : BaseValue) (r : nonnegreal),
      p ~p~ currComp m e /\ evalExpFun e = Some b /\ evalBaseNonnegFun b = Some r) \/
   p ~p~ paused.
 Proof.
@@ -780,7 +780,7 @@ Proof.
     + do 8 right. eapply bisim_del_pres; [del_self_body | exact H | exact D].
 Qed.
 
-Theorem listener_outProc_out_not (p p' : ProcTerm) (v : list BaseType) : 
+Theorem listener_outProc_out_not (p p' : ProcTerm) (v : list BaseValue) : 
   listenerState p -> p -PA- chanOutProc ;! v -PA> p' -> False.
 Proof.
   intros LS TR. destruct (listenerState_shape _ LS); prot_outProc_in_not_contra.
@@ -926,7 +926,7 @@ them to m and to the output takes a timing argument, since ovWait's parameters a
 observable through its timers.*)
 Theorem ovWait_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) (t x y : Time) :
   p -PA- a -PA> p' -> overlapState p -> ovWaitState m t x y p' ->
-  initState m p \/ exists (v l : BaseType) (u : Exp),
+  initState m p \/ exists (v l : BaseValue) (u : Exp),
   p ~p~ ovReady v u l /\ a = chanOutProc ;! [v, l].
 Proof.
   intros TR O SP. red in SP. backtrack_shape SP.
@@ -1598,7 +1598,7 @@ Qed.
 (** gotRange shows its range only through the threat tests of currPincCheck and nextPincCheck,
 against the modes it reads. So two gotRange whose ranges are closed and pass the same tests
 are bisimilar.*)
-Lemma gotRange_threat_bisim (m : Mode) (e e' : Exp) (b b' : BaseType) :
+Lemma gotRange_threat_bisim (m : Mode) (e e' : Exp) (b b' : BaseValue) :
   evalExpFun e = Some b -> evalExpFun e' = Some b' ->
   (forall v : Mode, evalBoolExpFun (bPossInc v m e) = evalBoolExpFun (bPossInc v m e')) ->
   gotRange m e ~p~ gotRange m e'.
@@ -1998,7 +1998,7 @@ Proof.
 Qed.
 
 (** Only a timer that has run out lets a waiting broadcaster read its position.*)
-Lemma bcWait_pos_read_inv (m : Mode) (e : Exp) (v : list BaseType) q :
+Lemma bcWait_pos_read_inv (m : Mode) (e : Exp) (v : list BaseValue) q :
   bcWait m e -PA- chanPos ;? v -PA> q -> evalExpFunTime e = Some zeroTime.
 Proof.
   unfold bcWait. intro S. invert_disc_prefixes. assumption.

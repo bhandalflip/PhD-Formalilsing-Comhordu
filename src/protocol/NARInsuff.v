@@ -109,7 +109,7 @@ Qed.
 (*A delay of at most the timestamp t just ages an incoming notification by d. Unlike
 (Basics::incomingNetNotif_del), this needs nothing about the listener, so it holds for
 any v.*)
-Local Lemma incomingNetNotif_del_le (n n' : Network) (d : Delay) (v : list BaseType)
+Local Lemma incomingNetNotif_del_le (n n' : Network) (d : Delay) (v : list BaseValue)
   (t : Time) (i : nat) (q : d <= t) :
   n -ND- d -ND> n' -> incomingNetNotif v t i n ->
   incomingNetNotif v (minusTime t d q) i n'.
@@ -122,7 +122,7 @@ Qed.
 
 (*If a message was delivered at a time less than AN ago, then a notification of that
 message's delivery is enqueued with time stamp AN - t. *)
-Theorem delivered_incomingNetNotif (n : Network) (v : list BaseType) (r : Distance)
+Theorem delivered_incomingNetNotif (n : Network) (v : list BaseValue) (r : Distance)
   (l : Position) (t : Time) (i : nat) (p : reachableProtNet n) :
   delivered ([-v, l, r-]) t i n p -> forall q : t < adaptNotif,
   incomingNetNotif ((baseDistance r)::v) (minusTime adaptNotif t (Rlt_le t adaptNotif q)) i n.
@@ -500,9 +500,9 @@ Theorem instant_insuff_abort (n : Network) (m : Mode) (l l0 : Position)
   nextSince m t i n p -> adaptNotif < t ->
   incomingNetNotif [baseDistance r, baseMode m, basePosition l] zeroTime i n \/
   notifAbortPathNet i n \/ notifBadPathNet i n.
-  (*Induction on delivered. BaseType case fails because of AN not equal 0.*)
+  (*Induction on delivered. Base case fails because of AN not equal 0.*)
   intros H H0 H1 H2.
-  (*Induction on delivered. BaseType case fails because of AN not equal 0.*)
+  (*Induction on delivered. Base case fails because of AN not equal 0.*)
   dependent induction H. false. apply (Rlt_irrefl adaptNotif).
   eapply Rle_lt_trans. rewrite <- x. apply Rle_refl. apply adaptNotif_positive.
   (*Discrete inductive case: Apply I.H. to previous state, yielding incomingNetNotif
@@ -678,7 +678,7 @@ Theorem instant_insuff_bad (n : Network) (m : Mode) (l l0 : Position)
   incomingNetNotif [baseDistance r, baseMode m, basePosition l] zeroTime i n
   \/ notifBadPathNet i n \/ exists t, tfs m t i n p.
   intros H NFS H0 H1 H2. lets CSS : H1.
-  (*Induction on delivered. BaseType case fails by contradiction on AN = 0.*)
+  (*Induction on delivered. Base case fails by contradiction on AN = 0.*)
   dependent induction H. false. apply (Rlt_irrefl adaptNotif).
   eapply Rle_lt_trans. rewrite <- x. apply Rle_refl. apply adaptNotif_positive.
   (*Discrete Inductive case. Destruct currSince for previous cases.*)
