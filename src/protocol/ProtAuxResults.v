@@ -39,9 +39,6 @@ Ltac invert_app_trans := match goal with
   | [U : liftNameProc _ -PA- _ -PA> _ |- _] => invertClear U; invert_def; clean_proc_trans
   end. 
 
-Ltac update_eval := match goal with [H : ?e |_| ?m |- update _ ?x ?e ?x |_| ?m]
-  => rewrite updateAppEq; apply H end.
-
 (*Converts a hypothesis of an action for p1 or p2, into a hypothesis
 of the same action by p1 + p2*)
 Ltac lift_act_sum p1 p2 :=
@@ -946,27 +943,6 @@ Proof.
   - right. output_values. do 3 eexists. split; [exact B | reflexivity].
 Qed.
 
-(** After a step into ovReady, the overlap component was ovWait with its position timer run
-out.*)
-Theorem ovReady_prev (p p' : ProcTerm) (a : DiscAct) (m : Mode) (t : Time) (l : Position) :
-  p -PA- a -PA> p' -> overlapState p -> ovReadyState m t l p' ->
-  exists u x, ovWaitStateExp m u x zeroTime p.
-Proof.
-  intros TR O SP. red in SP. backtrack_shape SP.
-  (* ovWait: its derivative broadcasts its mode and the position it read, so ovReady m t l
-     matches that output, which fixes the mode.*)
-  match type of BT with outPrefix _ (eBase ?b1 :: eBase ?b :: nil) _ ~p~ _ =>
-    bt_step BT (chanOutProc ;! [b1, b]) S2 end.
-  destruct (bisim_step_disc _ _ _ _ BT S2) as [r2 [R2 _]].
-  invert_disc_prefixes. output_values.
-  exists e2 e3. red. eapply bisim_trans; [exact B | ]. unfold ovWait.
-  repeat apply choice_bisim_context;
-    first [apply bisim_refl
-      | apply del_bisim_guard;
-        match goal with [E : evalExpFunTime _ = Some zeroTime |- _] => rewrite E end;
-        reflexivity].
-Qed.
-
 (** The step into ovReady reads the position ovReady holds: its derivative broadcasts that
 position, so the value read is the one ovReady m t l holds, whatever its timer.*)
 Theorem ovReady_prev_act (p p' : ProcTerm) (a : DiscAct) (m : Mode) (t : Exp) (l : Position) :
@@ -1467,17 +1443,6 @@ Qed.
 
 (*** Fwd tracking ***)
 
-(** Tactics **)
-
-(**This is an activation-esque pre-tactic that instead of proving a dae,
-matches to an actual transition, possibly with an eVar.*)
-Ltac activation_trans_pre := match goal with [U : _ ?p |- ?p -PA- _ -PA> _] =>
-  inversion U; try (econstructor; [reflexivity | ]); remove_resets;
-  remove_updates end.
-
-Ltac fwd_track_pre := intros; repeat eexists_safe;
-  match goal with [ |- ?P /\ _] => assert P end.
-
 (** Results **)
 
 
@@ -1938,53 +1903,6 @@ that the delay relation preserves certain state predicates. Here we will
 write a few examples, but there is no need to write out all the cases,
 especially since the way these things are defined might change. Just
 enough to get a general idea.*)
-
-(*** Tactics ***)
-
-(*del_pres_fwd_tac*)
-
-(**Very similar to existentialise_evals but for a delay transition rather
-than a discrete transition.*)
-Ltac existentialise_evals_del H :=
-  let y1 := fresh in let y2 := fresh in
-  let y3 := fresh in let y4 := fresh in let U := fresh in
-  match type of H with
-  | ?P /\ ?Q =>
-    match P with
-    | (((?e1 |_| ?v1 /\ ?e2 |_| ?v2) /\
-      ?e3 |_| ?v3) /\ ?e4 |_| ?v4) =>
-      match Q with ?f ?e1 ?e2 ?e3 ?e4 -PD- ?d -PD> ?p' => 
-      assert (exists y1 y2 y3 y4, f y1 y2 y3 y4 -PD- d -PD> p'
-      /\ (((y1 |_| v1 /\ y2 |_| v2) /\
-      y3 |_| v3) /\ y4 |_| v4)) as U;
-      [repeat eexists; apply H | clear H]; rename U into H
-      end
-    | ((?e1 |_| ?v1 /\ ?e2 |_| ?v2) /\
-      ?e3 |_| ?v3) =>
-      match Q with ?f ?e1 ?e2 ?e3 -PD- ?d -PD> ?p' => 
-      assert (exists y1 y2 y3, f y1 y2 y3 -PD- d -PD> p'
-      /\ ((y1 |_| v1 /\ y2 |_| v2) /\
-      y3 |_| v3)) as U;
-      [repeat eexists; apply H | clear H]; rename U into H
-      end
-    | (?e1 |_| ?v1 /\ ?e2 |_| ?v2) =>
-      match Q with ?f ?e1 ?e2 -PD- ?d -PD> ?p' => 
-      assert (exists y1 y2, f y1 y2 -PD- d -PD> p'
-      /\ (y1 |_| v1 /\ y2 |_| v2)) as U;
-      [repeat eexists; apply H | clear H]; rename U into H
-      end
-    | ?e1 |_| ?v1 =>
-      match Q with ?f ?e1 -PD- ?d -PD> ?p' => 
-      assert (exists y1, f y1 y2 -PD- d -PD> p'
-      /\ y1 |_| v1) as U;
-      [repeat eexists; apply H | clear H]; rename U into H
-      end
-    end
-  | _ => idtac
-  end.
-
-Ltac invert_trans_del := match goal with [P : _ -PD- _ -PD> _ |- _]
-  => invertClear P; subst end.
 
 (*** Simple Predicate Preservation ***)
 
@@ -2461,38 +2379,6 @@ Ltac triple_disc_inv H :=
   triple_parAll H; apply parAll_disc_inv in H;
   destruct H as [? [? [? [[? H] | [? [? [? [? [? [? [? [H ?]]]]]]]]]]]]; triple_pos.
 
-Ltac link_partripdelex_tac U p1' p2' p3' :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PD- ?d -PD> ?p' |- _] =>
-  let Q1 := fresh in triple_shape H Q1;
-  let U1 := fresh U in decompEx3 Q1 p1' p2' p3' U1
-  end.
-
-Ltac link_partripdelex_tac2 p1' p2' p3' :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PD- ?d -PD> ?p' |- _] =>
-  let Q1 := fresh in triple_shape H Q1;
-  let U1 := fresh in decompEx3 Q1 p1' p2' p3' U1;
-  rewrite U1 in H; clear U1
-  end.
-
-(** The same for an input.*)
-Ltac link_partripin_tac U :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?c ;? ?v -PA> ?p1' $||$ ?p2' $||$ ?p3' |- _] =>
-  let H1 := fresh in
-  assert (H1 : p1 -PA- c ;? v -PA> p1' /\ p2 = p2' /\ p3 = p3' \/
-    p2 -PA- c ;? v -PA> p2' /\ p1 = p1' /\ p3 = p3' \/
-    p3 -PA- c ;? v -PA> p3' /\ p1 = p1' /\ p2 = p2') by
-    (triple_disc_nonTau H; eauto 7);
-  let H2 := fresh in elimOr3 H1 H2; andflat U
-  end.
-
-Ltac link_partripdiscW1_tac H W :=
-  match type of H with ?p1 $||$ _ $||$ _ -PA- _ -PA> ?p1' $||$ _ $||$ _ =>
-    link_partripdiscW_tac H W (p1 = p1' \/ exists b, p1 -PA- b -PA> p1') end.
-
-
 (* begin helpers for link_reach_triple_tau *)
 Lemma link_reach_triple_tau_bc p p' :
   broadcastState p -> p -PA- tauAct -PA> p' -> False.
@@ -2559,25 +2445,6 @@ Proof.
   destruct (bisim_disc_match _ _ _ _ B T) as [q R]. unfold bcReady in R.
   invert_disc_prefixes. reflexivity.
 Qed.
-
-Ltac link_partriptau_tac c v U :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- tauAct -PA> ?p1' $||$ ?p2' $||$ ?p3',
-  H0 : protocolState (?p1 $||$ ?p2 $||$ ?p3) |- _] =>
-  let H1 := fresh in lets H1 : link_reach_triple_tau H H0;
-  let Q1 := fresh in decompEx2 H1 c v Q1;
-  let H2 := fresh in elimOr6 Q1 H2; andflat U
-  end.
-
-(** A delay of a triple to a triple is a delay of each component, flattened into U names.*)
-Ltac link_partripdel_tac U :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PD- ?d -PD> ?p1' $||$ ?p2' $||$ ?p3' |- _] =>
-  let Q1 := fresh in
-  assert (Q1 : p1 -PD- d -PD> p1' /\ p2 -PD- d -PD> p2' /\ p3 -PD- d -PD> p3') by
-    (triple_del_inv H; auto);
-  andflat U
-  end.
 
 (****************** Reachability Results ******************)
 (**In here we put results that are specific to reachable processes,
@@ -2661,20 +2528,6 @@ Proof.
 Qed.
 (**Proof: Brute force. Analogous to bc_outProc_out but with overlap states*)
 
-(**A protocol process cannot input on the channel outProc.*)
-Theorem prot_outProc_in_not (p p' : ProcTerm) (v : list BaseType) : 
-  p -PA- chanOutProc ;? v -PA> p' -> protocolState p -> False.
-Proof.
-  intros TR PS. inversion PS as [p1 p2 p3 BS OS LS]; subst; clear PS.
-  inversion TR; subst; clear TR.
-  - destruct (broadcastState_shape _ BS); prot_outProc_in_not_contra.
-  - match goal with [V : p2 $||$ p3 -PA- _ -PA> _ |- _] =>
-      inversion V; subst; clear V end.
-    + destruct (overlapState_shape _ OS); prot_outProc_in_not_contra.
-    + destruct (listenerState_shape _ LS); prot_outProc_in_not_contra.
-Qed.
-(**Proof sketch: Brute force. Because none of its constituents can input on said channel.*)
-
 Theorem bc_mCurr_out_not (p p' : ProcTerm) : 
   p -PA- chanMCurrWrite ;! [] -PA> p' -> broadcastState p -> False.
 Proof.
@@ -2716,18 +2569,6 @@ Theorem listen_mStable_out_not (p p' : ProcTerm) :
   p -PA- chanMStableWrite ;! [] -PA> p' -> listenerState p -> False.
 Proof.
   intros TR S. destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
-Lemma bc_abort_out_not (p p' : ProcTerm) : 
-  p -PA- chanAbort;! [] -PA> p' -> broadcastState p -> False.
-Proof.
-  intros TR S. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
-Qed.
-
-Lemma ovlp_abort_out_not (p p' : ProcTerm) : 
-  p -PA- chanAbort;! [] -PA> p' -> overlapState p -> False.
-Proof.
-  intros TR S. destruct (overlapState_shape _ S); prot_outProc_in_not_contra.
 Qed.
 
 (**The two cases where the overlap component can output on mCurr.*)
@@ -2792,58 +2633,6 @@ Qed.
 
 (*LOCAL TIDY*)
 
-(** Destructs any entities into constituent parts, looks for a
-discrete entity transition in the goal, extracts a process transition
-or a process equality from this.*)
-Ltac link_entsoftdisc_tac :=
-  destrEnts_norm; match goal with
-  [V : [|_, _, _, _|] -EA- _ ->> [|_, _, _, _|] |- _] =>
-  let U := fresh in let U1 := fresh "LES" in
-  let U2 := fresh "LES" in
-  lets U : link_ent_soft_disc V; elim_intro U U1 U2; [ | ex_flat];subst end.
-
-(*Togo: beside link_partripdiscex_tac2*)
-Ltac link_partripdiscex_tac_subst p1' p2' p3' :=
-  match goal with
-  [H : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?a -PA> ?p' |- _] =>
-  let Q1 := fresh in triple_shape H Q1;
-  let U1 := fresh in decompEx3 Q1 p1' p2' p3' U1; subst
-  end.
-
-Ltac link_partripdiscex_tac_norm :=
-  let p1' := fresh "p1'" in let p2' := fresh "p2'" in
-  let p3' := fresh "p3'" in
-  link_partripdiscex_tac_subst p1' p2' p3'.
-
-(** An output of a triple that changes one component, V1 : pk <> pk', is an output of that
-component alone: LPO, flattened into AND names.*)
-Ltac link_partripneq_out_tac :=
-  let LPO := fresh "LPO" in
-  match goal with
-  [V : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?c ;! ?v -PA> ?p1' $||$ ?p2' $||$ ?p3' |- _] =>
-  match goal with
-  | [V1 :  p1 <> p1' |- _ ] => assert (LPO : p1 -PA- c ;! v -PA> p1' /\ p2 = p2' /\ p3 = p3')
-  | [V1 :  p2 <> p2' |- _ ] => assert (LPO : p2 -PA- c ;! v -PA> p2' /\ p1 = p1' /\ p3 = p3')
-  | [V1 :  p3 <> p3' |- _ ] => assert (LPO : p3 -PA- c ;! v -PA> p3' /\ p1 = p1' /\ p2 = p2')
-  end; [triple_disc_nonTau V; auto | ];
-  and_flat
-  end.
-
-(** The same for an input.*)
-Ltac link_partripneq_in_tac :=
-  let LPO := fresh "LPO" in
-  match goal with
-  [V : ?p1 $||$ ?p2 $||$ ?p3 -PA- ?c ;? ?v -PA> ?p1' $||$ ?p2' $||$ ?p3' |- _] =>
-  match goal with
-  | [V1 :  p1 <> p1' |- _ ] => assert (LPO : p1 -PA- c ;? v -PA> p1' /\ p2 = p2' /\ p3 = p3')
-  | [V1 :  p2 <> p2' |- _ ] => assert (LPO : p2 -PA- c ;? v -PA> p2' /\ p1 = p1' /\ p3 = p3')
-  | [V1 :  p3 <> p3' |- _ ] => assert (LPO : p3 -PA- c ;? v -PA> p3' /\ p1 = p1' /\ p2 = p2')
-  end; [triple_disc_nonTau V; auto | ];
-  and_flat
-  end.
-
-Ltac link_partripneq_tac := first [link_partripneq_in_tac | link_partripneq_out_tac].
-
 Lemma ovlp_abort_in_notNextSince p p' :
   p -PA- chanAbort;? [] -PA> p' -> overlapState p -> ~ nextSinceState p'.
 Proof.
@@ -2858,18 +2647,6 @@ Proof.
     pose proof (bisim_trans _ _ _ (bisim_symm _ _ B) X) as BT; clear B X;
     clean_proc_hyp BT; unfold liftNameProc in BT; unfold_app_hyp_l BT;
     prot_outProc_in_not_body; refute_by_chan BT.
-Qed.
-
-Lemma listening_abort_contra p :
-  listeningState p -> abortOvlpState p -> False.
-Proof.
-  intros L A. unfold listeningState, abortOvlpState in *.
-  (* abortOvlp can output on abort; so p can, and hence so can listening. *)
-  assert (S : abortOvlp -PA- chanAbort *! -PA> liftNameProc listeningN)
-    by (apply stepDpOut; constructor).
-  destruct (bisim_disc_match _ _ _ _ (bisim_trans _ _ _ (bisim_symm _ _ A) L) S) as [q' Q].
-  (* But listening is a sum of input prefixes: no output on abort. *)
-  unfold listening in Q. invert_disc_prefixes.
 Qed.
 
 End ProtAuxResults.

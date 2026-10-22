@@ -29,8 +29,6 @@ Context {Model : ComhModel}.
 (*Broadcast*)
 Definition bcWaitStateEnt (m : Mode) (x : Time) : Entity -> Prop :=
 liftProcEnt (bcWaitStateProt m x).
-Definition sleepingStateEnt : Entity -> Prop :=
-liftProcEnt sleepingStateProt.
 Definition bcReadyStateEnt  (m : Mode) (l : Position) : Entity -> Prop :=
 liftProcEnt (bcReadyStateProt m l).
 
@@ -55,7 +53,6 @@ Definition tfsBcStateEnt := liftProcEnt tfsBcStateProt.
 Definition switchBcStateEnt m := liftProcEnt (switchBcStateProt m).
 Definition ovWaitStateEnt (m : Mode) (t x y : Time) : Entity -> Prop :=
 liftProcEnt (ovWaitStateProt m t x y).
-Definition ovWaitTypedEnt := liftProcEnt ovWaitTypedProt.
 Definition tfsCurrStateEnt := liftProcEnt tfsCurrStateProt.
 Definition tfsNextStateEnt m := liftProcEnt (tfsNextStateProt m).
 
@@ -73,7 +70,6 @@ Definition currOKStateEnt m'' := liftProcEnt (currOKStateProt m'').
 Definition gotMsgStateEnt m l := liftProcEnt (gotMsgStateProt m l).
 Definition gotRangeStateEnt m r := liftProcEnt (gotRangeStateProt m r).
 Definition currPincCheckStateEnt m m'' r := liftProcEnt (currPincCheckStateProt m m'' r).
-Definition nextPincCheckStateEnt m m'' r := liftProcEnt (nextPincCheckStateProt m m'' r).
 Definition rangeBadStateEnt m := liftProcEnt (rangeBadStateProt m).
 
 

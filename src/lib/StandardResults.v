@@ -120,23 +120,13 @@ Lemma addNonnegFact : forall (r1 r2 : nonnegreal),
 
 (** zeroNonneg is the right zero for addNonneg*)
 Lemma addNonnegZeroR : forall (r : nonnegreal),
-  r +nn+ zeroNonneg = r. intros.
-  assert (nonneg (r +nn+ zeroNonneg) = nonneg r).
-  rewrite addNonnegFact. unfold zeroNonneg. simpl. ring.
-  destruct (r +nn+ zeroNonneg), r. simpl in H.
-  generalize dependent cond_nonneg0.
-  generalize dependent cond_nonneg.
-  rewrite H. intros. f_equal. apply proof_irrelevance. Qed.
+  r +nn+ zeroNonneg = r.
+  intro r. apply nonnegRealEqR. rewrite addNonnegFact. simpl. ring. Qed.
 
 (** zeroNonneg is the right zero for addNonneg*)
 Lemma addNonnegZeroL : forall (r : nonnegreal),
-  zeroNonneg +nn+ r = r. intros.
-  assert (nonneg (zeroNonneg +nn+ r) = nonneg r).
-  rewrite addNonnegFact. unfold zeroNonneg. simpl. ring.
-  destruct (zeroNonneg +nn+ r), r. simpl in H.
-  generalize dependent cond_nonneg0.
-  generalize dependent cond_nonneg.
-  rewrite <- H. intros. f_equal. apply proof_irrelevance. Qed.
+  zeroNonneg +nn+ r = r.
+  intro r. apply nonnegRealEqR. rewrite addNonnegFact. simpl. ring. Qed.
 
 (** Addition of nonnegative reals is associative*)
 Lemma addNonnegAssoc : forall (r1 r2 r3 : nonnegreal),
@@ -149,10 +139,8 @@ Lemma addNonnegComm : forall (r1 r2 : nonnegreal),
 
 Lemma addNonnegCancel : forall (r1 r2 r3 : nonnegreal),
   r1 +nn+ r2 = r1 +nn+ r3 -> r2 = r3.
-  intros.
-  destruct r1 as [r1 c1]. destruct r2 as [r2 c2].
-  destruct r3 as [r3 c3]. apply nonnegRealEqR.
-  simpl. simpl in H. inversion H. lra. Qed.
+  intros r1 r2 r3 H. apply nonnegRealEqR. apply (f_equal nonneg) in H.
+  rewrite !addNonnegFact in H. lra. Qed.
 
 (**Equality is decidable for reals.*)
 Lemma eqDecReal : eqDec R. unfold eqDec. intros.
@@ -236,10 +224,8 @@ Ltac unfoldPosDefs := unfold addPos; unfold minusPos; unfold oppPos;
 
 (** The negation of p1 - p2 is p2 - p1.*)
 Theorem oppMinusPos : forall (p1 p2 : Position),
-   ~-(p1 -~p- p2) = (p2 -~p- p1). intros. destruct p1.
-  destruct p2. unfold minusPos. simpl. unfold oppPos.
-  simpl. repeat rewrite Ropp_minus_distr. reflexivity.
-  Qed.
+   ~-(p1 -~p- p2) = (p2 -~p- p1).
+  intros. unfoldPosDefs. f_equal; simpl; ring. Qed.
 
 (** 0 is the right unit of plus.*)
 Theorem plusRightUnitPos : forall (p1 : Position),
@@ -383,55 +369,39 @@ Notation "i [++] i'" := (addInterval i i') (at level 45).
 
 (** If x is in i then x is less than or equal to the upper bound of i.*) 
 Lemma inIntervalLeUpper : forall (i : Interval) (x : R),
-  x [:] i -> x <= upper i. destruct i. intros. unfold inInterval in H.
-  simpl in H. destruct lowerClosed0, upperClosed0; simpl; inversion H;
-  try assumption; try apply Rlt_le; assumption. Qed. 
+  x [:] i -> x <= upper i.
+  intros [l u [|] [|]] x H; unfold inInterval in H; simpl in *; lra. Qed.
 
 (** If x is in i then the lower bound of i is less than or equal x.*) 
 Lemma inIntervalLeLower: forall (i : Interval) (x : R),
-  x [:] i -> lower i <= x. destruct i. intros. unfold inInterval in H.
-  simpl in H. destruct lowerClosed0, upperClosed0; simpl; inversion H;
-  try assumption; try apply Rlt_le; assumption. Qed. 
+  x [:] i -> lower i <= x.
+  intros [l u [|] [|]] x H; unfold inInterval in H; simpl in *; lra. Qed.
 
 Lemma inIntervalLtUpper : forall (i : Interval) (r : R),
   r [:] i -> upperClosed i = false ->
-  r < upper i. intros. destruct i. destruct lowerClosed0.
-  simpl in H0. rewrite H0 in H. unfold inInterval in H.
-  simpl in H. simpl. invertClear H. assumption.
-  simpl in H0. rewrite H0 in H. unfold inInterval in H.
-  simpl in H. simpl. invertClear H. assumption. Qed.
+  r < upper i.
+  intros [l u [|] [|]] r H C; unfold inInterval in H; simpl in *;
+  try discriminate; lra. Qed.
 
 Lemma inIntervalLtLower : forall (i : Interval) (r : R),
   r [:] i -> lowerClosed i = false ->
-  lower i < r. intros. destruct i. destruct upperClosed0.
-  simpl in H0. rewrite H0 in H. unfold inInterval in H.
-  simpl in H. simpl. invertClear H. assumption.
-  simpl in H0. rewrite H0 in H. unfold inInterval in H.
-  simpl in H. simpl. invertClear H. assumption. Qed.
+  lower i < r.
+  intros [l u [|] [|]] r H C; unfold inInterval in H; simpl in *;
+  try discriminate; lra. Qed.
 
 Lemma inAddLtLower : forall (i1 i2 : Interval) (r1 r2 : R),
   r1 [:] i1 -> r2 [:] i2 ->
   lowerClosed i1 = false \/ lowerClosed i2 = false ->
-  lower i1 + lower i2 < r1 + r2. intros.
-  inversion H1. apply Rplus_lt_le_compat.
-  apply inIntervalLtLower; assumption.
-  apply inIntervalLeLower; assumption.
-  apply Rplus_le_lt_compat.
-  apply inIntervalLeLower; assumption.
-  apply inIntervalLtLower; assumption.
-  Qed.
+  lower i1 + lower i2 < r1 + r2.
+  intros [l1 u1 [|] [|]] [l2 u2 [|] [|]] r1 r2 H1 H2 [C | C];
+  unfold inInterval in *; simpl in *; try discriminate; lra. Qed.
 
 Lemma inAddLtUpper : forall (i1 i2 : Interval) (r1 r2 : R),
   r1 [:] i1 -> r2 [:] i2 ->
   upperClosed i1 = false \/ upperClosed i2 = false ->
-  r1 + r2 < upper i1 + upper i2. intros.
-  inversion H1. apply Rplus_lt_le_compat.
-  apply inIntervalLtUpper; assumption.
-  apply inIntervalLeUpper; assumption.
-  apply Rplus_le_lt_compat.
-  apply inIntervalLeUpper; assumption.
-  apply inIntervalLtUpper; assumption.
-  Qed.
+  r1 + r2 < upper i1 + upper i2.
+  intros [l1 u1 [|] [|]] [l2 u2 [|] [|]] r1 r2 H1 H2 [C | C];
+  unfold inInterval in *; simpl in *; try discriminate; lra. Qed.
 
 Lemma addIntervalLower : forall (i1 i2 : Interval),
   lower (i1 [++] i2) = lower i1 + lower i2.
@@ -455,25 +425,8 @@ Lemma addIntervalLowerOpen : forall (i1 i2 : Interval),
 
 Theorem inAddInterval : forall (i1 i2 : Interval) (r1 r2 : R),
   r1 [:] i1 -> r2 [:] i2 -> (r1 + r2) [:] (i1 [++] i2).
-  intros. unfold inInterval. remember (lowerClosed (i1[++]i2)) as l.
-  remember (upperClosed (i1[++]i2)) as u. destruct l, u;
-  rewrite addIntervalLower, addIntervalUpper.
-  split. apply Rplus_le_compat; apply inIntervalLeLower; assumption.
-  apply Rplus_le_compat; apply inIntervalLeUpper; assumption.
-  (*Case 2*)
-  split. apply Rplus_le_compat; apply inIntervalLeLower; assumption.
-  apply inAddLtUpper; try assumption.
-  apply addIntervalUpperOpen. symmetry. assumption.
-  (*Case 3*)
-  split. apply inAddLtLower; try assumption.
-  apply addIntervalLowerOpen. symmetry. assumption.
-  apply Rplus_le_compat; apply inIntervalLeUpper; assumption.
-  (*Case 4*)
-  split. apply inAddLtLower; try assumption.
-  apply addIntervalLowerOpen. symmetry. assumption.
-  apply inAddLtUpper; try assumption.
-  apply addIntervalUpperOpen. symmetry. assumption.
-  Qed.
+  intros [l1 u1 [|] [|]] [l2 u2 [|] [|]] r1 r2 H1 H2;
+  unfold inInterval in *; simpl in *; lra. Qed.
 
 (** Shifts an interval right by some amount i.e. adds that amount to the upper and lower
 bounds of the interval. Closedness does not change.*)
@@ -512,19 +465,14 @@ Theorem inIntervalPlusCancel : forall (i : Interval) (x r : R),
   intros [l u [|] [|]] x r H;
   unfold inInterval in *; simpl in *; lra. Qed.
 
-Theorem subIntervalPlusCancel : forall (i i' : Interval) (r : R),
-  i [+] r <[ i' [+] r -> i <[ i'. unfold subInterval. intros.
-  eapply inIntervalPlusCancel. apply H.
-  apply inIntervalPlusCancel with (r := -r).
-  rewrite minusOppInterval. rewrite <- plusMinusInterval.
-  replace (r0 + r + - r) with r0. apply H0. ring. Qed.
-
 Theorem inIntervalPlusCompat : forall (i : Interval) (x r : R),
-  x [:] i -> x + r [:] i [+] r. intros.
-  apply inIntervalPlusCancel with (r := -r).
-  replace (x + r + - r) with x.
-  replace ((i[+]r)[+]- r) with i. assumption.
-  destruct i. simpl. f_equal; ring. ring. Qed.
+  x [:] i -> x + r [:] i [+] r.
+  intros [l u [|] [|]] x r H; unfold inInterval in *; simpl in *; lra. Qed.
+
+Theorem subIntervalPlusCancel : forall (i i' : Interval) (r : R),
+  i [+] r <[ i' [+] r -> i <[ i'.
+  intros i i' r H x X.
+  apply (inIntervalPlusCancel i' x r), H, inIntervalPlusCompat, X. Qed.
 
 (** Every interval is a sub interval of itself.*)
 Lemma subIntervalRefl : forall (i : Interval), i <[ i. unfold subInterval.
@@ -581,9 +529,8 @@ Ltac Rminus_refl_simpl := match goal with |- context [?x - ?x] =>
   replace (x - x) with 0; [ | ring] end.
 
 Lemma Rminus_lt_subNonnegTot (a b : nonnegreal) c :
-  0 < c -> a - b < c -> a -nn- b < c. unfold subNonnegTot.
-  remember (Rle_dec b a). intros. destruct s. assumption.
-  assumption. Qed.
+  0 < c -> a - b < c -> a -nn- b < c.
+  intros C H. unfold subNonnegTot. destruct (Rle_dec b a); simpl; lra. Qed.
 
 Lemma Rminus_plus_lt_subNonnegTot (a b : nonnegreal) c z :
   z < c -> a - b + z < c -> a -nn- b + z < c.

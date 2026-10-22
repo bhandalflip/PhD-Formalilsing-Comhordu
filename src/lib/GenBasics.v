@@ -5,7 +5,7 @@ School of Computer Science and Statistics, Trinity College, Dublin, Ireland.*)
 distances, and helpers for natural numbers, lists and sets.*)
 
 Require Import ComhCoq.lib.Extras.LibTactics.
-From Stdlib Require Import Reals Arith Lia.
+From Stdlib Require Import Reals Arith Lia Lra.
 
 (*********Imports********)
 From Stdlib Require Export List.
@@ -187,10 +187,8 @@ Lemma minusDelayAddTime : forall (d : Delay) (t : Time) (p : t < d),
 
 (**The right summand in a sum of delays is less than the total sum.*)
 Lemma addDelayLtR : forall (d1 d2 : Delay),
-  d2 < d1 +d+ d2. destruct d1, d2. destruct delay0, delay1.
-  simpl. rewrite <- Rplus_comm. cut (pos0 + 0 < pos0 + pos).
-  rewrite Rplus_0_r. intros. assumption. apply Rplus_lt_compat_l.
-  assumption. Qed.
+  d2 < d1 +d+ d2.
+  intros [[r1 P1]] [[r2 P2]]. simpl. lra. Qed.
 
 (** Adding and then subtracting the same quantity leaves the original delay.*)
 Lemma addMinusDelay : forall (d1 d2 : Delay),
@@ -249,24 +247,33 @@ Open Scope nat_scope.
 
 Open Scope nat_scope.
 
+(**If a property p is true of the number k, and j <= k,
+then there is some smallest j' between j and k such that p is true at j'.*)
+Theorem leftmost : forall (j k : nat) (p : nat -> Prop)
+  (K : forall i : nat, decidable (p i)),
+  p k -> j <= k ->
+  exists j', j <= j' <= k /\ p j' /\
+  forall x : nat, j <= x < j' -> ~ p x. intros j k p K H H0.
+  assert (D : forall n, (j <= n /\ p n) \/ ~ (j <= n /\ p n)).
+  intro n. destruct (le_dec j n), (K n); tauto.
+  destruct (dec_inh_nat_subset_has_unique_least_element _ D (ex_intro _ k (conj H0 H)))
+    as [j' [[[J Pj] L] _]].
+  exists j'. split. split. assumption. apply L. split; assumption.
+  split. assumption. intros x [X1 X2] Px. specialize (L x (conj X1 Px)). lia. Qed.
+
 (**If a property p is true of the number j, and j <= k, then there is some
 largest j' between j and k such that p is true at j'.*)
 Theorem rightmost : forall (j k : nat) (p : nat -> Prop)
   (K : forall i : nat, decidable (p i)),
   p j -> j <= k ->
   exists j', j <= j' <= k /\ p j' /\
-  forall x : nat, j' < x <= k -> ~ p x. intros.
-  induction H0. exists j. split. split; apply Nat.le_refl.
-  split. assumption. intros. inversion H0. apply False_ind.
-  eapply (proj1 (Nat.lt_nge _ _)). apply H1. assumption.
-  invertClear IHle. addHyp (K (S m)). invertClear H2.
-  exists (S m). split. split. constructor. assumption. apply Nat.le_refl.
-  split. assumption. intros. invertClear H2. apply False_ind.
-  eapply (proj1 (Nat.lt_nge _ _)). apply H4. assumption. exists x.
-  invertClear H1. invertClear H4. split. invertClear H2.
-  split. assumption. constructor. assumption. split.
-  assumption. intros. invertClear H4. invertClear H7.
-  assumption. apply H5; split; assumption. Qed.
+  forall x : nat, j' < x <= k -> ~ p x.
+  intros j k p K H H0.
+  destruct (leftmost j k (fun x => p (j + k - x)) (fun x => K _)) as [x [X [Px L]]];
+    [replace (j + k - k) with j by lia; exact H | exact H0 | ].
+  exists (j + k - x). split; [lia | split; [exact Px | ]].
+  intros y Y Py. apply (L (j + k - y)); [lia | ].
+  replace (j + k - (j + k - y)) with y by lia. exact Py. Qed.
 
 Open Scope R_scope.
 
@@ -282,29 +289,12 @@ Theorem rightmostNeg : forall (j k : nat) (p : nat -> Prop)
   (K : forall i : nat, decidable (p i)),
   ~p j -> j <= k ->
   exists j', j <= j' <= k /\ ~p j' /\
-  forall x : nat, j' < x <= k -> p x. intros.
-  assert (forall a, ~(~(p a)) -> p a). intros.
-  addHyp (K a). invertClear H2. apply H3. apply False_ind.
-  apply H1. assumption. assert (forall a, decidable (~ p a)).
-  intros. apply dec_not. apply K.
-  addHyp (rightmost j k (fun j => ~p j) H2 H H0).
-  invertClear H3. rename x into j'. exists j'. invertClear H4.
-  invertClear H5. split. assumption. split. assumption. intros.
-  apply H1. apply H6. assumption. Qed.   
-
-(**If a property p is true of the number k, and j <= k,
-then there is some smallest j' between j and k such that p is true at j'.*)
-Theorem leftmost : forall (j k : nat) (p : nat -> Prop)
-  (K : forall i : nat, decidable (p i)),
-  p k -> j <= k ->
-  exists j', j <= j' <= k /\ p j' /\
-  forall x : nat, j <= x < j' -> ~ p x. intros j k p K H H0.
-  assert (D : forall n, (j <= n /\ p n) \/ ~ (j <= n /\ p n)).
-  intro n. destruct (le_dec j n), (K n); tauto.
-  destruct (dec_inh_nat_subset_has_unique_least_element _ D (ex_intro _ k (conj H0 H)))
-    as [j' [[[J Pj] L] _]].
-  exists j'. split. split. assumption. apply L. split; assumption.
-  split. assumption. intros x [X1 X2] Px. specialize (L x (conj X1 Px)). lia. Qed.
+  forall x : nat, j' < x <= k -> p x.
+  intros j k p K H H0.
+  destruct (rightmost j k (fun x => ~ p x) (fun x => dec_not _ (K x)) H H0)
+    as [j' [J [N L]]].
+  exists j'. split; [exact J | split; [exact N | ]].
+  intros x X. apply (not_not _ (K x)), L, X. Qed.
 
 (**The same theorem as leftmost but with
 negation of P as existential and P as universal properties.*)
@@ -312,15 +302,12 @@ Theorem leftmostNeg : forall (j k : nat) (p : nat -> Prop)
   (K : forall i : nat, decidable (p i)),
   ~p k -> j <= k ->
   exists j', j <= j' <= k /\ ~p j' /\
-  forall x : nat, j <= x < j' -> p x. intros.
-  assert (forall a, ~(~(p a)) -> p a). intros.
-  addHyp (K a). invertClear H2. apply H3. apply False_ind.
-  apply H1. assumption. assert (forall a, decidable (~ p a)).
-  intros. apply dec_not. apply K.
-  addHyp (leftmost j k (fun j => ~p j) H2 H H0).
-  invertClear H3. rename x into j'. exists j'. invertClear H4.
-  invertClear H5. split. assumption. split. assumption. intros.
-  apply H1. apply H6. assumption. Qed. 
+  forall x : nat, j <= x < j' -> p x.
+  intros j k p K H H0.
+  destruct (leftmost j k (fun x => ~ p x) (fun x => dec_not _ (K x)) H H0)
+    as [j' [J [N L]]].
+  exists j'. split; [exact J | split; [exact N | ]].
+  intros x X. apply (not_not _ (K x)), L, X. Qed.
 
 (**If p is true at j and j <= k, then there is some rightmost
 j' such that p is true from j to j' and either ~p is true at j'+1 or j' = k.*)
@@ -329,37 +316,18 @@ Theorem rightmostCont : forall (j k : nat) (p : nat -> Prop)
   p j -> j <= k ->
   exists j' , j <= j' <= k /\ 
   forall m : nat, j <= m <= j' -> p m /\
-  (~p (S j') \/ j' = k). intros. induction H0.
-  exists j. split. split; constructor. intros. split.
-  assert (m = j). invertClear H0.
-  apply Nat.le_antisymm; assumption. rewrite H1. assumption.
-  right. reflexivity. invertClear IHle. invertClear H1.
-  rename x into j'. invertClear H2.
-  apply le_lt_eq_dec in H4. invertClear H4.
-  (*Case j' < m*) 
-  exists j'. split. split. assumption.
-  constructor. apply Nat.lt_le_incl in H2. assumption. intros.
-  rename m0 into n. addHyp (H3 n H4). clear H3.
-  invertClear H5. split. assumption. invertClear H6.
-  left. assumption. apply False_ind. rewrite <- H5 in H2.
-  eapply Nat.lt_irrefl. apply H2.
-  (*Case j' = m*)
-  addHyp (K (S m)). invertClear H4.
-  (*Case p is true at the last p*)
-  exists (S m). split.
-  split. constructor. rewrite <- H2. assumption. constructor.
-  intros. invertClear H4. apply le_lt_eq_dec in H7.
-  invertClear H7. rename m0 into n. rewrite H2 in H3.
-  addHyp (H3 n). assert (j <= n <= m). split. assumption.
-  apply le_S_n. apply H4. addHyp (H7 H8). clear H7.
-  invertClear H9. split. assumption. right. reflexivity.
-  split. rewrite H4. assumption. right. reflexivity.
-  (*Case p is not true at the last p*)
-  exists j'. split. split. assumption. rewrite H2.
-  repeat constructor. intros n Q.
-  addHyp (H3 n Q). invertClear H4. split. assumption.
-  invertClear H7. left. assumption. left.
-  rewrite H4. assumption. Qed.
+  (~p (S j') \/ j' = k).
+  intros j k p K H H0. induction H0 as [ | k L [j' [J F]]].
+  - exists j. split; [lia | ]. intros m M.
+    replace m with j by lia. split; [exact H | right; reflexivity].
+  - destruct (Nat.eq_dec j' k) as [-> | E].
+    + destruct (K (S k)) as [P | P].
+      * exists (S k). split; [lia | ]. intros m M. split; [ | right; reflexivity].
+        destruct (Nat.eq_dec m (S k)) as [-> | E]; [exact P | apply (F m); lia].
+      * exists k. split; [lia | ]. intros m M. split; [apply (F m M) | left; exact P].
+    + exists j'. split; [lia | ]. intros m M. destruct (F m M) as [Pm [N | Q]].
+      * split; [exact Pm | left; exact N].
+      * contradiction. Qed.
 
 Open Scope R_scope.
 
@@ -372,16 +340,6 @@ Lemma timeZero : forall (u : Time),
 
 (*****Incl stuff******)
 
-Lemma inclNotEx {A : Type} (l1 l2 : list A) : (forall x y : A, {x = y} + {x <> y}) ->
-  ~ incl l1 l2 -> exists a, a _: l1 /\ ~a _: l2. intros. induction l1.
-  apply False_ind. apply H. unfold incl. intros. inversion H0.
-  addHyp (in_dec X a l2). invertClear H0. assert (~ incl l1 l2).
-  unfold not. intro. apply H. unfold incl. intros. inversion H2.
-  rewrite <- H3. assumption. apply H0. apply H3. apply IHl1 in H0.
-  invertClear H0. exists x. invertClear H2. split. apply in_cons.
-  assumption. assumption. exists a. split. constructor. reflexivity.
-  assumption. Qed. 
-
 Lemma diff_emp {A : Type} (l : list A)
   (p : forall x y : A, {x = y} + {x <> y}) : set_diff p l [] = [] -> l = [].
   intros. destruct l. reflexivity. inversion H. apply set_add_not_empty in H1.
@@ -389,27 +347,18 @@ Lemma diff_emp {A : Type} (l : list A)
 
 Lemma incl_diff_equiv {A : Type} (l1 l2 : list A)
   (p : forall x y : A, {x = y} + {x <> y}) : incl l1 l2 <-> set_diff p l1 l2 = [].
-  split; intros. unfold incl in H. remember (set_diff p l1 l2) as l.
-  destruct l. reflexivity. apply False_ind. cut (~a _: l2). intros. apply H0.
-  apply H. apply set_diff_elim1 with (Aeq_dec := p) (y := l2). rewrite <- Heql.
-  constructor. reflexivity. apply set_diff_elim2 with (Aeq_dec := p) (x := l1).
-  rewrite <- Heql. constructor. reflexivity.
-  unfold incl. intros. addHyp (in_dec p a l2). invertClear H1. assumption.
-  addHyp (set_diff_intro p a l1 l2 H0 H2). rewrite H in H1. inversion H1. Qed.
-
-Lemma decIncl {A : Type} (l1 l2 : list A) :
-  (forall x y : A, {x = y} + {x <> y}) -> decidable (incl l1 l2).
-  intros. remember (set_diff X l1 l2) as l. destruct l. left.
-  rewrite incl_diff_equiv. symmetry. apply Heql.
-  right. unfold not. intro. rewrite incl_diff_equiv with (p := X) in H.
-  rewrite <- Heql in H. inversion H. Qed.
+  split.
+  - intro I. destruct (set_diff p l1 l2) as [ | a l] eqn:E; [reflexivity | ].
+    assert (D : In a (set_diff p l1 l2)) by (rewrite E; left; reflexivity).
+    apply set_diff_iff in D. destruct D as [D1 D2]. contradiction (D2 (I a D1)).
+  - intros E a A1. destruct (in_dec p a l2) as [A2 | A2]; [exact A2 | ].
+    assert (D : In a (set_diff p l1 l2)) by (apply set_diff_iff; split; assumption).
+    rewrite E in D. contradiction. Qed.
 
 Lemma inter_incl {A : Type} (x y z : set A)
   (p : forall a b : A, {a = b} + {a <> b}) :
-  incl x y -> incl (set_inter p x z) (set_inter p y z). intros.
-  unfold incl. intros. addHyp H0. apply set_inter_elim1 in H0.
-  apply set_inter_elim2 in H1. apply H in H0. apply set_inter_intro;
-  assumption. Qed.  
+  incl x y -> incl (set_inter p x z) (set_inter p y z).
+  intros I a. rewrite !set_inter_iff. intros [X Z]. split; [apply I | ]; assumption. Qed.
 
 (*****END : Incl stuff******)
 

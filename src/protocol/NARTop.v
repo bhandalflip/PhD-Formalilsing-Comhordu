@@ -278,31 +278,6 @@ Theorem nextSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   rewrite <- ME. intro YL. lets SD : sentDel p w SE. my_applys_eq SD.
   timering. Qed.
 
-
-(** An entity in tfsBc is not currSince in a mode that is not fail safe: on entering tfsBc
-it switched to the fail-safe successor of its mode, which differs from the mode unless the
-mode was fail safe already (a fail-safe mode may be its own successor).*)
-Theorem tfsBc_not_currSince (n : Network) (m : Mode) (t  : Time)
-  (i : nat) (p : reachableProtNet n) :
-  ~ failSafe m -> tfsBcStateNet i n -> currSince m t i n p -> False.
-(**Proof: Induction on currSince. The base case fails because tfsBcState is not switchListen.
-The delay case is easy because by (...backwards del pres state...) the previous state is
-tfsBc also, and we just apply the I.H. to get false. The discrete case proceeds by
-(...backtracking...) on tfsBcState to get that the previous state was either tfsBc state or
-tfsCurr. In the former case, applying the I.H. will do. In the latter, we can show that the
-current mode is no longer m. We do this by showing that the mode was m in the previous
-state (currSince-curr) and then showing that the mode transition relation is anti-reflexive
-& by (...tracking...) we know the action linking the states is a synch on mCurr, so the new
-mode must be different to m, which contradicts the currSince discrete constructor that
-required the currMode to be m.*)
-Proof.
-  intros NF TB CS. apply NF.
-  pose proof (currSince_curr n m t i p CS) as CM. rewrite currMode_ent_ex in CM.
-  destruct CM as [e [E CE]]. destruct TB as [e' TBe E'].
-  assert (e' = e) by (eapply entInNetUnique; eassumption). subst e'.
-  rewrite <- CE. exact (tfsBc_failSafe e (reachable_net_ent _ _ _ p E) TBe).
-Qed.
-
 (** switchBc's only step wakes the broadcaster in its mode.*)
 Local Lemma switchBc_step_wake (m : Mode) p p' c :
   switchBcState m p -> p -PA- c -PA> p' -> c = chanWake ;! [baseMode m].

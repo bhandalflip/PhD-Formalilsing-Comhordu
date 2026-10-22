@@ -100,6 +100,20 @@ Coercion currModeEnt (e : Entity) : Mode :=
 Definition nextModeEnt (e : Entity) : option Mode :=
   match e with [|_, _, _, a|] => nextModeMState a end.
 
+(** An entity in a stable mode has no next mode.*)
+Lemma nextModeEnt_not_stable m1 (m2 : Mode) p l h :
+  nextModeEnt ([|p, l, h, m2|]) = Some m1 -> False.
+Proof.
+  intro H. simpl in H. discriminate.
+Qed.
+
+(** An entity's next mode is its mode state's.*)
+Lemma nextMode_ent_mState p l h k m :
+  nextModeEnt ([|p, l, h, k|]) = Some m -> nextModeMState k = Some m.
+Proof.
+  intro U. exact U.
+Qed.
+
 (** incomingEnt v e means v is in the incoming list of the interface of e.*)
 Inductive incomingEnt (v : list BaseType) : Entity -> Prop :=
   | incent P l h K : incomingInter v h -> incomingEnt v ([|P, l, h, K|]).

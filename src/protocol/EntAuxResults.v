@@ -54,13 +54,6 @@ Proof.
   intro R. apply reachableProt_reachableFrom. exact (reachableEnt_proc _ _ R).
 Qed.
 
-(** An entity in a stable mode has no next mode.*)
-Lemma nextModeEnt_not_stable m1 (m2 : Mode) p l h :
-  nextModeEnt ([|p, l, h, m2|]) = Some m1 -> False.
-Proof.
-  intro H. simpl in H. discriminate.
-Qed.
-
 (***************************** Steps to a component *****************************)
 (** The language takes an entity step down to the components of its software, for any
 number of them (ent_disc_comps and its kin in EntityLanguage.v). Here the software is the
@@ -543,14 +536,6 @@ Proof.
         intros m0 e2 e3 e4 B. ovWait_bisim_contra B. }
       rewrite <- (stepTimedEnt_currMode _ _ _ S). apply IL. constructor. constructor. exact X0.
 Qed.
-
-(**If an entity is in the tfsCurr state, then the mext mode exists and is failsafe.*)
-Lemma tfsCurr_failSafe (e : Entity) :
-  reachableProtEnt e -> tfsCurrStateEnt e -> exists m, nextModeEnt e = Some m /\ failSafe m.
-Proof. intro R. exact (proj1 (tfs_failSafe_ent e R)). Qed.
-(**GENERAL TACTICS WOULD BE USEFUL HERE, BECAUSE THERE ARE 3 FAIRLY SMILAR THEOREMS TO COME.
-Proof: Look at the overlap component. Upon entering this state, it must have written out a fail safe mode
-to the mode state- in particular, the successor to the current mode.*)
 
 (**If a reachable entity is in the tfsBc state, then the current mode of that entity
 is failsafe.*)
@@ -1665,18 +1650,6 @@ Lemma msgAbortPathEnt_urgent e e' d :
   econstructor; eassumption.  
   eapply abortOvlpStateEnt_urgent; eassumption. Qed.
 
-(** The interface component is irrelevant to the msgAbortPath.*)
-Lemma msgAbort_inter_irrel p l h h' k :
-  msgAbortPathEnt ([|p, l, h, k|]) ->
-  msgAbortPathEnt ([|p, l, h', k|]).
-Proof.
-  intro H. inversion H; subst.
-  - eapply mapMsg; try reflexivity; eassumption.
-  - eapply mapGrng; try reflexivity; eassumption.
-  - eapply mapCuco; eassumption.
-  - eapply mapAbort; eassumption.
-Qed.  
-
 (***************************** Delay Behaviour *****************************)
 
 (** The listener reads any current mode in rangeBad and gotRange, and stability and any next
@@ -1860,17 +1833,6 @@ Proof.
   - destruct (NX v eq_refl) as [NM _].
     right. right. exists v. split; [constructor; constructor; exact N | exact NM].
 Qed.
-
-Lemma nextMode_ent_mState p l h k m :
-  nextModeEnt ([|p, l, h, k|]) = Some m -> nextModeMState k = Some m.
-Proof.
-  intro U. exact U.
-Qed.
-
-Ltac ent_disc_pres_pos_tac := match goal with
-  [V : [|_, ?l, _, _|] -EA- ?b ->> [|_, ?l', _, _|] |- _ ] =>
-  let EDP := fresh "EDP" in
-  lets EDP : stepEnt_disc_pres_pos V; simpl in EDP end.
 
 (*+*)
 (** A step of an entity whose listener is in gotRange: the listener stays, or it read the

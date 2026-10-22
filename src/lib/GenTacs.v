@@ -25,9 +25,6 @@ Ltac introz U := repeat let H := fresh U in intro H.
 leaving only the case that didn't fit (if it exists)*)
 Ltac appDisj H := destruct H; try apply H.
 
-(*Do t and then apply H to the second subgoal generated. 2 subgoals expected.*)
-Ltac doappsnd t H := t;[ | apply H].
-
 (** If the hypothesis in question is invertible into exactly one other hypothesis, then
 this tactic changes the current hypothesis to the inverted hypothesis. It does this by a
 regular inversion, then a clear, then a rename.*)
@@ -106,7 +103,6 @@ Ltac my_applys_eq5 H :=
 Ltac my_applys_eq H := first [my_applys_eq5 H | my_applys_eq4 H |
   my_applys_eq3 H | my_applys_eq2 H | my_applys_eq1 H].
 
-Ltac invertClearAs1 H U := inversion H as [U]; clear H.
 Ltac invertClearAs2 H U V := inversion H as [U V]; clear H.
 Ltac invertClearAs3 H U V W := inversion H as [U V W]; clear H.
 
@@ -124,8 +120,6 @@ Ltac elimOr4 P U := let H := fresh in let U1 := fresh U in
   elim_intro P U1 H;[ | elimOr3 H U].
 Ltac elimOr5 P U := let H := fresh in let U1 := fresh U in
   elim_intro P U1 H;[ | elimOr4 H U].
-Ltac elimOr6 P U := let H := fresh in let U1 := fresh U in
-  elim_intro P U1 H;[ | elimOr5 H U].
 
 (*Decompose an and of multiple parts into named hypotheses.*)
 Ltac decompAnd2 H H1 H2 := elim H; intros H1 H2; clear H.
@@ -173,17 +167,6 @@ Ltac eassert := let H := fresh in eassertArg H.
 
 Tactic Notation "eassert" "as" ident(Y) := eassertArg Y.
 
-Ltac genDep2 x1 x2 := generalize dependent x1; generalize dependent x2.
-
-Ltac genDep3 x1 x2 x3 := genDep2 x1 x2; generalize dependent x3.
-
-Ltac genDep4 x1 x2 x3 x4:= genDep3 x1 x2 x3; generalize dependent x4.
-
-Ltac genDep5 a b c d e := genDep4 a b c d; generalize dependent e.
-
-(**Safe version of eexists that checks for existential first*)
-Ltac eexists_safe := match goal with [ |- ex _] => eexists end.
-
 (** Given an equality U : a = b, this tactic first tries to rewrite U
 in the goal, then if this does not work rewrites it in a hypothesis.*)
 Ltac subst_once U :=
@@ -222,23 +205,7 @@ Ltac ex_flat := repeat
   [U1 : context[ex] |- _] =>  invertClearAs2 U1 x U
   end.
 
-Ltac unfold_all_step r := match goal with [V : context[r] |- _] =>
-  unfold r in V end.
-
-Ltac unfold_all r := repeat unfold_all_step r.
-
-Ltac exand_flat := repeat (progress (ex_flat; and_flat)).
-
 (******* Specialised tactics *******)
-
-(*Given two different state predicates U1 and U2 holding over the same process,
-this tactic yeilds a contradiction.*)
-Ltac state_pred_elim U1 U2 := inversion U1; subst; inversion U2.
-
-(*Destruct a state predicate at the network level to lower level components.*)
-Ltac state_pred_net_destr U :=
-  let e := fresh "e" in let U1 := fresh in let U2 := fresh in
-  inversion U as [e U1 U2]; inversion U1; subst.
 
 (**Given a hypothesis H that the length of l = n, for some ACTUAL natural
 number n- not a symbolic n or this won't terminate!! This function then uses the dummy

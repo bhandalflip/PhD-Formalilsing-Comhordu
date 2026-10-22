@@ -6,7 +6,7 @@ The Comhordú protocol (thesis chapter 5, p.102), written in the [language](../l
 Theorem safety (n : Network) : reachableProtNet n -> safe n.
 ```
 
-The proof builds up level by level, from processes to entities to networks.
+The proof builds up level by level, from processes to entities to networks. Every result here serves `safety`, except a few kept for proofs of other properties, such as liveness or that time can always pass: `protocolGuarded` and `delApp` in `ProtocolBridge.v`, and some facts in `ProtAuxResults.v`, `EntAuxResults.v` and `NetAuxBasics.v` about what a component can do next, or where it goes next.
 
 | File | What it holds |
 |---|---|

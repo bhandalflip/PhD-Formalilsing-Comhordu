@@ -191,14 +191,6 @@ Qed.
 (**Proof: Strtengthen the statement to replace nextSince with nextSinceState.
 Then split into the different nextSinceState cases and use an aux lemma for each.*)
 
-Lemma switchCurr_nextSince_next m t i n p :
-  nextSince m t i n p ->
-  switchCurrStateNet i n -> nextModeNet m i n.
-Proof.
-  (* nextSince m alone gives the next mode m (nextSince_next). *)
-  intros NS _. exact (nextSince_next _ _ _ _ _ NS).
-Qed.
-
 (** An entity has at most one next mode.*)
 Local Lemma nextModeNet_unique m m' i n : nextModeNet m i n -> nextModeNet m' i n -> m = m'.
 Proof.
@@ -224,17 +216,6 @@ Proof.
   intros NS OW. eapply nextModeNet_unique;
     [exact (nextSince_next _ _ _ _ _ NS)
     | exact (proj1 (ovWait_ovReady_nextMode_net i n p) _ _ _ _ OW)].
-Qed.
-(*+PROBABLY NEED TO PROVE THESE TOGETHER FROM A MASTER "MUTUAL" RESULT+*)
-Lemma nextSince_ovReaddy_modeEq m m' t t' l i n p :
-  nextSince m t i n p -> ovReadyStateNet m' t' l i n -> m = m'.
-(*Proof: Inudction nextSince, eliminate all non-matching state predicates.*)
-Proof.
-  (* m and m' are both the next mode, by nextSince_next and
-  ovWait_ovReady_nextMode_net.*)
-  intros NS OR. eapply nextModeNet_unique;
-    [exact (nextSince_next _ _ _ _ _ NS)
-    | exact (proj2 (ovWait_ovReady_nextMode_net i n p) _ _ _ OR)].
 Qed.
 
 (*If an entity is tfs m, then it is in some tfsState.*)
@@ -324,24 +305,6 @@ Proof.
       eapply tfsNext_urgent_net; [exact p0 | eapply del_pres_bkwd_tfsNext; eassumption | exact w0].
 Qed.
 
-Lemma tfsStart_tfs_zero : forall (n : Network) (t : Time)
-  (i : nat) (m : Mode) (p : reachableProtNet n),
-  tfs m t i n p -> tfsStartStateNet i n -> t = zeroTime.
-Proof.
-  intros n t i m p H TS. exact (proj2 (tfs_tfsStart_tfsNext_inv m t i n p H (or_introl TS))).
-Qed.
-(*Proof: Similar to tfsNext_tfs_zero except can eliminate the backtrack
-case because it implies the previous state is not tfs.*)
-
-(*The tfs relation is at zero time when in the state tfsNext.*)
-Lemma tfsNext_tfs_zero : forall (n : Network) (t : Time)
-  (i : nat) (m : Mode) (p : reachableProtNet n),
-  tfs m t i n p -> tfsNextStateNet m i n -> t = zeroTime.
-Proof.
-  intros n t i m p H TN.
-  exact (proj2 (tfs_tfsStart_tfsNext_inv m t i n p H (or_intror (ex_intro _ m TN)))).
-Qed.
-  
 Lemma currModeNet_switch_states n n' a m m' i :
   reachableProtNet n -> n -NA- a -NA> n' -> currModeNet m i n ->
   currModeNet m' i n' -> m <> m' ->
@@ -1005,20 +968,6 @@ Proof.
     pose proof (proj2 (tfsState_del_pres_net n n' i d OS w) TS) as TSn.
     pose proof (proj2 (currModeNet_del_pres n n' d m i w) CM) as CMn.
     destruct (IH TSn CMn NFS) as [t T]. exists (t +dt+ d). apply tfsDel. exact T.
-Qed.
-
-(** With a time parameter of 0, the tfs relation is preserved by a discrete step, as long
-as the entity's mode is not fail safe. The mode is tfs's own mode m, which the caller knows
-to be current. See tfsState_not_currSince for why a fail-safe mode is excluded.*)
-Lemma tfs_zero_disc_pres (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mode)
-  (p : reachableProtNet n) (w : n -NA- a -NA> n') :
-  currModeNet m i n -> ~ failSafe m ->
-  tfs m zeroTime i n p ->
-  tfs m zeroTime i n' (reachNetDisc n n' a p w).
-Proof.
-  intros CM NFS T. apply tfsDisc; [exact T | ].
-  eapply (tfs_currMode_disc_pres n n' a i m); [exact p | exact w | exact CM | exact NFS | ].
-  eapply tfs_rel_state. exact T.
 Qed.
 
 (** No overlap component is both init and in a nextSince state.*)
