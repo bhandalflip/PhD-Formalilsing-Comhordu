@@ -6,7 +6,7 @@ This repository holds a proof, checked by the [Rocq prover](https://rocq-prover.
 
 Comhordú coordinates mobile entities, such as cars, robots or drones, that move in real time and talk over an unreliable wireless network. Each entity is in a mode, and each pair of modes has a minimum distance. Safety means that no two entities are closer than their modes allow. A fail-safe mode needs no distance at all. So the protocol has an entity broadcast a new mode for a set time before entering it. That gives any entity it might threaten the time to switch to a fail-safe mode.
 
-Mélanie Bouroche created Comhordú in [her PhD thesis](https://www.scss.tcd.ie/publications/theses/phd/TCD-SCSS-PHD-2007-07.pdf) in 2007. In mine, I revise it so that it can be made formal. I define a language for such systems, write the protocol in it and prove the protocol safe (Theorem 6.1, p.140). That is, if every entity starts in a fail-safe mode and runs the protocol, every state the system can reach is safe.
+Comhordú began in Mélanie Bouroche's [PhD thesis](https://www.scss.tcd.ie/publications/theses/phd/TCD-SCSS-PHD-2007-07.pdf) in 2007. Her aim, I believe, was to keep cars and other vehicles from colliding. In my thesis I revise her model so that it can be made formal, so my version differs from hers. I define a language for such systems, write the protocol in it and prove the protocol safe (Theorem 6.1, p.140). That is, if every entity starts in a fail-safe mode and runs the protocol, every state the system can reach is safe.
 
 I also encoded the language, the protocol and the proof in Coq. The proof was only partly checked, though: its main theorem rested on lower-level results, and many of them were assumed without proof (Summary, p.ii). In 2015, with 254 results still unproved, I wrote [a plan](doc/archive/2015-05-08-coq-project-plan.pdf) to finish it.
 
@@ -15,6 +15,14 @@ In 2026 I finished the proof with AI agents, reviewing every change as it went i
 Finishing the proof turned up errors in the thesis. The [thesis corrections](doc/thesis/thesis-corrections.md) list them, and the [thesis remarks](doc/thesis/thesis-remarks.md) note other things worth knowing. The Rocq proof also departs from the thesis's in many details. Where they differ, the Rocq proof is the one to trust.
 
 The thesis suggested that its language could be reused for other protocols (p.197). Now it can be. The language takes a protocol's processes as parameters, and its general results sit apart from the protocol, in [`src/lang/`](src/lang/README.md).
+
+## Collision freedom
+
+My version of Comhordú can't promise, on its own, that entities never collide. A fail-safe mode must be compatible with every other mode at every distance, even zero, yet two physical entities can't occupy the same point in space.
+
+Under some assumptions, though, it can. Say a car's fail-safe mode is to be on the hard shoulder, its other modes are to be in the traffic lanes, and distance is measured only along the road, in its direction of travel. Two cars can then be at the same point in this abstract space without touching, as when one is on the hard shoulder and the other is in a lane. One weakness is the assumption that every car can reach the hard shoulder in a bounded time. Still, this is the closest example I can think of where Comhordú guarantees freedom from collisions (Remark 4.20, p.97).
+
+Even there, I don't think Comhordú in its current form is the best protocol for the job. It ignores velocities, so I feel it may be overly conservative.
 
 ## Model your own system
 
