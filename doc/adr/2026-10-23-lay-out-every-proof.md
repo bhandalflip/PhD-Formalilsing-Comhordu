@@ -20,7 +20,7 @@ Every proof starts with `Proof.` on a new line after its statement and ends with
 
 ## Rationale
 
-The Rocq manual recommends this layout, and the standard library, MathComp and CompCert use it in nearly every proof. All three also let a short proof sit on one line, which keeps a one-tactic proof from taking three, and the cap stops a long proof from being squashed onto one.
+The Rocq manual recommends this layout, and the standard library, MathComp and CompCert use it in nearly every proof. All three also let a short proof sit on one line, which keeps a one-tactic proof from taking three lines, and the cap stops a long proof from being squashed onto one.
 
 ## Revisit when
 
@@ -54,7 +54,7 @@ Rocq's timing output gives the span of every sentence, so a check built on it co
 
 ## Implementation notes
 
-- **The survey.** Measured with the same sentence splitter as the checker:
+- **The survey**, counted by a one-off script:
 
   | | Proofs | Start with `Proof.` | One-line proofs | Multi-line proofs that end with `Qed.` on its own line | Proof indented by |
   |---|---|---|---|---|---|
@@ -69,10 +69,10 @@ Rocq's timing output gives the span of every sentence, so a check built on it co
   - The blanks are space, tab, newline and carriage return. A `.` ends a sentence when a blank or the end of the file follows it, which also covers `...`, but `..` is a token of its own and doesn't.
   - Between sentences, a run of `-`, `+` or `*` is a bullet and a `{` or `}` is a brace, each a sentence of its own, as is a goal selector with its brace, such as `2: {`.
   - Comments nest, and a string inside a comment hides any `*)` in it.
-- **What it checks.** A proof runs from a statement to its first closer: `Qed`, `Defined`, `Admitted`, `Abort` or `Save`. The statements are `Lemma`, `Theorem`, `Corollary`, `Proposition`, `Fact`, `Remark`, `Property` and `Goal`, and `Definition`, `Example`, `Instance`, `Fixpoint`, `CoFixpoint` and `Let` when they have no body, after any attributes and modifiers such as `Local`. Commands that it doesn't know open a proof, such as `Program` obligations, `Add Morphism` and `Function`, are left alone. `Proof using …` and `Proof with …` count as `Proof.`, and `Proof term.` is a whole proof on its own line. The 80-character cap counts the whole line, indentation included, but not trailing blanks. A comment may sit anywhere, between a statement and its `Proof.` too.
+- **What it checks.** A proof runs from a statement to its first closer: `Qed`, `Defined`, `Admitted`, `Abort` or `Save`. The statements are `Lemma`, `Theorem`, `Corollary`, `Proposition`, `Fact`, `Remark`, `Property` and `Goal`, and `Definition`, `Example`, `Instance`, `Fixpoint`, `CoFixpoint` and `Let` when they have no body, after any attributes and modifiers such as `Local`. It doesn't know every command that opens a proof, such as `Next Obligation`, `Add Morphism` and `Function`, and leaves their proofs alone. `Proof using …` and `Proof with …` count as `Proof.`, and `Proof term.` is a whole proof in one sentence. The 80-character cap counts the whole line, indentation included, but not trailing blanks. A comment may sit anywhere, between a statement and its `Proof.` too.
 - **Tests**, in [`helper-scripts/test_check_proof_layout.py`](../../helper-scripts/test_check_proof_layout.py): 38 layouts that must pass, 27 that must fail with given problems at given lines, 6 kinds of whitespace change that must change no verdict, 5 files that aren't valid Rocq, and tables of which sentences open a proof and what a `Proof` sentence does. Where `rocq` is on the `PATH`, 179 of the cases are compiled with `rocq compile -time`, which prints every sentence's span, and the checker must find the same spans. Of 31 bugs planted in the checker one at a time, the tests catch 30. The last treats a form feed as a blank, which changes nothing, since Rocq refuses a form feed outside comments and strings.
 - **Checked against Rocq on real code.** The checker's sentences match Rocq's on every file in `src/`, before the change (24,457 sentences) and after it (25,083), and on 150 files picked at random from the standard library's 583 (43,125). It ran without failing on all 648 files of the core and standard libraries, the 5 of MathComp and the 7 of CompCert, and every problem it reported in a sample of each kind was a real departure from this layout.
-- **The change.** 626 proofs gained `Proof.`, and 137 of them stayed on one line. 454 closers moved to a line of their own, 15 one-line proofs longer than 80 characters spread over lines, and 56 closers moved to their statement's column. Where a proof gained `Proof.`, a comment that sat before its first tactic, such as a `(*Proof: …*)` sketch, now follows `Proof.`. 15 proofs already had `Proof.` after such a comment, and keep it there.
+- **The change.** 626 proofs gained `Proof.`, and 137 of them stayed on one line. 454 closers moved to a line of their own, 19 one-line proofs longer than 80 characters spread over lines, and 56 closers moved to their statement's column. Where a proof gained `Proof.`, a comment that sat before its first tactic, such as a `(*Proof: …*)` sketch, now follows `Proof.`, which spread 2 more one-line proofs over lines. 15 proofs already had `Proof.` after such a comment, and keep it there.
 - **Nothing else changed.** With blanks and `Proof.` removed, every file is as it was. The sentences are the same, in the same order, apart from the 626 new `Proof.`s, and every comment is unchanged. A clean build passes with the same warnings, and `safety` still rests on no unproved result and on the same 6 standard-library axioms.
 - **CI.** The job `layout` in [`.github/workflows/build.yml`](../../.github/workflows/build.yml) runs in the same image as the build, so that the tests can compile their cases.
 - **The rule** is in [`src/AGENTS.md`](../../src/AGENTS.md).
