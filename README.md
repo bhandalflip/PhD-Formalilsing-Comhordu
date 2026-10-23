@@ -40,7 +40,7 @@ Definition my_model : ComhModel := {| (* your system's model *) |}.
 Check @safety my_model.
 ```
 
-[`concrete_model`](src/model/ModelConsistency.v) is a small, complete example.
+[`concrete_model`](src/model/ModelConsistency.v) shows what such a value looks like. It is trivial, though: it exists only to show that the model's constraints can all be met, not to model any real system.
 
 Then check that your system runs exactly Comhordú's protocol, as [`src/protocol/Protocol.v`](src/protocol/Protocol.v) defines it. `safety` says nothing about a protocol that differs, however slightly. A test oracle, which checks what your system does against what the protocol allows, is one way to check.
 
