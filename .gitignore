@@ -25,6 +25,9 @@ GEMINI.md
 .nra.cache
 .Makefile.coq.d
 
+# Python's cache, which running the helper scripts' tests writes
+__pycache__/
+
 # Windows image file caches
 Thumbs.db
 ehthumbs.db
