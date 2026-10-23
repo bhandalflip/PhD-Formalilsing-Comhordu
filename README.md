@@ -12,7 +12,7 @@ I also encoded the language, the protocol and the proof in Coq. The proof was on
 
 In 2026 I finished the proof with AI agents, reviewing every change as it went in. It now runs on Rocq 9.2, and its main theorem, `safety`, rests on no unproved result. Besides the model's parameters and their constraints, it assumes only six axioms from Rocq's standard library, such as classical logic. [A concrete model](src/model/ModelConsistency.v), built without axioms, shows that the constraints can all be met.
 
-Finishing the proof turned up errors in the thesis. The [thesis corrections](doc/thesis/thesis-corrections.md) list them, and the [thesis remarks](doc/thesis/thesis-remarks.md) note other things worth knowing. The Rocq proof also departs from the thesis's in many details. Where they differ, the Rocq proof is the one to trust.
+Finishing the proof turned up small errors in the thesis, and safety does not hold without their corrections. The [thesis corrections](doc/thesis/thesis-corrections.md) list them, and the [thesis remarks](doc/thesis/thesis-remarks.md) note other things worth knowing. The Rocq proof also differs from the thesis's in its details, but the heart of the argument is the same. Where they differ, the Rocq proof is the one to trust.
 
 The thesis suggested that its language could be reused for other protocols (p.197). Now it can be. The language takes a protocol's processes as parameters, and its general results sit apart from the protocol, in [`src/lang/`](src/lang/README.md).
 
