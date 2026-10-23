@@ -19,6 +19,7 @@ Require Import ComhCoq.model.ComhBasics.
 Require Import ComhCoq.lang.LanguageFoundations.
 Require Import ComhCoq.lang.EntityLanguage.
 Require Import ComhCoq.lang.NetworkLanguage.
+Require Import ComhCoq.lang.ProcEquiv.
 Require Import ComhCoq.protocol.NetAuxBasics.
 Require Import ComhCoq.protocol.NetAuxDefs.
 Require Import ComhCoq.protocol.NARMisc.
@@ -45,16 +46,16 @@ Ltac currModeNet_notifBad_pres_bkwd_close :=
     currCompState, pausedState, gotMsgState, gotRangeState, currEqState, nextEqState,
     currPincCheckState, nextPincCheckState in *;
   match goal with
-  | [V : ProcEquiv.bisimilar ?p ?x, V1 : ProcEquiv.bisimilar ?p ?y |- False] =>
+  | [V : ?p ~p~ ?x, V1 : ?p ~p~ ?y |- False] =>
     let BT := fresh "BT" in
-    assert (ProcEquiv.bisimilar x y) as BT by
-      (eapply ProcEquiv.bisim_trans; [apply ProcEquiv.bisim_symm; exact V | exact V1]);
+    assert (x ~p~ y) as BT by
+      (eapply bisim_trans; [apply bisim_symm; exact V | exact V1]);
     unfold bcWait, sleeping, bcReady, dormant, init, ovWait, ovReady, switchBc,
       switchCurr, switchListen, tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen, ovAbort,
       listening, checkRange, rangeBad, currEq, badOvlp, currOK, nextEq, abortOvlp,
       gotMsg, gotRange, currPincCheck, currComp, nextPincCheck, paused in BT;
     first [solve [bisim_contra BT] |
-      apply ProcEquiv.bisim_symm in BT; solve [bisim_contra BT]]
+      apply bisim_symm in BT; solve [bisim_contra BT]]
   end.
 
 Lemma currModeNet_notifBad_pres_bkwd_paused i n :
@@ -176,15 +177,15 @@ Local Lemma listening_AN_insuff_rangeBad p p' r m l :
   p -PA- chanAN ;? [baseDistance r, baseMode m, basePosition l] -PA> p' ->
   rangeBadState m p'.
 Proof.
-  intros LS NS T. destruct (ProcEquiv.bisim_step_disc _ _ _ _ LS T) as [q [TQ B]].
+  intros LS NS T. destruct (bisim_step_disc _ _ _ _ LS T) as [q [TQ B]].
   unfold listening in TQ. invert_disc_prefixes. explicit_typed_input. clean_proc_hyp B.
-  red. eapply ProcEquiv.bisim_trans; [exact B | ]. unfold_app_bisim.
+  red. eapply bisim_trans; [exact B | ]. unfold_app_bisim.
   assert (EB : evalBoolExp (bSufficient (eBase (baseMode m)) (eBase (baseDistance r))) false).
   { assert (F : suffBool m r = false)
       by (unfold suffBool; destruct (suffDec m r); [contradiction | reflexivity]).
     rewrite <- F. apply bevalSufficient_dist; apply evalBase. }
-  eapply ProcEquiv.bisim_trans; [apply (ProcEquiv.if_then_bisim_false _ _ _ EB) | ].
-  unfold_app_bisim. apply ProcEquiv.bisim_refl.
+  eapply bisim_trans; [apply (if_then_bisim_false _ _ _ EB) | ].
+  unfold_app_bisim. apply bisim_refl.
 Qed.
 
 (** A notification with timestamp 0 stays incoming across a discrete step of a reachable
@@ -380,7 +381,7 @@ Qed.
 Local Lemma badOvlp_act p p' a : badOvlpState p -> p -PA- a -PA> p' -> a = chanBad ;! [].
 Proof.
   intros B T. unfold badOvlpState, badOvlp in B.
-  destruct (ProcEquiv.bisim_disc_match _ _ _ _ B T) as [q TQ]. invert_disc_prefixes.
+  destruct (bisim_disc_match _ _ _ _ B T) as [q TQ]. invert_disc_prefixes.
   match goal with [H : evalExpLists [] _ |- _] => inversion H end.
   reflexivity.
 Qed.
@@ -397,10 +398,10 @@ Proof.
   intros P O N. destruct (overlapState_shape _ O)
     as [D | v D | v e2 e3 e4 D | v1 e2 v3 D | m0 D | D | D | D | D | v D | D | D | D];
     try solve [prot_outProc_in_not_contra];
-    destruct (ProcEquiv.bisim_step_disc _ _ _ _ D P) as [q' [Q B]];
+    destruct (bisim_step_disc _ _ _ _ D P) as [q' [Q B]];
     prot_outProc_in_not_body; invert_disc_prefixes;
     destruct N as [m1 t1 x1 y1 X | m1 t1 l1 X | m1 X | m1 X]; red in X;
-    pose proof (ProcEquiv.bisim_trans _ _ _ (ProcEquiv.bisim_symm _ _ B) X) as BT; clear B X;
+    pose proof (bisim_trans _ _ _ (bisim_symm _ _ B) X) as BT; clear B X;
     clean_proc_hyp BT; unfold liftNameProc in BT; unfold_app_hyp_l BT;
     prot_outProc_in_not_body; refute_by_chan BT.
 Qed.
@@ -566,16 +567,16 @@ Ltac badOvlp_listening_tfs_close :=
     currCompState, pausedState, gotMsgState, gotRangeState, currEqState, nextEqState,
     currPincCheckState, nextPincCheckState in *;
   match goal with
-  | [V : ProcEquiv.bisimilar ?p ?x, V1 : ProcEquiv.bisimilar ?p ?y |- False] =>
+  | [V : ?p ~p~ ?x, V1 : ?p ~p~ ?y |- False] =>
     let BT := fresh "BT" in
-    assert (ProcEquiv.bisimilar x y) as BT by
-      (eapply ProcEquiv.bisim_trans; [apply ProcEquiv.bisim_symm; exact V | exact V1]);
+    assert (x ~p~ y) as BT by
+      (eapply bisim_trans; [apply bisim_symm; exact V | exact V1]);
     unfold bcWait, sleeping, bcReady, dormant, init, ovWait, ovReady, switchBc,
       switchCurr, switchListen, tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen, ovAbort,
       listening, checkRange, rangeBad, currEq, badOvlp, currOK, nextEq, abortOvlp,
       gotMsg, gotRange, currPincCheck, currComp, nextPincCheck, paused in BT;
     first [solve [bisim_contra BT] |
-      apply ProcEquiv.bisim_symm in BT; solve [bisim_contra BT]]
+      apply bisim_symm in BT; solve [bisim_contra BT]]
   end.
 (* end helpers *)
 

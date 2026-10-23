@@ -1940,11 +1940,11 @@ Proof.
 Qed.
 
 (* begin helpers for tfsNext_next_ent *)
-Lemma tfsNext_next_ent_currN : ProcEquiv.bisimilar (tfsCurrN $([])$) tfsCurr.
+Lemma tfsNext_next_ent_currN : tfsCurrN $([])$ ~p~ tfsCurr.
 Proof. apply app_bisim_nil. reflexivity. Qed.
 
 Lemma tfsNext_next_ent_nextN (m : Mode) :
-  ProcEquiv.bisimilar (tfsNextN $([eBase (baseMode m)])$) (tfsNext m).
+  tfsNextN $([eBase (baseMode m)])$ ~p~ tfsNext m.
 Proof.
   replace (tfsNext m)
     with (subProcTerm (listsToSub [vM] [eBase (baseMode m)]) (tfsNext (eVar vM))).
@@ -1960,9 +1960,9 @@ Proof.
   destruct (bisim_step_disc _ _ _ _ B T) as [q [Tq Bq]].
   unfold tfsNext in Tq. inversion Tq; subst.
   - match goal with [V : outPrefix _ _ _ -PA- _ -PA> _ |- _] => inversion V; subst end.
-    right. eapply ProcEquiv.bisim_trans; [eassumption | apply tfsNext_next_ent_currN].
+    right. eapply bisim_trans; [eassumption | apply tfsNext_next_ent_currN].
   - match goal with [V : outPrefix _ _ _ -PA- _ -PA> _ |- _] => inversion V; subst end.
-    left. eapply ProcEquiv.bisim_trans; [eassumption | apply tfsNext_next_ent_nextN].
+    left. eapply bisim_trans; [eassumption | apply tfsNext_next_ent_nextN].
 Qed.
 (* end helpers *)
 
@@ -2007,10 +2007,10 @@ Qed.
 (** Closes a goal [S p'] (S a bisimilarity-class state predicate) from a
 hypothesis [p' ~p~ n $(l)$] by unfolding the application.*)
 Ltac tfsCurr_next_ent_close_tac :=
-  match goal with [B1 : ProcEquiv.bisimilar ?p' ?q' |- _] =>
-    hnf; eapply ProcEquiv.bisim_trans; [exact B1 | ];
-    eapply ProcEquiv.bisim_trans; [apply app_bisim | ];
-    rewrite unfoldApp_body; clean_proc; apply ProcEquiv.bisim_refl
+  match goal with [B1 : ?p' ~p~ ?q' |- _] =>
+    hnf; eapply bisim_trans; [exact B1 | ];
+    eapply bisim_trans; [apply app_bisim | ];
+    rewrite unfoldApp_body; clean_proc; apply bisim_refl
   end.
 
 (** Process-level forward tracking for a goal of the form
