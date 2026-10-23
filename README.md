@@ -80,5 +80,5 @@ Each folder in `src/` builds only on the ones before it.
 - [`doc/adr/`](doc/adr): a record of each design decision.
 - [`doc/reports/`](doc/reports): reports on the work, such as the first pass at the proofs.
 - [`doc/archive/`](doc/archive/README.md): old documents, such as the 2015 plan.
-- [`doc/workstreams/`](doc/workstreams): plans for work in progress.
+- [`doc/workstreams/`](doc/workstreams): ideas on how this could be improved.
 - [`helper-scripts/`](helper-scripts/README.md): scripts that the build does not need.
