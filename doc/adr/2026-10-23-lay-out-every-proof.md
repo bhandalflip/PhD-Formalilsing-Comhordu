@@ -1,4 +1,4 @@
-# Lay out every proof from `Proof.` to `Qed.`, and check it in CI
+# Lay out every proof from `Proof.` to `Qed.`, and add a CI check for the layout
 
 Date: 2026-10-23
 Status: 2026-10-23 accepted
