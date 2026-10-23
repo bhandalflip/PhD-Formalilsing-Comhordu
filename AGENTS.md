@@ -40,6 +40,7 @@
 - Don't tell readers what a document is or how to read it: no "this page is the short version", "the rest is detail" or "this section goes through…". Write it so it flows, and let them experience that for themselves. This applies to all prose: docs, READMEs and PR descriptions.
 - Cite the thesis by its printed page number, not the PDF page, and by definition or remark number where there is one. The two page numbers differ; see [`doc/thesis/`](doc/thesis/README.md).
 - Never link to a workstream. Workstreams are deleted when they finish (see `doc/workstreams/AGENTS.md`), so a link from anything that outlives them would break: docs, reports, ADRs, READMEs, code comments, commit messages and PR descriptions. Name the workstream in words, or link the PR.
+- **`README.md` is in the author's voice**: calm and candid, as in the thesis, but simpler. Each section serves one need, as in [Diátaxis](https://diataxis.fr): the history explains, the instructions guide and the folder list describes. Keep sentences short and words plain: "for example" and "that is", not e.g. and i.e. Write "I" in the history and "you" in the instructions.
 
 ## Scripts
 

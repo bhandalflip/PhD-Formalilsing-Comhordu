@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Started** | 2026-10-13 |
-| **Status** | 🧑 Phase 5: rewriting the README |
+| **Status** | 🤖 Phase 5: deleting this workstream, the last step |
 | **Branch** | One per PR |
 | **Goal** | Port the Comhordú formalisation to **Rocq 9.2.0**, then close every assumption under `safety` that can be closed, and write up the ones that can't. |
 | **Supersedes** | [2015 project plan](../archive/2015-05-08-coq-project-plan.pdf). What was carried over is in [`doc/archive/README.md`](../archive/README.md). |
@@ -97,8 +97,7 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 - [x] 🧑 **Restate unfoldings as `unfoldApp`.** Seven lemmas in `lang/SoftwareLanguage.v`, `stepDpApp_alt` and the six `…AppAuto…` ones, spell out `subProcTerm (listsToSub (fst (def h)) l) (snd (def h))`, which is `unfoldApp h l`. Restate them with `unfoldApp h l`, and update the two tactics in `ProtAuxResults.v` that match the long form. ✅ 2026-10-23. With approval, the seven say `unfoldApp h l`, and three tactics are updated to match. `safety` still rests on no unproved result. [#29](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/29).
 - [x] 🧑 **Define bisimilarity from bisimulations** in `lang/ProcEquiv.v`, as the literature does. `bisimulation p q` said that p and q are bisimilar, while a bisimulation is a relation that shows it. ✅ 2026-10-23. With approval, `bisimulation R` says that R is a bisimulation, and `bisimilar p q`, still written `p ~p~ q`, that some bisimulation relates p and q. `safety` still rests on no unproved result. [#30](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/30).
 - [x] 🧑 **Lay out proofs so that each statement stands apart.** 617 of the 1,220 results have no `Proof.`, and 347 of those start their proof on the line where the statement ends, so it's hard to see where one ends and the other begins. Check the standard layouts that large Rocq projects use, and propose one in an ADR, which also says whether CI should check it. Then apply it to every proof, and make it a rule in `src/AGENTS.md` so that later changes follow it. ✅ 2026-10-23. With approval, every proof runs from `Proof.`, on a new line after its statement, to `Qed.` on a line of its own, or takes one line of at most 80 characters, as the [ADR](../adr/2026-10-23-lay-out-every-proof.md) records. No Rocq linter exists to borrow, so a script of our own checks the layout in CI, on the sentences that Rocq itself found in the build. 626 proofs gain `Proof.`, and `safety` still rests on no unproved result. [#31](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/31).
-- [ ] 🧑 _Placeholder: anything else the first pass couldn't decide._
-- [ ] 🧑 **Rewrite the README**, last, since it tells the outcome of every other step. Keep it short, cut anything else, and link to the thesis corrections and remarks rather than repeat them.
+- [x] 🧑 **Rewrite the README**, last, since it tells the outcome of every other step. Keep it short, cut anything else, and link to the thesis corrections and remarks rather than repeat them. ✅ 2026-10-23. With approval, the README tells the story and gives the advice below, in the author's voice made simpler as in Diátaxis, which the top-level `AGENTS.md` now asks of it. Beyond them it keeps only short instructions for building and a list of folders. `safety` still rests on no unproved result. [#32](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/32).
   - **Keep the author's style, strictly.** The README is in the voice of the author of the thesis and of this repository, so it must read as the author wrote it, not as an agent did. Before drafting, read the whole thesis and analyse its style thoroughly: word choice, sentence length and rhythm, tone, and how it explains and argues. Then hold every sentence of the draft to that analysis. Where a habit of the thesis clashes with the writing rules in the top-level `AGENTS.md`, as its signposting does, ask the author which wins.
   - The story: the thesis (2014), its proof partly encoded in Coq, the [2015 plan](../archive/2015-05-08-coq-project-plan.pdf) to finish it, and now a full proof in Rocq, with general results about the language.
   - Advice for anyone who uses Comhordú to model a system: build on the Rocq formalisation, give the system's model as a value of `ComhModel`, so that Rocq checks it meets every assumption and `safety` applies to it, and check that its protocol matches Comhordú's exactly, with an oracle or another method.
@@ -106,6 +105,7 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 
 ## Log
 
+- **2026-10-23:** The placeholder step is dropped, since nothing else was left to decide.
 - **2026-10-23:** The README step now says to keep the author's style, strictly, after a thorough analysis of the whole thesis.
 - **2026-10-23:** The rename of `bisimulation` to `bisimilar` widens: bisimilarity is now defined from bisimulations, as the literature does.
 - **2026-10-23:** New step in the final phase: lay out every proof so that its statement stands apart, in a standard layout that an ADR picks, and make the layout a rule.
