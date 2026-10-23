@@ -520,27 +520,27 @@ Ltac fwd_track_net_tac RE :=
 Lemma tfsStart_next_net n n' a i :
   n -NA- a -NA> n' -> tfsStartStateNet i n ->
   tfsStartStateNet i n' \/ exists m, tfsNextStateNet m i n'.
-  fwd_track_net_tac tfsStart_next_ent. Qed.
+Proof. fwd_track_net_tac tfsStart_next_ent. Qed.
 
 Lemma tfsNext_next_net m n n' a i :
   n -NA- a -NA> n' -> tfsNextStateNet m i n ->
   tfsNextStateNet m i n' \/ tfsCurrStateNet i n'.
-  fwd_track_net_tac tfsNext_next_ent. Qed.
+Proof. fwd_track_net_tac tfsNext_next_ent. Qed.
 
 Lemma tfsCurr_next_net n n' a i :
   n -NA- a -NA> n' -> tfsCurrStateNet i n ->
   tfsCurrStateNet i n' \/ tfsBcStateNet i n'.
-  fwd_track_net_tac tfsCurr_next_ent. Qed.
+Proof. fwd_track_net_tac tfsCurr_next_ent. Qed.
 
 Lemma tfsBc_next_net n n' a i :
   n -NA- a -NA> n' -> tfsBcStateNet i n ->
   tfsBcStateNet i n' \/ tfsListenStateNet i n'.
-  fwd_track_net_tac tfsBc_next_ent. Qed.
+Proof. fwd_track_net_tac tfsBc_next_ent. Qed.
 
 Lemma tfsListen_next_net n n' a i :
   n -NA- a -NA> n' -> tfsListenStateNet i n ->
   tfsListenStateNet i n' \/ dormantStateNet i n'.
-  fwd_track_net_tac tfsListen_next_ent. Qed.
+Proof. fwd_track_net_tac tfsListen_next_ent. Qed.
 
 Lemma rangeBad_next_net m m'' i n n' a : reachableProtNet n ->
   n -NA- a -NA> n' -> rangeBadStateNet m'' i n -> currModeNet m i n ->
@@ -590,14 +590,16 @@ Lemma tfsState_elim_net i n :
   tfsStateNet i n -> tfsStartStateNet i n \/
   (exists m, tfsNextStateNet m i n) \/
   tfsCurrStateNet i n \/ tfsBcStateNet i n \/
-  tfsListenStateNet i n. intro. inversion H. inversion H0.
+  tfsListenStateNet i n.
+Proof.
+  intro. inversion H. inversion H0.
   inversion H2. inversion H4.
   left. netState_auto_tac.
   right. left. eexists. netState_auto_tac.
   right. right. left. netState_auto_tac.
   right. right. right. left. netState_auto_tac.
   right. right. right. right. netState_auto_tac.
-  Qed.
+Qed.
 
 Lemma tfsListen_failSafe_net m i n : reachableProtNet n ->
   tfsListenStateNet i n -> currModeNet m i n -> failSafe m.
@@ -614,7 +616,9 @@ Qed.
 
 Lemma tfs_currMode_disc_pres (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mode) :
   reachableProtNet n -> n -NA- a -NA> n' -> currModeNet m i n -> ~ failSafe m ->
-  tfsStateNet i n -> tfsStateNet i n'. intro RN. introz U.
+  tfsStateNet i n -> tfsStateNet i n'.
+Proof.
+  intro RN. introz U.
   (*Destruct the tfs state into its components and apply an array of
   network level fwd-tracking results.*)
   apply tfsState_elim_net in U2. or_flat; ex_flat; [ |
@@ -636,7 +640,7 @@ Lemma tfs_currMode_disc_pres (n n' : Network) (a : ActDiscNet) (i : nat) (m : Mo
   (*The only case that differs is where we are tfsListen. In this case
   we observe that the currMode is failSafe.*)
   false. apply U1. eapply tfsListen_failSafe_net; eassumption.
-  Qed. 
+Qed. 
 
 Lemma paused_switch_net (n : Network) (i : nat) :
   reachableProtNet n -> (pausedStateNet i n <-> switchStateNet i n).
@@ -868,9 +872,11 @@ Qed.
 
 Lemma ovWaitState_nextMode_net (n : Network) (m : Mode) (t x y : Time) (i : nat):
   reachableProtNet n -> ovWaitStateNet m t x y i n -> nextModeNet m i n.
+Proof.
   (*Proof: Use the more general result ovWait_ovReady_nextMode_net.*)
   introz U. eapply ovWait_ovReady_nextMode_net with (l := mkPosition 0 0).
-  assumption. left. eassumption. Qed.
+  assumption. left. eassumption.
+Qed.
 
 (*If a delay is possible, then every entity is in the listening state.*)
 Theorem del_listening_net (n n' : Network) (d : Delay) (e : Entity) (i : nat) :
@@ -900,6 +906,7 @@ Theorem incomingNetNotif_del (n n' : Network) (d : Delay) (r : Distance) (m : Mo
   incomingNetNotif [baseDistance r, baseMode m, basePosition lm] t i n ->
   {p : d <= t | incomingNetNotif [baseDistance r, baseMode m, basePosition lm]
     (minusTime t d p) i n'}.
+Proof.
   (*invert/destruct incomingNotif to [p, l, {li, lo, ln}, k] @ i.: n & v, t : ln*)
   intro RN. introz U. remember [baseDistance r, baseMode m, basePosition lm] as v eqn:Hv.
   destruct U0.
@@ -964,7 +971,8 @@ Theorem incomingNetNotif_del (n n' : Network) (d : Delay) (r : Distance) (m : Mo
   cut (e = e0). intros. rewrite H8 in H7. rewrite Heqe0 in H7. inversion H7.
   reflexivity. entnetuniq U e e0. assumption. apply NSN in DAE. decompAnd2 DAE DI DM.
   apply DI. assert (t = zeroTime) as TZ. apply timeEqR. rewrite <- Q.
-  reflexivity. rewrite TZ in H0. apply notif_timeout_enabled. assumption. Qed.
+  reflexivity. rewrite TZ in H0. apply notif_timeout_enabled. assumption.
+Qed.
 
 (** Every entity of a reachable network is reachable.*)
 Lemma reachable_net_ent : forall (n : Network) (e : Entity) (i : nat),

@@ -49,7 +49,9 @@ Definition nextModeMState (a : ModeState) : option Mode :=
   end.
 
 (** Equality on mode states is decidable.*)
-Lemma eqDecModeState : eqDec ModeState. unfold eqDec.
+Lemma eqDecModeState : eqDec ModeState.
+Proof.
+  unfold eqDec.
   destruct x1, x2; try solve [right; unfold not;
   intros; inversion H]. addHyp (eqDecMode m m0). invertClear H.
   left. subst. reflexivity. right. unfold not. intros.
@@ -60,7 +62,8 @@ Lemma eqDecModeState : eqDec ModeState. unfold eqDec.
   left. subst. reflexivity. right. unfold not. intros.
   apply H2. inversion H. reflexivity. right. unfold not. intros.
   apply H1. inversion H. reflexivity. right. unfold not. intros.
-  apply H0. inversion H. reflexivity. Qed.
+  apply H0. inversion H. reflexivity.
+Qed.
  
 (** The actions of the mode state are: input/output of a mode on a channel,
 or delay.*)
@@ -120,21 +123,28 @@ Inductive discActEnabledMState : DiscAct -> ModeState -> Prop :=
 or t = t' + d.*)
 Lemma delMStateTrans : forall (m1 m2 m1' m2' : Mode) (t t' : Time) (d : Delay),
   <| m1, m2, t |> -ms- d -ms> <| m1', m2', t' |> ->
-  t' = zeroTime /\ t < d \/ t = t' +dt+ d. intros. inversion H. left.
+  t' = zeroTime /\ t < d \/ t = t' +dt+ d.
+Proof.
+  intros. inversion H. left.
   split. reflexivity. destruct d. destruct delay. apply cond_pos.
-  right. assumption. left. split. reflexivity. assumption. Qed. 
+  right. assumption. left. split. reflexivity. assumption.
+Qed. 
 
 Lemma delMStateTout : forall (m1 m2 : Mode) (a : ModeState) (d : Delay),
   <| m1, m2, zeroTime |> -ms- d -ms> a -> a = <| m1, m2, zeroTime |>.
+Proof.
   intros. inversion H. reflexivity. destruct (t' +dt+ d).
   unfold zeroTime in H5. destruct delay. inversion H5.
   clear H5. rewrite <- H7 in cond_pos. apply Rlt_irrefl in cond_pos.
-  inversion cond_pos. reflexivity. Qed.
+  inversion cond_pos. reflexivity.
+Qed.
 
 (** If an MState can timeout in d then it can timeout in d + d'.*)
 Lemma delMStateToutLengthen : forall (m1 m2 : Mode) (t : Time) (d d' : Delay),
   <| m1, m2, t |>  -ms- d -ms> <| m1, m2, zeroTime |> ->
-  <| m1, m2, t |>  -ms- d +d+ d' -ms> <| m1, m2, zeroTime |>. intros.
+  <| m1, m2, t |>  -ms- d +d+ d' -ms> <| m1, m2, zeroTime |>.
+Proof.
+  intros.
   inversion H. constructor. apply stepMsTimeout. rewrite H1.
   unfold zeroTime. destruct d, d'. unfold zeroNonneg.
   destruct delay, delay0. simpl. rewrite Rplus_comm.
@@ -143,19 +153,24 @@ Lemma delMStateToutLengthen : forall (m1 m2 : Mode) (t : Time) (d d' : Delay),
   replace (pos (delay d)) with (0 + d).
   destruct d, d'. destruct delay, delay0. simpl.
   rewrite Rplus_comm. apply Rplus_le_lt_compat.
-  apply Rle_refl. assumption. ring. Qed.
+  apply Rle_refl. assumption. ring.
+Qed.
   
 (** If an Mstate is transitioning and it delays, then it is still transitioning.*)
 Lemma delMStatePresTrans : forall (m1 m2 : Mode) (a : ModeState) (d : Delay) (t : Time),
   <| m1, m2, t|> -ms- d -ms> a -> exists t', a = <| m1, m2, t'|>.
+Proof.
   intros. inversion H. exists zeroTime. reflexivity.
-  exists t'. reflexivity. exists zeroTime. reflexivity. Qed.
+  exists t'. reflexivity. exists zeroTime. reflexivity.
+Qed.
 
 (** Two consecutive delays can be joined together into one delay, skipping the intermediate
 state. The final delay is the sum of the two original delays.*)
 Lemma delAddMState : forall (a a' a'' : ModeState) (d d' : Delay),
   a -ms- d -ms> a' -> a' -ms- d' -ms> a'' ->
-  a -ms- d +d+ d' -ms> a''. intros. inversion H.
+  a -ms- d +d+ d' -ms> a''.
+Proof.
+  intros. inversion H.
   rewrite <- H2 in H0. inversion H0. constructor.
   rewrite <- H2 in H0. apply delMStateTout in H0. rewrite H0.
   constructor. rewrite <- H4 in H0. addHyp H0.
@@ -172,23 +187,30 @@ Lemma delAddMState : forall (a a' a'' : ModeState) (d d' : Delay),
   rewrite <- H4 in H0. apply delMStateTout in H0. rewrite H0.
   rewrite <- H4 in H. rewrite H2. rewrite H4.
   rewrite <- H4. rewrite <- H2. apply delMStateToutLengthen.
-  rewrite H2. assumption. Qed.
+  rewrite H2. assumption.
+Qed.
 
 (** Every mode state can delay by any amount d.*)
 Lemma delEnabledMState : forall (a : ModeState) (d : Delay),
-  exists a', a -ms- d -ms> a'. intros.
+  exists a', a -ms- d -ms> a'.
+Proof.
+  intros.
   destruct a. exists m. constructor. addHyp (Rlt_le_dec t d).
   invertClear H. exists (<| m, m0, zeroTime |>).
   apply stepMsTimeout. assumption. apply delLeTimeSum in H0.
   invertClear H0. exists (<| m, m0, x |>). rewrite H.
-  constructor. reflexivity. Qed.
+  constructor. reflexivity.
+Qed.
 
 (*The only way the current mode of a mode state can change is via an input on the
 channel mCurr.*)
 Lemma curr_switch_mState (k k' : ModeState) (a : ActModeState) :
   k -ms- a -ms> k' -> currModeMState k <> currModeMState k' ->
-  a = chanMCurrWrite @?. intros H H0. invertClear H;
-  try (false; apply H0; subst; reflexivity). reflexivity. Qed.
+  a = chanMCurrWrite @?.
+Proof.
+  intros H H0. invertClear H;
+  try (false; apply H0; subst; reflexivity). reflexivity.
+Qed.
 
 (** A mode output on mCurr is the current mode, and one on mNext is the next mode; neither
 changes the mode state.*)
@@ -202,6 +224,7 @@ Proof. intro S. inversion S; subst; split; reflexivity. Qed.
 Lemma timeSplit_mState (k k'' : ModeState) (d d' d'' : Delay) :
   k -ms- d'' -ms> k'' -> d'' = d +d+ d' ->
   exists k', k -ms- d -ms> k' /\ k' -ms- d' -ms> k''.
+Proof.
   (*Proof: This proof is fairly straightforward. We destruct k firstly*)
   destruct k.
   (*For the case where k is stable, the proof is trivial because the
@@ -237,7 +260,8 @@ Lemma timeSplit_mState (k k'' : ModeState) (d d' d'' : Delay) :
   [ | apply OR0]. simpl. rewrite Rplus_comm.
   rewrite Rplus_assoc. Rplus_le_tac. replace 0 with (0 + 0).
   apply Rplus_le_compat. apply Rlt_le. delPos. timeNonneg.
-  ring. Qed.
+  ring.
+Qed.
   
 (*LOCAL TIDY*)
 
@@ -246,11 +270,11 @@ Inductive unstable : ModeState -> Prop :=
   | unstbl m m' t : unstable (<| m , m' , t |>).
 
 Lemma unstable_stable_in k : unstable k -> discActEnabledMState (chanMStableWrite *?) k.
-  intros. inversion H. subst. repeat econstructor. Qed.
+Proof. intros. inversion H. subst. repeat econstructor. Qed.
 
 Lemma modeState_curr_enabled k :
   discActEnabledMState (chanMCurrRead ;! [baseMode (currModeMState k)]) k.
-  destruct k; econstructor; constructor. Qed.
+Proof. destruct k; econstructor; constructor. Qed.
 
 (** A mode state whose transition has timed out can take the switch on mCurr.*)
 Lemma mst_tout_mCurr_in m1 m2 :
@@ -260,9 +284,11 @@ Proof. repeat econstructor. Qed.
 Lemma mState_stable_next_enabled k m' : currModeMState k -mtr-> m' ->
   discActEnabledMState (chanMStableWrite*?) k \/
   discActEnabledMState (chanMNextWrite;? [baseMode m']) k.
+Proof.
   intros. destruct k. right. econstructor.
   lets SMI : stepMsInit H. apply SMI.
-  left. econstructor. constructor. Qed.
+  left. econstructor. constructor.
+Qed.
 
 Lemma next_modeState_stable_not k k' m' :
   nextModeMState k = Some m' -> k -ms- chanMStableRead @! -ms> k' -> False.
@@ -273,15 +299,22 @@ Qed.
 Lemma modeState_abort_in_not k k' :
   k -ms- chanAbort @? -ms> k' -> False.
 Proof.
-  intros H. inversion H. Qed.
+  intros H. inversion H.
+Qed.
 
 Lemma unstable_stable_out_not k : unstable k ->
-  ~ discActEnabledMState (chanMStableRead *!) k. unfold not. intros.
-  inversion H. inversion H0. subst. inversion H3. Qed.
+  ~ discActEnabledMState (chanMStableRead *!) k.
+Proof.
+  unfold not. intros.
+  inversion H. inversion H0. subst. inversion H3.
+Qed.
 
 Lemma nextMode_unstable k m : nextModeMState k = Some m ->
-  unstable k. intros. destruct k. inversion H.
-  constructor. Qed.
+  unstable k.
+Proof.
+  intros. destruct k. inversion H.
+  constructor.
+Qed.
  
 (*-LOCAL TIDY*)
 

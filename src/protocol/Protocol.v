@@ -23,9 +23,12 @@ Inductive ProtocolName := bcWaitN | sleepingN | bcReadyN | dormantN | initN |
   gotRangeN | currPincCheckN | currCompN | nextPincCheckN | pausedN.
 
 (** Equality is decidable on names.*)
-Lemma eqDecProtocolName : eqDec ProtocolName. unfold eqDec.
+Lemma eqDecProtocolName : eqDec ProtocolName.
+Proof.
+  unfold eqDec.
   destruct x1, x2; try solve [right; unfold not; intro; inversion H];
-  left; reflexivity. Qed.
+  left; reflexivity.
+Qed.
 
 #[export] Instance protocolNames : ProcNames := {|
   Name := ProtocolName;

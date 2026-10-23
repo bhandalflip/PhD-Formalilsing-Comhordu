@@ -30,13 +30,15 @@ Record TimedEl : Type := mkTimedEl
 Notation "<( m , t )>" := (mkTimedEl m t) (at level 40).
 
 (** Equality is decidable on timed elements.*)
-Lemma eqDecTimedEl : eqDec TimedEl. unfold eqDec.
+Lemma eqDecTimedEl : eqDec TimedEl.
+Proof.
+  unfold eqDec.
   destruct x1, x2. addHyp (eqDecTime stamp0 stamp1).
   invertClear H. addHyp (list_eq_dec eqDecBase msg0 msg1).
   invertClear H. left. subst. reflexivity. right.
   unfold not. intros. apply H1. inversion H. reflexivity.
   right. unfold not. intros. apply H0. inversion H. reflexivity.
-  Qed.
+Qed.
 
 (** A timed list is a list of timed elements.*)
 Definition TimedList : Type := list TimedEl.
@@ -75,27 +77,38 @@ Inductive stepTimedList : TimedList -> ActTimedList -> TimedList -> Prop :=
 
 (** The delay action preserves the size of a timed list.*)
 Lemma delPresSizeTL : forall (l l' : TimedList) (d : Delay),
-  l -tl- d -tl> l' -> length l = length l'. intros.
+  l -tl- d -tl> l' -> length l = length l'.
+Proof.
+  intros.
   remember (atlDel d) as a. induction H. inversion Heqa.
   apply IHstepTimedList in Heqa. simpl. rewrite Heqa. reflexivity.
   reflexivity. apply IHstepTimedList in Heqa. simpl.
-  rewrite Heqa. reflexivity. Qed.
+  rewrite Heqa. reflexivity.
+Qed.
 
 (** If [] delays to l', then l' = []*)
 Lemma empLeftDelTL : forall (l' : TimedList) (d : Delay),
-  [] -tl- d -tl> l' -> l' = []. intros. apply delPresSizeTL in H.
-  destruct l'. reflexivity. inversion H. Qed.
+  [] -tl- d -tl> l' -> l' = [].
+Proof.
+  intros. apply delPresSizeTL in H.
+  destruct l'. reflexivity. inversion H.
+Qed.
 
 (** If l delays to [], then l = []*)
 Lemma empRightDelTL : forall (l : TimedList) (d : Delay),
-  l -tl- d -tl> [] -> l = []. intros. apply delPresSizeTL in H.
-  destruct l. reflexivity. inversion H. Qed.
+  l -tl- d -tl> [] -> l = [].
+Proof.
+  intros. apply delPresSizeTL in H.
+  destruct l. reflexivity. inversion H.
+Qed.
 
 (** If a timed list l can delay by d to l' which in turn can delay by d' to l'',
 then l can delay by d+d' to l''.*)
 Lemma delAddTL : forall (l l' l'' : TimedList) (d d' : Delay),
   l -tl- d -tl> l' -> l' -tl- d' -tl> l'' ->
-  l -tl- d +d+ d' -tl> l''. induction l; intros.
+  l -tl- d +d+ d' -tl> l''.
+Proof.
+  induction l; intros.
   erewrite empLeftDelTL. constructor. assert (l' = []).
   eapply empLeftDelTL. apply H. rewrite H1 in H0. apply H0.
   destruct a. destruct l'. apply empRightDelTL in H. inversion H.
@@ -104,13 +117,16 @@ Lemma delAddTL : forall (l l' l'' : TimedList) (d d' : Delay),
   destruct t0. inversion H0. rewrite H18 in H9.
   rewrite delTimeAddAssoc in H9. rewrite timeDelAddSwitch in H9.
   rewrite addDelayComm in H9. rewrite H9. constructor.
-  eapply IHl. apply H3. assumption. reflexivity. Qed.
+  eapply IHl. apply H3. assumption. reflexivity.
+Qed.
 
 Lemma timedList_timeout_enabled v l :
   <( v, zeroTime )> _: l -> exists l', l -tl- v !! -tl> l'.
+Proof.
   introz U. induction l; inversion U. subst.
   exists l. constructor. apply IHl in H.
-  ex_flat. eexists. eapply stepTlFwd. eassumption. Qed.
+  ex_flat. eexists. eapply stepTlFwd. eassumption.
+Qed.
 
 Lemma timedList_del_le l l' d v t q :
    l -tl- atlDel d -tl> l' -> <( v, t )> _: l ->
@@ -203,21 +219,26 @@ Inductive stepInputList : InputList -> ActTimedList -> InputList -> Prop :=
 (** The size of a list is non-increasing for an input list.*)
 Lemma delNonIncSizeIL : forall (l l' : InputList) (d : Delay),
   l -il- d -il> l' -> length (inList l') <= length (inList l).
+Proof.
   intros. inversion H. simpl. apply le_0_n.
   apply delPresSizeTL in H0. simpl. rewrite H0.
-  constructor. Qed.
+  constructor.
+Qed.
 
 (** If an input list l can delay by d to l' which in turn can delay by d' to l'',
 then l can delay by d+d' to l''.*)
 Lemma delAddInput : forall (l l' l'' : InputList) (d d' : Delay),
   l -il- d -il> l' -> l' -il- d' -il> l'' ->
-  l -il- d +d+ d' -il> l''. intros. destruct l''.
+  l -il- d +d+ d' -il> l''.
+Proof.
+  intros. destruct l''.
   destruct inList0. constructor. rename t into a.
   destruct l'. destruct inList1. apply delNonIncSizeIL in H0.
   inversion H0. rename t into b. destruct l. destruct inList2.
   apply delNonIncSizeIL in H. inversion H. rename t into c.
   inversion H. inversion H0.
-  constructor. eapply delAddTL. apply H4. assumption. Qed.
+  constructor. eapply delAddTL. apply H4. assumption.
+Qed.
   
 (** An input list l is action enabled for the action a iff
 there is some derivative list l' such that l transitions to l' via a.*)
@@ -226,8 +247,11 @@ Definition actEnabledInList (l : InputList) (a : ActTimedList) : Prop :=
 
 (** An input list can always input a message.*)
 Lemma inListInEnabled : forall (l : InputList) (v : list BaseValue),
-  actEnabledInList l (v??). intros. destruct l as [l].
-  exists (mkInputList (<(v, zeroTime)> :: l)). constructor. Qed.
+  actEnabledInList l (v??).
+Proof.
+  intros. destruct l as [l].
+  exists (mkInputList (<(v, zeroTime)> :: l)). constructor.
+Qed.
 
 (**Semantics for the output list.*)
 Inductive stepOutputList : OutputList -> ActTimedList -> OutputList -> Prop :=
@@ -241,9 +265,12 @@ Inductive stepOutputList : OutputList -> ActTimedList -> OutputList -> Prop :=
 
 Lemma delAddOutput : forall (l l' l'' : OutputList) (d d' : Delay),
   l -ol- d -ol> l' -> l' -ol- d' -ol> l'' ->
-  l -ol- d +d+ d' -ol> l''. intros. inversion H.
+  l -ol- d +d+ d' -ol> l''.
+Proof.
+  intros. inversion H.
   rewrite <- H4 in H0. inversion H0. constructor.
-  eapply delAddTL. apply H1. assumption. Qed.
+  eapply delAddTL. apply H1. assumption.
+Qed.
 
 (**Semantics for the notification list.*)
 Inductive stepNotifList : NotifList -> ActTimedList -> NotifList -> Prop :=
@@ -267,7 +294,9 @@ Inductive stepNotifList : NotifList -> ActTimedList -> NotifList -> Prop :=
 
 Lemma notifList_del_le ln ln' d v t q :
   ln -nl- atlDel d -nl> ln' -> <( v, t )> _: notifList ln ->
-  <( v, minusTime t d q )> _: notifList ln'. introz U.
+  <( v, minusTime t d q )> _: notifList ln'.
+Proof.
+  introz U.
   (*Proof: Induction on the proof of the delay of the notifList.*)
   remember (atlDel d). generalize dependent d.
   generalize dependent t. induction U; intros t U0 d2 q EQ; subst.
@@ -292,7 +321,8 @@ Lemma notifList_del_le ln ln' d v t q :
   f_equal. apply timeEqR. simpl. ring.
   (*Finally we have the lifting case, in which case we lift a similar
   (analogous) result for timed lists.*)
-  eapply timedList_del_le; eassumption. Qed.
+  eapply timedList_del_le; eassumption.
+Qed.
 
 (** Inputting into a notification list keeps its elements.*)
 Lemma notifList_in_pres ln ln' w x :
@@ -415,6 +445,7 @@ Record Interface : Type := mkInterface
 
 (** Equality is decidable on interfaces.*)
 Lemma eqDecInterface : eqDec Interface.
+Proof.
   unfold eqDec. destruct x1, x2.
   destruct li0, lo0, ln0, li1, lo1, ln1.
   addHyp (list_eq_dec eqDecTimedEl inList0 inList1).
@@ -425,7 +456,7 @@ Lemma eqDecInterface : eqDec Interface.
   apply H0. invertClear H1. reflexivity. right. unfold not.
   intros. apply H. invertClear H0. reflexivity. right.
   unfold not. intros. apply H2. invertClear H. reflexivity.
-  Qed.
+Qed.
 
 (** Actions for the interface semantics. We have delay, input of a list of base values
 on a channel, output of the same, and finally output of a list of base values on a
@@ -490,19 +521,25 @@ Inductive discActEnabledInter : DiscAct -> Interface -> Prop :=
 
 (** An interface is always enabled on an input on the channel chanIOEnv.*)
 Theorem interfaceInEnabled : forall (i : Interface) (v : list BaseValue),
-  actEnabledInter i (chanIOEnv {? v). destruct i. intros.
+  actEnabledInter i (chanIOEnv {? v).
+Proof.
+  destruct i. intros.
   addHyp (inListInEnabled li0 v). invertClear H. rename x into l'.
   exists ({| li := l'; lo := lo0; ln := ln0 |}). constructor.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma delAddInter : forall (i i' i'' : Interface) (d d' : Delay),
   i -i- d -i> i' -> i' -i- d' -i> i'' ->
-  i -i- d +d+ d' -i> i''. destruct i as [l1 l2 l3]. intros.
+  i -i- d +d+ d' -i> i''.
+Proof.
+  destruct i as [l1 l2 l3]. intros.
   destruct i' as [l1' l2' l3']. destruct i'' as [l1'' l2'' l3''].
   invertClear H. invertClear H0. constructor.
   eapply delAddInput. apply H6. assumption.
   eapply delAddOutput. apply H9. assumption.
-  eapply stepNlDelAdd. apply H10. assumption. Qed.
+  eapply stepNlDelAdd. apply H10. assumption.
+Qed.
 
 Lemma outList_received_in : forall (l l' : OutputList) (v : list BaseValue),
   l -ol- v ?? -ol> l' -> <(v, msgLatency)> _: outList l'.
@@ -570,7 +607,9 @@ Lemma inList_inter_pres_input v lix lox lnx lix' lox' lnx' a :
   (forall d, a <> aiDel d) -> <(v, zeroTime )> _: inList lix ->
   mkInterface lix lox lnx -i- a -i> mkInterface lix' lox' lnx' ->
   <(v, zeroTime )> _: inList lix' \/
-  a = chanInProc{! v. intros.
+  a = chanInProc{! v.
+Proof.
+  intros.
   (*Proof: Case analyse the interface transition.*)
   inversion H1;
   (*In most of the remaining cases, the input list is preserved, giving the LHS.
@@ -587,11 +626,12 @@ Lemma inList_inter_pres_input v lix lox lnx lix' lox' lnx' a :
   [left | right; inversion VEQ]; assumption.
   lets IPI : inList_pres_input ND H0 H6. elim_intro IPI IL VEQ;
   [left | right; inversion VEQ]. assumption. reflexivity.
-  Qed.
+Qed.
 
 Lemma timeSplit_inter (h h'' : Interface) (d d' d'' : Delay) :
   h -i- d'' -i> h'' -> d'' = d +d+ d' ->
   exists h', h -i- d -i> h' /\ h' -i- d' -i> h''.
+Proof.
   (*Proof: Follows from time-split results on timed lists*)
   intros. inversion H.
   lets TSI : timeSplit_inputList H2 H0.
@@ -599,20 +639,24 @@ Lemma timeSplit_inter (h h'' : Interface) (d d' d'' : Delay) :
   lets TSN : timeSplit_notifList H5 H0.
   ex_flat. or_flat. and_flat.
   exists ({| li := x1; lo := x0; ln := x |}).
-  split; constructor; eassumption. Qed.
+  split; constructor; eassumption.
+Qed.
 
 (*A notification list with a timed-out element can output that element.*)
 Local Lemma notifList_timeout_enabled v lnx :
   <( v, zeroTime )> _: notifList lnx ->
   exists lnx', lnx -nl- (v !!) -nl> lnx'.
+Proof.
   (*Proof: Lift a more general result on timed lists*)
   introz U. lets TTE : timedList_timeout_enabled U.
   ex_flat. destruct lnx. simpl in H. eexists.
-  econstructor. eassumption. Qed.
+  econstructor. eassumption.
+Qed.
 
 Lemma notif_timeout_enabled v lix lox lnx :
   <( v, zeroTime )> _: notifList lnx ->
   discActEnabledInter (chanAN ;! v) (mkInterface lix lox lnx).
+Proof.
   (*Proof: Follows from the timeout rule of timed lists
   and the interface semantics.*)
   introz U.
@@ -621,21 +665,23 @@ Lemma notif_timeout_enabled v lix lox lnx :
   assert (exists lnx', lnx -nl- (v !!) -nl> lnx') as EXL.
   apply notifList_timeout_enabled; assumption. ex_flat.
   eapply daeiOut. eapply stepIntFwdNotif. eassumption.
-  Qed.
+Qed.
 
 (*LOCAL TIDY*)
 
 Lemma interface_outProc_in (h : Interface) (v : list BaseValue) :
   discActEnabledInter (chanOutProc ;? v) h.
+Proof.
   (*Proof: Obvious from semantics*)
-  destruct h. destruct lo0. repeat econstructor. Qed.
+  destruct h. destruct lo0. repeat econstructor.
+Qed.
 
 Lemma inter_mStable_in_not h h' : h -i- chanMStableRead {! [] -i> h' -> False.
-  introz U. inversion U. Qed.
+Proof. introz U. inversion U. Qed.
 
 Lemma inter_abort_in_not h h' :
   h -i- chanAbort {?[] -i> h' -> False.
-  introz U. inversion U. Qed.
+Proof. introz U. inversion U. Qed.
 
 (** Buffering a message into an output list keeps every element.*)
 Lemma outList_buff_pres lo lo' w x :

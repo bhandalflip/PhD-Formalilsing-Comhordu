@@ -405,91 +405,113 @@ Context {Model : ComhModel}.
 
 Lemma bcReady_outProc_out m l p :
   bcReadyState m l p -> discActEnabled p (chanOutProc ;! [baseMode m, basePosition l]).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 Lemma tfsStart_mCurr_in (p : ProcTerm) (m : Mode) : tfsStartState p ->
-  discActEnabled p (chanMCurrRead ;? [baseMode m]). activation_tac. Qed.
+  discActEnabled p (chanMCurrRead ;? [baseMode m]).
+Proof. activation_tac. Qed.
 
 Lemma tfsNext_mStable_out (p : ProcTerm) (m : Mode) : tfsNextState m p ->
-  discActEnabled p (chanMStableWrite *!). activation_tac. Qed.
+  discActEnabled p (chanMStableWrite *!).
+Proof. activation_tac. Qed.
 
 Lemma tfsNext_mNext_out (p : ProcTerm) (m : Mode) : tfsNextState m p ->
   discActEnabled p (chanMNextWrite ;! ([baseMode (failSafeSucc m)])).
+Proof.
   activation_tac; apply daeSumL; apply dae_outPfx; constructor;
-  constructor; try rewrite updateAppEq; assumption; constructor. Qed.
+  constructor; try rewrite updateAppEq; assumption; constructor.
+Qed.
 
 Lemma switchCurr_mCurr_out (p : ProcTerm) : switchCurrState p ->
-  discActEnabled p (chanMCurrWrite *!). activation_tac. Qed.
+  discActEnabled p (chanMCurrWrite *!).
+Proof. activation_tac. Qed.
 
 Lemma switchListen_unpause_out (p : ProcTerm) : switchListenState p ->
-  discActEnabled p (chanUnpause *!). activation_tac. Qed.
+  discActEnabled p (chanUnpause *!).
+Proof. activation_tac. Qed.
 
 Lemma tfsCurr_bad_in (p : ProcTerm) : tfsCurrState p ->
-  discActEnabled p (chanBad *?). activation_tac. Qed.
+  discActEnabled p (chanBad *?).
+Proof. activation_tac. Qed.
 
 Lemma tfsCurr_abort_in (p : ProcTerm) : tfsCurrState p ->
-  discActEnabled p (chanAbort *?). activation_tac. Qed.
+  discActEnabled p (chanAbort *?).
+Proof. activation_tac. Qed.
 
 Lemma tfsCurr_mCurr_out (p : ProcTerm) : tfsCurrState p ->
-  discActEnabled p (chanMCurrWrite *!). activation_tac. Qed.
+  discActEnabled p (chanMCurrWrite *!).
+Proof. activation_tac. Qed.
 
 Lemma tfsListen_bad_in (p : ProcTerm) : tfsListenState p ->
-  discActEnabled p (chanBad *?). activation_tac. Qed.
+  discActEnabled p (chanBad *?).
+Proof. activation_tac. Qed.
 
 Lemma tfsListen_abort_in (p : ProcTerm) : tfsListenState p ->
-  discActEnabled p (chanAbort *?). activation_tac. Qed.
+  discActEnabled p (chanAbort *?).
+Proof. activation_tac. Qed.
 
 Lemma tfsListen_unpause_out (p : ProcTerm) : tfsListenState p ->
-  discActEnabled p (chanUnpause *!). activation_tac. Qed.
+  discActEnabled p (chanUnpause *!).
+Proof. activation_tac. Qed.
 
 Lemma dormant_bad_in (p : ProcTerm) : dormantState p ->
-  discActEnabled p (chanBad *?). activation_tac. Qed.
+  discActEnabled p (chanBad *?).
+Proof. activation_tac. Qed.
 
 Lemma dormant_abort_in (p : ProcTerm) : dormantState p ->
-  discActEnabled p (chanAbort *?). activation_tac. Qed.
+  discActEnabled p (chanAbort *?).
+Proof. activation_tac. Qed.
 
 Lemma dormant_mNext_in (p : ProcTerm) (m : Mode) : dormantState p ->
-  discActEnabled p (chanMNextRead ;? [baseMode m]). activation_tac.
-  Qed.
+  discActEnabled p (chanMNextRead ;? [baseMode m]).
+Proof.
+  activation_tac.
+Qed.
 
 Lemma switchBc_wake_out m p : switchBcState m p ->
-  discActEnabled p (chanWake ;! [baseMode m]). activation_tac. Qed.
+  discActEnabled p (chanWake ;! [baseMode m]).
+Proof. activation_tac. Qed.
 
 Lemma sleeping_wake_in m p : sleepingState p ->
-  discActEnabled p (chanWake ;? [baseMode m]). activation_tac. Qed.
+  discActEnabled p (chanWake ;? [baseMode m]).
+Proof. activation_tac. Qed.
 
 Lemma bcWait_wake_in m m' x p : bcWaitState m' x p ->
-  discActEnabled p (chanWake ;? [baseMode m]). activation_tac. Qed.
+  discActEnabled p (chanWake ;? [baseMode m]).
+Proof. activation_tac. Qed.
 
 Lemma ovAbort_stable_out p : ovAbortState p -> discActEnabled p (chanMStableWrite *!).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
  
 Lemma tfsBc_trans_out p : tfsBcState p -> discActEnabled p (chanTrans *!).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 Lemma bcWait_trans_in p m x : bcWaitState m x p -> discActEnabled p (chanTrans *?).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 (** The same, for a broadcast component with any received values; see the component
 shapes below.*)
 Lemma bcWait_trans_in_shape (v : BaseValue) (e : Exp) p : p ~p~ bcWait v e ->
-  discActEnabled p (chanTrans *?). activation_tac. Qed.
+  discActEnabled p (chanTrans *?).
+Proof. activation_tac. Qed.
 
 Lemma bcWait_wake_in_shape m (v : BaseValue) (e : Exp) p : p ~p~ bcWait v e ->
-  discActEnabled p (chanWake ;? [baseMode m]). activation_tac. Qed.
+  discActEnabled p (chanWake ;? [baseMode m]).
+Proof. activation_tac. Qed.
 
 Lemma bcReady_outProc_out_shape (v1 v2 : BaseValue) p : p ~p~ bcReady v1 v2 ->
-  discActEnabled p (chanOutProc ;! [v1, v2]). activation_tac. Qed.
+  discActEnabled p (chanOutProc ;! [v1, v2]).
+Proof. activation_tac. Qed.
 
 Lemma ovReady_outProc_out_shape (v1 : BaseValue) (e2 : Exp) (v3 : BaseValue) p :
   p ~p~ ovReady v1 e2 v3 -> discActEnabled p (chanOutProc ;! [v1, v3]).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 Lemma sleep_trans_in p : sleepingState p -> discActEnabled p (chanTrans *?).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 Lemma paused_unpause_in p : pausedState p -> discActEnabled p (chanUnpause *?).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 (** The listener offers an unpause while listening.*)
 Lemma listening_unpause_in p : listeningState p -> discActEnabled p (chanUnpause *?).
@@ -498,13 +520,19 @@ Proof. activation_tac. Qed.
 (*** Versions of activation using sort ***)
 
 Lemma paused_unpause_in_sort d p : pausedState p -> sort (chanUnpause *?) d p.
-  intro Q. apply paused_unpause_in in Q. apply enabledInSort_in. assumption. Qed.
+Proof.
+  intro Q. apply paused_unpause_in in Q. apply enabledInSort_in. assumption.
+Qed.
   
 Lemma switchListen_unpause_out_sort d p : switchListenState p -> sort (chanUnpause *!) d p.
-  intro Q. apply switchListen_unpause_out in Q. apply enabledInSort_out. assumption. Qed.
+Proof.
+  intro Q. apply switchListen_unpause_out in Q. apply enabledInSort_out. assumption.
+Qed.
 
 Lemma tfsListen_unpause_out_sort d p : tfsListenState p -> sort (chanUnpause *!) d p.
-  intro Q. apply tfsListen_unpause_out in Q. apply enabledInSort_out. assumption. Qed.
+Proof.
+  intro Q. apply tfsListen_unpause_out in Q. apply enabledInSort_out. assumption.
+Qed.
 
 
 
@@ -1958,6 +1986,7 @@ Qed.
 (**The delay relation preserves the nextSinceState predicate.*)
 Theorem del_pres_nextSinceState (p p' : ProcTerm) (d : Delay) : 
   nextSinceState p -> p -PD- d -PD> p' -> nextSinceState p'.
+Proof.
   (*Proof: Inversion on nextSinceState into all possible cases*)
   introz U. inversion U.
   (*Now simply apply delay preservation results on these.*)
@@ -1965,7 +1994,7 @@ Theorem del_pres_nextSinceState (p p' : ProcTerm) (d : Delay) :
   lets AUX : ovReady_del_pres H U0. eapply nexsOvrSt; eassumption.
   lets AUX : switchBc_del_pres H U0. eapply nexsSbcSt; eassumption.
   lets AUX : switchCurr_del_pres H U0. eapply nexsScSt; eassumption.
-  Qed.
+Qed.
 
 (**The delay relation preserves the tfsState predicate.*)
 Theorem del_pres_tfsState (p p' : ProcTerm) (d : Delay): 
@@ -2429,11 +2458,15 @@ Qed.
 (** Only the overlap component switches mode.*)
 Lemma broadcast_mCurr_out_not p p' v :
   broadcastState p -> p -PA- chanMCurrWrite ;! v -PA> p' -> False.
-Proof. intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
+Proof.
+  intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
+Qed.
 
 Lemma listener_mCurr_out_not p p' v :
   listenerState p -> p -PA- chanMCurrWrite ;! v -PA> p' -> False.
-Proof. intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra. Qed.
+Proof.
+  intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
+Qed.
 
 (** The broadcaster outputs only on outProc.*)
 Lemma broadcast_out_outProc p p' c v :

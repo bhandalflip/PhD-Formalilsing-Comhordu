@@ -331,7 +331,8 @@ level using a tactic- netState_auto_tac or some variant?*)
 (* If the nextSince relation holds for some m t then the entity in question
 is in a nextSinceState.*)
 Theorem nextSince_rel_state (n : Network) (m : Mode) (t : Time) (i : nat)
-  (p : reachableProtNet n) : nextSince m t i n p -> nextSinceStateNet i n. 
+  (p : reachableProtNet n) : nextSince m t i n p -> nextSinceStateNet i n.
+Proof.
   (*Induction on nextSince.*)
   intro U. induction U.
   (*The base case follows because ovWaitStateNet m t' x y i n' is a nextSinceStateNet.*)
@@ -347,7 +348,8 @@ Theorem nextSince_rel_state (n : Network) (m : Mode) (t : Time) (i : nat)
   andflat Q.
   match goal with [PD : _ $||$ _ $||$ _ -PD- _ -PD> _ |- _] => triple_del_inv PD end.
   dofirst3 econstructor. eapply del_pres_nextSinceState.
-  apply U1. eassumption. apply Q. Qed.
+  apply U1. eassumption. apply Q.
+Qed.
 
 
 (*Let's say two entities e1 and e2 are separated by a distance x. If e1 has delivered
@@ -357,6 +359,7 @@ Theorem delivered_received (n : Network) (v : list BaseValue) (t : Time) (r x : 
   (i j : nat) (p : reachableProtNet n) (l : Position) :
   delivered ([-v, l, r-]) t i n p -> i <> j ->
   distNet i j n x -> x + 2*speedMax*t <= r -> received v t j n p.
+Proof.
   intros. generalize dependent x.
   (*Induction on the proof of delivered.*)
   induction H; intros.
@@ -410,11 +413,12 @@ Theorem delivered_received (n : Network) (v : list BaseValue) (t : Time) (r x : 
   (*Note: The intuition here is that e1 and e2 could have been separated by at most
   x + 2*Smax*t t time units ago, due to the separation being x now, the maximum
   relative speed being 2*Smax and the time since the message delivery being t.*) 
-  Qed. 
+Qed. 
 
 (*The currSince relation for mode m implies that the current mode we are now in is m.*)
 Theorem currSince_curr (n : Network) (m : Mode) (t : Time) (i : nat)
   (p : reachableProtNet n) : currSince m t i n p -> currModeNet m i n.
+Proof.
   intros.
   (*Induction on currSince.*)
   induction H.
@@ -426,7 +430,7 @@ Theorem currSince_curr (n : Network) (m : Mode) (t : Time) (i : nat)
   assumption.
   (*Delay doesn't change the mode state, so I.H. will do.*)
   erewrite <- currModeNet_del_pres. apply IHcurrSince. apply w. 
-  Qed.
+Qed.
 
 (*If an entity is tfs t in the state tfsCurrState, then there is some t' such that
 the mode transition guard for that entity is t' and the sum of t and t' is at most
@@ -769,7 +773,9 @@ Qed.
 
 (** The broadcast component never inputs on bad.*)
 Local Lemma bc_bad_in_not p p' : p -PA- chanBad *? -PA> p' -> broadcastState p -> False.
-Proof. intros TR S. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
+Proof.
+  intros TR S. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
+Qed.
 
 (** The overlap component enters a tfs state when it inputs on bad.*)
 Local Lemma ovlp_bad_in_tfsState p p' :
@@ -1130,9 +1136,11 @@ Qed.
 
 Lemma msgAbortPathNet_urgent i n n' d :
   reachableProtNet n -> msgAbortPathNet i n -> n -ND- d -ND> n' -> False.
+Proof.
   intros. inversion H. link_netentdelfwd_tac e' LD.
   assert (reachableProtEnt e) as RE. eapply reachable_net_ent; eassumption.
-  eapply msgAbortPathEnt_urgent; eassumption. Qed.
+  eapply msgAbortPathEnt_urgent; eassumption.
+Qed.
 (**Proof: Synchronisation is always possible for the msgAbortPath states between the
 listener component and either the position, the mode state or the overlap component.
 Hence a delay would violate the noSynch property, and so cannot exist.*)
@@ -1144,6 +1152,7 @@ Lemma notifBadPathNet_cases m i n :
   notifBadPathNet i n -> currModeNet m i n ->
   rangeBadStateNet m i n \/
   badOvlpStateNet i n.
+Proof.
   (*Proof: Similar to nexSinceStateNet_cases.*)
   intros. rename H0 into CMN. inversion H.
   inversion H0.
@@ -1152,7 +1161,8 @@ Lemma notifBadPathNet_cases m i n :
   left. eexists;[ | apply H1]. simpl.
   econstructor. assumption.
   subst. right. econstructor;[ | apply H1]. subst.
-  constructor. assumption. Qed.
+  constructor. assumption.
+Qed.
 
 Lemma rangeBad_notifBad_net m i n :
   rangeBadStateNet m i n -> currModeNet m i n -> notifBadPathNet i n.

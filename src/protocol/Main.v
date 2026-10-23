@@ -44,6 +44,7 @@ Local Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
   (H6 : currModeNet m2 j n) (t1 : Time) (H7 : currSince m1 t1 i n X) (t2 : Time)
   (H8 : currSince m2 t2 j n X) (H9 : msgLatency + Rmax adaptNotif transMax < t1)
   (H10 : msgLatency + Rmax adaptNotif transMax < t2) (H11 : t1 <= t2) : False.
+Proof.
   (*Now, let's focus on the entity e1. We know that currSince m1 t1 e1 implies that a
   message of the form <m1, l'> was delivered t time units ago to a sufficient radius 
   (for m1) r by e1, where t is in the interval Ipd m1 (a) and t < t1 (b) and the distance
@@ -154,7 +155,8 @@ Local Theorem safety_aux (n : Network) (X : reachableProtNet n) (e1 e2 : Entity)
   apply tfs_bound in TF. simpl in H18. assert (transMax < t).
   eapply Rle_lt_trans;[ |apply H18]. apply Rmax_r.
   eapply Rlt_not_le. apply H36. eapply Rle_trans. apply LE. eapply Rle_trans. apply TF.
-  apply transMaxBound. Qed.
+  apply transMaxBound.
+Qed.
 
 (**This is the main result stating the correctness of the protocol. It says that if a network
 is reachable, then it is safe. To recap, what this means is that, if we start out a system in
@@ -167,6 +169,7 @@ respective modes. The sufficiency of the distance in question is in turn decided
 of the specific system in question. The result holds for every choice of those parameters
 that meets the assumptions of the model, [ComhModel].*)
 Theorem safety (n : Network) : reachableProtNet n -> safe n.
+Proof.
   (*So our assumption is that there exists some initial reachable network in which there is
   some pair of entities that are separated by a distance less than the minimum distance
   of compatibility for their respective modes. Let's call the entities e1 and e2 and

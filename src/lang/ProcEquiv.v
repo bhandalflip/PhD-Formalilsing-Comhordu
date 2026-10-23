@@ -387,6 +387,7 @@ d' and the resulting p' is capable of doing the action a.*)
 Lemma sort_del a d p : sort a d p -> timedActEnabled p d ->
   (exists p' d', p -PD- d' -PD> p' /\ d' < d /\ discActEnabled p' a)
   \/ discActEnabled p a.
+Proof.
   introz U. invertClearAs2 U0 p' PD.
   (*Induction on the delay rule.*)
   induction PD; inversion U; subst.
@@ -472,19 +473,25 @@ Lemma sort_del a d p : sort a d p -> timedActEnabled p d ->
   rewrite H0 in H5. inversion H5. rewrite H2 in H.
   false. eapply Rle_not_lt. apply H. simpl. Rplus_lt_tac.
   delPos.
-  rewrite H in H4. inversion H4. Qed.
+  rewrite H in H4. inversion H4.
+Qed.
 
 (*-TOGO*)
 
 Lemma bisim_dae p q a : p ~p~ q -> discActEnabled p a ->
-  discActEnabled q a. introz U. invertClear U0.
+  discActEnabled q a.
+Proof.
+  introz U. invertClear U0.
   apply stepPDisc in H. apply (bisimilar_bisimulation _ _ U) in H. ex_flat. and_flat.
-  econstructor. inversion AND. eassumption. Qed.
+  econstructor. inversion AND. eassumption.
+Qed.
 
 (*-TIDY*)
 
 Lemma bisim_del_sort p q a d : p ~p~ q -> timedActEnabled p d ->
-  sort a d p -> sort a d q. introz U.
+  sort a d p -> sort a d q.
+Proof.
+  introz U.
   lets SD : sort_del U1 U0. elim_intro SD PD DA.
   ex_flat. and_flat. apply stepPTimed in AND. apply (bisimilar_bisimulation _ _ U) in AND.
   ex_flat. and_flat. invertClear AND.
@@ -493,7 +500,8 @@ Lemma bisim_del_sort p q a d : p ~p~ q -> timedActEnabled p d ->
   right. exists x0 x1. repeat (split; [assumption | ]).
   assumption.
   lets BD : bisim_dae U DA. apply enabledInSort. assumption.
-  eapply sortNotTau. eassumption. Qed.
+  eapply sortNotTau. eassumption.
+Qed.
 
 (** Bisimilar processes, the first of which can delay by d, have the same actions within d.*)
 Lemma bisim_sort_iff p q a d : p ~p~ q -> (exists p', p -PD- d -PD> p') ->
@@ -516,6 +524,7 @@ Qed.
 (*** Bisimulation and Syntax ***)
 
 Lemma choice_bisim_symm p1 p2 : p1 $+$ p2 ~p~ p2 $+$ p1.
+Proof.
   apply (bisim_coind_upto (fun x y => exists p1 p2, x = p1 $+$ p2 /\ y = p2 $+$ p1));
     [ | exists p1 p2; split; reflexivity].
   clear p1 p2. intros x y [p1 [p2 [-> ->]]]. split.
@@ -545,9 +554,11 @@ Lemma choice_bisim_symm p1 p2 : p1 $+$ p2 ~p~ p2 $+$ p1.
   (*Timed case*)
   inversion H0. exists (p2' $+$ p1'). split.
   apply stepPTimed. constructor; assumption.
-  left. do 2 eexists. split; reflexivity. Qed.
+  left. do 2 eexists. split; reflexivity.
+Qed.
 
 Lemma par_bisim_symm p1 p2 : p1 $||$ p2 ~p~ p2 $||$ p1.
+Proof.
   apply (bisim_coind (fun x y => exists p1 p2, x = p1 $||$ p2 /\ y = p2 $||$ p1));
     [ | exists p1 p2; split; reflexivity].
   clear p1 p2. intros x y [p1 [p2 [-> ->]]]. split.
@@ -594,9 +605,11 @@ Lemma par_bisim_symm p1 p2 : p1 $||$ p2 ~p~ p2 $||$ p1.
   apply stepPTimed. constructor; try assumption.
   unfold not. intros. eapply H9. eassumption.
   my_applys_eq H10. symmetry. apply complementInvol.
-  do 2 eexists. split; reflexivity. Qed.
+  do 2 eexists. split; reflexivity.
+Qed.
 
 Lemma choice_bism_unit_r p : p $+$ nilProc ~p~ p.
+Proof.
   apply (bisim_coind_upto (fun x y => x = y $+$ nilProc)); [ | reflexivity].
   clear p. intros x p ->.
   split; intros; inversion H.
@@ -618,15 +631,20 @@ Lemma choice_bism_unit_r p : p $+$ nilProc ~p~ p.
   (*Timed case*)
   subst. exists (q' $+$ nilProc). split. apply stepPTimed.
   eapply stepTpSum. assumption. constructor.
-  left. reflexivity. Qed.
+  left. reflexivity.
+Qed.
 
 Lemma choice_bism_unit_l p : nilProc $+$ p ~p~ p.
+Proof.
   eapply bisim_trans. apply choice_bisim_symm.
-  apply choice_bism_unit_r. Qed.
+  apply choice_bism_unit_r.
+Qed.
 
 Lemma choice_bisim_context p1 p2 p1' p2' :
   p1 ~p~ p1' -> p2 ~p~ p2' ->
-  p1 $+$ p2 ~p~ p1' $+$ p2'. introz U.
+  p1 $+$ p2 ~p~ p1' $+$ p2'.
+Proof.
+  introz U.
   apply (bisim_coind_upto (fun x y => exists p1 p2 p1' p2',
     x = p1 $+$ p2 /\ y = p1' $+$ p2' /\ p1 ~p~ p1' /\ p2 ~p~ p2'));
     [ | exists p1 p2 p1' p2'; split; [reflexivity | split; [reflexivity | split; assumption]]].
@@ -670,7 +688,7 @@ Lemma choice_bisim_context p1 p2 p1' p2' :
   exists (x0 $+$ x). inversion AND. inversion AND1.
   split. apply stepPTimed. constructor; assumption.
   left. do 4 eexists. split; [reflexivity | split; [reflexivity | split; assumption]].
-  Qed.
+Qed.
 
 (*LOCAL TIDY*)
 
@@ -705,7 +723,9 @@ Ltac bisim_timed_tac :=
 (*-LOCAL TIDY*)
 
 Lemma cond_bisim_lift_true p q b : p ~p~ q -> evalBoolExp b true ->
-  b $> p ~p~ b $> q. intros. apply bisim_intro.
+  b $> p ~p~ b $> q.
+Proof.
+  intros. apply bisim_intro.
   intros. inversion H1.
   (*Disc case*)
   inversion H2.
@@ -727,10 +747,11 @@ Lemma cond_bisim_lift_true p q b : p ~p~ q -> evalBoolExp b true ->
   do 2 constructor; assumption. assumption.
   apply evalBoolExpTrueTot in H0. rewrite H0 in H9.
   inversion H9.
-  Qed.
+Qed.
 
 Lemma par_bisim_context p p' q :
   p ~p~ p' -> p $||$ q ~p~ p' $||$ q.
+Proof.
   intros. apply (bisim_coind (fun x y => exists p p' q,
     x = p $||$ q /\ y = p' $||$ q /\ p ~p~ p'));
     [ | exists p p' q; split; [reflexivity | split; [reflexivity | assumption]]].
@@ -792,18 +813,23 @@ Lemma par_bisim_context p p' q :
   apply bisim_symm. apply bisim_symm in H. eassumption. econstructor.
   eassumption. eassumption. assumption.
   do 3 eexists. split; [reflexivity | split; [reflexivity | assumption]].
-  Qed.
+Qed.
 
 Corollary par_bisim_context2 p q q' :
-  q ~p~ q' -> p $||$ q ~p~ p $||$ q'. intros.
+  q ~p~ q' -> p $||$ q ~p~ p $||$ q'.
+Proof.
+  intros.
   eapply bisim_trans. apply par_bisim_symm.
   eapply bisim_trans. apply par_bisim_context.
-  eassumption. apply par_bisim_symm. Qed.
+  eassumption. apply par_bisim_symm.
+Qed.
 
 Corollary par_bisim_context_strong p p' q q' :
   p ~p~ p' -> q ~p~ q' -> p $||$ q ~p~ p' $||$ q'.
+Proof.
   intros. eapply bisim_trans. apply par_bisim_context.
-  eassumption. apply par_bisim_context2. assumption. Qed.
+  eassumption. apply par_bisim_context2. assumption.
+Qed.
 
 (** Bisimilarity is a congruence for the parallel composition of any number of processes.*)
 Lemma parAll_bisim_context p ps p' ps' :
@@ -816,7 +842,9 @@ Proof.
 Qed.
 
 Lemma cond_bisim_true p b : evalBoolExp b true ->
-  b $> p ~p~ p. introz U.
+  b $> p ~p~ p.
+Proof.
+  introz U.
   apply bisim_intro; intros. exists p'. split;[ | apply bisim_refl].
   inversion H; inversion H0. apply stepPDisc. assumption.
   apply stepPTimed. assumption. apply evalBoolExpTrueTot in U.
@@ -826,7 +854,8 @@ Lemma cond_bisim_true p b : evalBoolExp b true ->
   do 2 constructor. assumption. apply evalBoolExpTrueTot.
   assumption. exists q'. split;[ | apply bisim_refl].
   do 2 constructor. assumption. apply evalBoolExpTrueTot.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (*TOGO: LanguageFoundations*)
 
@@ -843,7 +872,9 @@ Qed.
 (*TOGO*)
 
 Lemma cond_bisim_false p b : evalBoolExpFunTot b = false ->
-  b $> p ~p~ nilProc. introz U.
+  b $> p ~p~ nilProc.
+Proof.
+  introz U.
   apply (bisim_coind (fun x y => x = b $> p /\ y = nilProc)); [ | split; reflexivity].
   intros x y [-> ->]. split; intros.
   inversion H; inversion H0.
@@ -855,10 +886,11 @@ Lemma cond_bisim_false p b : evalBoolExpFunTot b = false ->
   inversion H; inversion H0; subst.
   exists (b $> p). split. constructor.
   apply stepTpIfFalse; assumption. split; reflexivity.
-  Qed.
+Qed.
 
 Lemma if_then_bisim_true b p q :
   evalBoolExp b true -> b $> p $+$ !~b $> q ~p~ p.
+Proof.
   introz U. cut (!~b $> q ~p~ nilProc). intro NP.
   eapply bisim_trans. eapply choice_bisim_context.
   apply bisim_refl. apply NP. eapply bisim_trans.
@@ -866,10 +898,12 @@ Lemma if_then_bisim_true b p q :
   assumption. apply cond_bisim_false.
   unfold evalBoolExpFunTot. simpl.
   apply evalBoolExpRelFun in U. rewrite U.
-  simpl. reflexivity. Qed.
+  simpl. reflexivity.
+Qed.
 
 Lemma if_then_bisim_false b p q :
   evalBoolExp b false -> b $> p $+$ !~b $> q ~p~ q.
+Proof.
   introz U. cut (b $> p ~p~ nilProc). intro NP.
   eapply bisim_trans. eapply choice_bisim_context.
   apply NP. apply bisim_refl. eapply bisim_trans.
@@ -877,7 +911,8 @@ Lemma if_then_bisim_false b p q :
   apply bevalNot in U. apply U.
   apply cond_bisim_false. apply evalBoolExpRelFun in U.
   unfold evalBoolExpFunTot. rewrite U. simpl.
-  reflexivity. Qed.
+  reflexivity.
+Qed.
 
 (** When the condition is ill formed, neither branch is available.*)
 Lemma if_then_bisim_none b p q :

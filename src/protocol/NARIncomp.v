@@ -286,6 +286,7 @@ Theorem instant_incomp_abort (n : Network) (t : Time) (l l' : Position) (i : nat
   dist2d l l' -nn- speedMax *nn* msgLatency < possIncDist m m' ->
   incomingNet [baseMode m', basePosition l'] i n  \/
   msgAbortPathNet i n \/ msgBadPathNet i n.
+Proof.
   intros U U0 LT U1 U2.
   (*Induction on received.*)
   dependent induction U1.
@@ -324,7 +325,8 @@ Theorem instant_incomp_abort (n : Network) (t : Time) (l l' : Position) (i : nat
   false. eapply tfsStateNet_nextSinceStateNet_disj; eassumption.
   (*Delay case: contradicion, the time parameter to received was assumed to be 0*)
   false. eapply Rle_not_lt. apply Req_le. apply x. eapply Rplus_lt_weaken_rl.
-  timeNonneg. delPos. Qed.
+  timeNonneg. delPos.
+Qed.
   (*Note: This proof is similar to instant_insuff_abort except uses
   (incomp_incomingNet_abort) and (msgAbort_not_nextSince).*)
 
@@ -338,6 +340,7 @@ Theorem incomp_abort (n : Network) (t t' : Time) (l l' : Position) (i : nat)
   received [baseMode m', basePosition l'] t' i n p -> zeroTime < t' -> t' < t ->
   dist2d l l' -nn- speedMax *nn* msgLatency + speedMax*t' < possIncDist m m' ->
   False.
+Proof.
   intros U0 U1 U2 U3 U4 U5. 
   (*First, we show that 0 < t because t' < t.*)
   assert (0 < t). eapply Rle_lt_trans;[ |apply U4]. timeNonneg.
@@ -389,7 +392,8 @@ Theorem incomp_abort (n : Network) (t t' : Time) (l l' : Position) (i : nat)
   (*However urgency in all three cases holds, giving us the required contradiction.*)
   destruct IC as [IN | [MA | MB]]. eapply incomingNet_urgent. apply p. apply IN. apply w.
   eapply msgAbortPathNet_urgent. eassumption. apply MA. apply w.
-  eapply msgBadPathNet_urgent. eassumption. apply MB. apply w. Qed.
+  eapply msgBadPathNet_urgent. eassumption. apply MB. apply w.
+Qed.
 
 (* A precursor to incomp_bad, this says that if a message was just received this instant
 and it's possibly incompatible with the current mode and position, then either a) it is
@@ -402,6 +406,7 @@ Theorem instant_incomp_tfs (n : Network) (t : Time) (l l' : Position) (i : nat)
   dist2d l l' -nn- speedMax *nn* msgLatency < possIncDist m m' ->
   incomingNet [baseMode m', basePosition l'] i n \/
   msgBadPathNet i n \/ exists t, tfs m t i n p.
+Proof.
   intros NFS H H0 U. intros.
   (*Induction on received.*)
   dependent induction H1.
@@ -459,7 +464,8 @@ Theorem instant_incomp_tfs (n : Network) (t : Time) (l l' : Position) (i : nat)
   eapply tfs_rel_state. exact TF.
   (*The delay inductive case can be thrown out because the time parameter to received is 0.*)
   assert (0 < t0 + d) as Q. apply Rplus_lt_weaken_rl. timeNonneg.
-  delPos. rewrite <- x in Q. false. eapply Rlt_irrefl. apply Q. Qed.
+  delPos. rewrite <- x in Q. false. eapply Rlt_irrefl. apply Q.
+Qed.
 
 (* If we have been in the current mode m since time t, and we receive a message
 with mode m' and position l0 some non-zero t' time units ago, with t' being

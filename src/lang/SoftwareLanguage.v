@@ -40,7 +40,9 @@ Inductive ProcTerm : Type :=
   | del : Exp -> ProcTerm -> ProcTerm.
 
 (** Equality is decidable on ProcTerms.*)
-Lemma eqDecProcTerm : eqDec ProcTerm. unfold eqDec.
+Lemma eqDecProcTerm : eqDec ProcTerm.
+Proof.
+  unfold eqDec.
   induction x1; induction x2; try solve [right; unfold not; intros; inversion H];
   try solve [left; reflexivity]; try solve [addHyp (IHx1 x2);
   invertClear H; [left; subst; reflexivity | right;
@@ -77,7 +79,8 @@ Lemma eqDecProcTerm : eqDec ProcTerm. unfold eqDec.
   addHyp (eqDecExp e e0). invertClear H. left. subst. reflexivity.
   right. unfold not. intros. apply H1. inversion H.
   reflexivity. right. unfold not. intros. apply H0. inversion H.
-  reflexivity. Qed.
+  reflexivity.
+Qed.
 
 
 
@@ -371,17 +374,21 @@ Proof. unfold unfoldApp. destruct (def h). reflexivity. Qed.
 
 (** The identity substitution leaves a process term unchanged.*)
 Lemma subProc_id_eq p : subProcTerm idSubst p = p.
+Proof.
   induction p; try simpl; try rewrite resetPreservesId;
   try rewrite idSubBoolExp;
   try rewrite IHp; try rewrite IHp1; try rewrite IHp2;
   try rewrite idSubList; try rewrite idSubExp; try reflexivity.
-  Qed.
+Qed.
 
 (** An application can do whatever its unfolding can do.*)
 Lemma stepDpApp_alt : forall (n : Name) (l2 : list Exp) (p' : ProcTerm) (a : DiscAct),
   stepDiscProc (unfoldApp n l2) a p' ->
-  stepDiscProc (app n l2) a p'. intros. rewrite unfoldApp_body in H. remember (def n).
-  destruct p. eapply stepDpApp. rewrite <- Heqp. reflexivity. apply H. Qed.
+  stepDiscProc (app n l2) a p'.
+Proof.
+  intros. rewrite unfoldApp_body in H. remember (def n).
+  destruct p. eapply stepDpApp. rewrite <- Heqp. reflexivity. apply H.
+Qed.
 
 (** guarded_rect for the terms that apply only names of rank below n outside a prefix.*)
 Local Lemma guarded_rect_aux (P : ProcTerm -> Type)
@@ -433,96 +440,137 @@ Qed.
 
 (** If the left component of a sum is dae, then so is the entire sum.*)
 Lemma daeSumL : forall (a : DiscAct) (p1 p2 : ProcTerm),
-  discActEnabled p1 a -> discActEnabled (p1 $+$ p2) a. intros.
-  invertClear H. eapply dae. constructor. apply H0. Qed.
+  discActEnabled p1 a -> discActEnabled (p1 $+$ p2) a.
+Proof.
+  intros.
+  invertClear H. eapply dae. constructor. apply H0.
+Qed.
 
 (** If the right component of a sum is dae, then so is the entire sum.*)
 Lemma daeSumR : forall (a : DiscAct) (p1 p2 : ProcTerm),
-  discActEnabled p2 a -> discActEnabled (p1 $+$ p2) a. intros.
-  invertClear H. eapply dae. apply stepDpChoiceR. apply H0. Qed.
+  discActEnabled p2 a -> discActEnabled (p1 $+$ p2) a.
+Proof.
+  intros.
+  invertClear H. eapply dae. apply stepDpChoiceR. apply H0.
+Qed.
 
 (** An output prefix is enabled on its channel for the values its expressions evaluate to.*)
 Lemma dae_outPfx c l v p :
-  evalExpLists l v -> discActEnabled (c $<l>$! p) (c;! v). intro X.
-  econstructor. constructor. assumption. Qed.
+  evalExpLists l v -> discActEnabled (c $<l>$! p) (c;! v).
+Proof.
+  intro X.
+  econstructor. constructor. assumption.
+Qed.
 
 (** An input prefix is enabled on its channel for any values typed for its variables.*)
 Lemma dae_inPfx c l v p :
   typedVals l v -> discActEnabled (c $<l>$? p) (c;? v).
-  intro W. econstructor. constructor. assumption. Qed.
+Proof. intro W. econstructor. constructor. assumption. Qed.
 
 (** If the left component of a sum is dae, then so is the entire sum.*)
 Lemma daeParL : forall (a : DiscAct) (p1 p2 : ProcTerm),
-  discActEnabled p1 a -> discActEnabled (p1 $||$ p2) a. intros.
-  invertClear H. eapply dae. constructor. apply H0. Qed.
+  discActEnabled p1 a -> discActEnabled (p1 $||$ p2) a.
+Proof.
+  intros.
+  invertClear H. eapply dae. constructor. apply H0.
+Qed.
 
 (** If the right component of a sum is dae, then so is the entire sum.*)
 Lemma daeParR : forall (a : DiscAct) (p1 p2 : ProcTerm),
-  discActEnabled p2 a -> discActEnabled (p1 $||$ p2) a. intros.
-  invertClear H. eapply dae. apply stepDpParR. apply H0. Qed.
+  discActEnabled p2 a -> discActEnabled (p1 $||$ p2) a.
+Proof.
+  intros.
+  invertClear H. eapply dae. apply stepDpParR. apply H0.
+Qed.
 
 (** If the body of a process definition is discActEnabled, then so is the application.*)
 Lemma daeApp : forall (a : DiscAct) (x : list Var) (l : list Exp)
   (h : Name) (p : ProcTerm), def h = (x, p) ->
   discActEnabled (subProcTerm (listsToSub x l) p) a ->
-  discActEnabled (h $(l)$) a. intros. invertClear H0.
-  eapply dae. eapply stepDpApp. apply H. apply H1. Qed.
+  discActEnabled (h $(l)$) a.
+Proof.
+  intros. invertClear H0.
+  eapply dae. eapply stepDpApp. apply H. apply H1.
+Qed.
 
 (** If the unfolding of an application is discActEnabled, then so is the application.*)
 Lemma daeAppAuto : forall (a : DiscAct) (l : list Exp) (h : Name),
   discActEnabled (unfoldApp h l) a ->
-  discActEnabled (h $(l)$) a. intros. rewrite unfoldApp_body in H. remember (def h) as e.
-  destruct e. symmetry in Heqe. eapply daeApp. apply Heqe. assumption. Qed.
+  discActEnabled (h $(l)$) a.
+Proof.
+  intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply daeApp. apply Heqe. assumption.
+Qed.
 
 (** If the then branch of an ifThen construct is discActEnabled for an action a,
 and the guard evaluates to true, then the whole construct is dae by action a.*)
 Theorem daeThenBranch : forall (a : DiscAct) (b : BoolExp) (p : ProcTerm),
-  evalBoolExp b true -> discActEnabled p a -> discActEnabled (b $> p) a. intros.
+  evalBoolExp b true -> discActEnabled p a -> discActEnabled (b $> p) a.
+Proof.
+  intros.
   invertClear H0. eapply dae. constructor. apply H1. unfold evalBoolExpFunTot.
-  apply evalBoolExpRelFun in H. rewrite H. reflexivity. Qed.
+  apply evalBoolExpRelFun in H. rewrite H. reflexivity.
+Qed.
 
 (** If p is discActEnabled for an action a, and the guard times out,
 then the whole construct is dae by action a.*)
 Theorem daeTimeout : forall (a : DiscAct) (e : Exp) (p : ProcTerm),
   evalExpFunTime e = Some zeroTime -> discActEnabled p a ->
-  discActEnabled ($<e>$ p) a. intros. invertClear H0. eapply dae.
-  constructor. apply H1. assumption. Qed.
+  discActEnabled ($<e>$ p) a.
+Proof.
+  intros. invertClear H0. eapply dae.
+  constructor. apply H1. assumption.
+Qed.
 
 (** All input prefixed terms are timed action enabled on all times.*)
 Lemma taeIn : forall (d : Delay) (c : Channel) (l : list Var) (p : ProcTerm),
-  timedActEnabled (c $<l>$ ? p) d. intros. eapply tae. constructor. Qed.
+  timedActEnabled (c $<l>$ ? p) d.
+Proof. intros. eapply tae. constructor. Qed.
 
 (** All output prefixed terms are timed action enabled on all times.*)
 Lemma taeOut : forall (d : Delay) (c : Channel) (l : list Exp) (p : ProcTerm),
-  timedActEnabled (c $<l>$ ! p) d. intros. eapply tae. constructor. Qed.
+  timedActEnabled (c $<l>$ ! p) d.
+Proof. intros. eapply tae. constructor. Qed.
 
 (** If both components of a sum are timedActEnabled, then so is the whole sum.*)
 Lemma taeSum : forall (d : Delay) (p1 p2 : ProcTerm),
   timedActEnabled p1 d -> timedActEnabled p2 d ->
-  timedActEnabled (p1 $+$ p2) d. intros.
+  timedActEnabled (p1 $+$ p2) d.
+Proof.
+  intros.
   invertClear H. invertClear H0. eapply tae. constructor. apply H1.
-  apply H. Qed.
+  apply H.
+Qed.
 
 (** If the body of a process definition is timedActEnabled, then so is the application.*)
 Lemma taeApp : forall (d : Delay) (x : list Var) (l : list Exp)
   (h : Name) (p : ProcTerm), def h = (x, p) ->
   timedActEnabled (subProcTerm (listsToSub x l) p) d ->
-  timedActEnabled (h $(l)$) d. intros. invertClear H0.
-  eapply tae. eapply stepTpApp. apply H. apply H1. Qed.
+  timedActEnabled (h $(l)$) d.
+Proof.
+  intros. invertClear H0.
+  eapply tae. eapply stepTpApp. apply H. apply H1.
+Qed.
 
 (** If the unfolding of an application is timedActEnabled, then so is the application.*)
 Lemma taeAppAuto : forall (d : Delay) (l : list Exp) (h : Name),
   timedActEnabled (unfoldApp h l) d ->
-  timedActEnabled (h $(l)$) d. intros. rewrite unfoldApp_body in H. remember (def h) as e.
-  destruct e. symmetry in Heqe. eapply taeApp. apply Heqe. assumption. Qed.
+  timedActEnabled (h $(l)$) d.
+Proof.
+  intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply taeApp. apply Heqe. assumption.
+Qed.
 
 (** If the then branch of an ifThen construct is timedActEnabled for an amount d,
 then the whole construct can delay by this amount.*)
 Theorem taeThenBranch : forall (d : Delay) (b : BoolExp) (p : ProcTerm),
-  timedActEnabled p d -> timedActEnabled (b $> p) d. intros.
+  timedActEnabled p d -> timedActEnabled (b $> p) d.
+Proof.
+  intros.
   remember (evalBoolExpFunTot b). invertClear H. destruct b0; eapply tae.
   constructor. apply H0. symmetry. assumption. apply stepTpIfFalse.
-  symmetry. assumption. Qed.
+  symmetry. assumption.
+Qed.
 
 
 (*********Some things about sort.*********)
@@ -531,12 +579,13 @@ Theorem taeThenBranch : forall (d : Delay) (b : BoolExp) (p : ProcTerm),
 to p within d are available to the guarded p within that time d.*)
 Lemma sortTimeOut : forall (e : Exp) (d : Delay) (p : ProcTerm) (a : DiscAct),
   evalExpFunTime e = Some zeroTime -> sort a d p -> sort a d (del e p).
-  intros. rewrite <- (timeDelAddZeroL d). constructor; assumption. Qed.
+Proof. intros. rewrite <- (timeDelAddZeroL d). constructor; assumption. Qed.
 
 (** If a process is enabled on a discrete action a other than tau,
 then forall delays d, a is in sort d for that process.*)
 Lemma enabledInSort : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
   discActEnabled p a -> a <> tauAct -> sort a d p.
+Proof.
   intros. inversion H. induction H1; try solve [apply False_ind; apply H0;
   reflexivity]. constructor; assumption. constructor.
   assumption. constructor. rewrite evalBoolExpTrueTot. assumption.
@@ -550,49 +599,71 @@ Lemma enabledInSort : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
   apply IHstepDiscProc. eapply dae. inversion H.
   inversion H3. rewrite H6 in H1. inversion H1. apply H2.
   assumption. eapply sortTimeOut. assumption. apply IHstepDiscProc.
-  inversion H. inversion H3. eapply dae. apply H6. assumption. Qed.
+  inversion H. inversion H3. eapply dae. apply H6. assumption.
+Qed.
 
 Lemma enabledInSort_in (c : Channel) (v : list BaseValue) (d : Delay) (p : ProcTerm) :
-  discActEnabled p (c ;? v) -> sort (c ;? v) d p. intros. eapply enabledInSort.
-  assumption. unfold not. intro. inversion H0. Qed.
+  discActEnabled p (c ;? v) -> sort (c ;? v) d p.
+Proof.
+  intros. eapply enabledInSort.
+  assumption. unfold not. intro. inversion H0.
+Qed.
 
 Lemma enabledInSort_out (c : Channel) (v : list BaseValue) (d : Delay) (p : ProcTerm) :
-  discActEnabled p (c ;!v) -> sort (c ;! v) d p. intros. eapply enabledInSort.
-  assumption. unfold not. intro. inversion H0. Qed.
+  discActEnabled p (c ;!v) -> sort (c ;! v) d p.
+Proof.
+  intros. eapply enabledInSort.
+  assumption. unfold not. intro. inversion H0.
+Qed.
 
 (** If we can prove sort a d p, then the action a is either an input of some vector
 or the output of some vector.*)
 Lemma sortInOrOut : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
   sort a d p -> exists v : list BaseValue, exists c : Channel,
-  a = c ;? v \/ a = c ;! v. intros. induction H; try apply IHsort.
+  a = c ;? v \/ a = c ;! v.
+Proof.
+  intros. induction H; try apply IHsort.
   exists l2. exists c. right. reflexivity. exists l2. exists c. left.
-  reflexivity. Qed. 
+  reflexivity.
+Qed. 
   
 (** If an action is in sort d of p, then it is also in sort d + d' of p.*)
 Theorem sortAddR : forall (a : DiscAct) (d d' : Delay) (p : ProcTerm),
-  sort a d p -> sort a (d +d+ d') p. intros. induction H;
+  sort a d p -> sort a (d +d+ d') p.
+Proof.
+  intros. induction H;
   try solve [constructor; assumption]. 
   eapply sortApp. apply H. assumption.
-  rewrite delTimeAddAssoc2. constructor; assumption. Qed.
+  rewrite delTimeAddAssoc2. constructor; assumption.
+Qed.
 
 (** If an action is in sort d of p, then it is also in sort d' + d of p.*)
 Theorem sortAddL : forall (a : DiscAct) (d d' : Delay) (p : ProcTerm),
-  sort a d p -> sort a (d' +d+ d) p. intros. rewrite addDelayComm.
-  apply sortAddR. assumption. Qed.
+  sort a d p -> sort a (d' +d+ d) p.
+Proof.
+  intros. rewrite addDelayComm.
+  apply sortAddR. assumption.
+Qed.
 
 (** If an action is in sort d of p, then it is also in sort t + d of p.*)
 Theorem sortAddTime : forall (a : DiscAct) (d : Delay) (t : Time) (p : ProcTerm),
-  sort a d p -> sort a (t +dt+ d) p. intros. induction H;
+  sort a d p -> sort a (t +dt+ d) p.
+Proof.
+  intros. induction H;
   try solve [constructor; assumption]. 
   eapply sortApp. apply H. assumption.
-  rewrite timeDelAddComm. constructor; assumption. Qed.
+  rewrite timeDelAddComm. constructor; assumption.
+Qed.
 
 (** If sort a d p and d' <= d, then sort a d' p.*)
 Theorem sortLe : forall (a : DiscAct) (d d' : Delay) (p : ProcTerm),
-  sort a d p -> d <= d' -> sort a d' p. intros. apply RlePlusExistsL in H0.
+  sort a d p -> d <= d' -> sort a d' p.
+Proof.
+  intros. apply RlePlusExistsL in H0.
   invertClear H0. invertClear H1. remember (mkTime (mknonnegreal x H2)) as t.
   assert (d' = t +dt+ d). rewrite Heqt. apply delayEqR. apply H0.
-  rewrite H1. apply sortAddTime. assumption. Qed.
+  rewrite H1. apply sortAddTime. assumption.
+Qed.
 
 Ltac evalExp_evalExpFunTime_step := match goal with
   [V : ?e |_| baseTime ?t |- _] => apply evalExp_evalExpFunTime in V end.
@@ -604,9 +675,11 @@ d + d' of p.*)
 Local Lemma sortDeriv_delSub (a : DiscAct) (d d' : Delay) (t : Time) (H : d <= t) e p :
   evalExpFunTime e = Some t ->
   sort a d' ($< minusTime t d H >$ p) -> sort a (d +d+ d') ($< e >$ p).
+Proof.
   intros EV S. inversion S; subst. simpl in H4. injection H4. intro EQ.
   replace (d +d+ (t0 +dt+ d0)) with (t +dt+ d0).
-  constructor; assumption. apply delayEqR. subst. simpl. ring. Qed.
+  constructor; assumption. apply delayEqR. subst. simpl. ring.
+Qed.
 (* end helpers *)
 
 Theorem sortDeriv : forall (a : DiscAct) (d d' : Delay) (p p' : ProcTerm),
@@ -629,19 +702,21 @@ Proof.
   eapply sort_guard_eval_eq. apply H. rewrite H1.
   apply evalExpFunTime_time.
   inversion H. rewrite H0 in H5. inversion H5. Qed.*)
-  Qed.
+Qed.
 
 Lemma sort_minus_guard a d' d t H p :
   sort a d' ($<eBase (baseTime (minusTime (nonneg (time t))
   (pos (delay d)) H))>$ p) ->
   sort a (d +d+ d') ($<eBase (baseTime t)>$ p).
 Proof.
-  apply sortDeriv_delSub. destruct t. reflexivity. Qed.
+  apply sortDeriv_delSub. destruct t. reflexivity.
+Qed.
 
 Lemma evalExpFunTime_time t :
   evalExpFunTime (eBase (baseTime t)) = Some t.
+Proof.
   destruct t. unfold evalExpFunTime. simpl. reflexivity.
-  Qed.
+Qed.
 
 (** A time that evaluates to the zero time is zero.*)
 Lemma evalExpFunTime_zero_inv t :
@@ -654,12 +729,17 @@ Qed.
 Lemma sort_guard_eval_eq a d e1 e2 p :
   sort a d ($<e1>$ p) ->
   evalExpFunTime e1 = evalExpFunTime e2 ->
-  sort a d ($<e2>$ p). intros. inversion H.
-  rewrite H0 in H5. constructor; assumption. Qed.
+  sort a d ($<e2>$ p).
+Proof.
+  intros. inversion H.
+  rewrite H0 in H5. constructor; assumption.
+Qed.
 
 (** A version of sortDeriv but as an equivalence rather than an implication.*)
 Corollary sortDerivEquiv (a : DiscAct) (d d' : Delay) (p p' : ProcTerm) :
-  p -PD- d -PD> p' -> (sort a d' p' <-> sort a (d +d+ d') p). intros.
+  p -PD- d -PD> p' -> (sort a d' p' <-> sort a (d +d+ d') p).
+Proof.
+  intros.
   split. intros. eapply sortDeriv. apply H0. assumption.
   induction H; intro; try solve [inversion H; constructor; assumption].
   inversion H1. apply IHstepTimedProc. assumption.
@@ -687,7 +767,7 @@ Corollary sortDerivEquiv (a : DiscAct) (d d' : Delay) (p p' : ProcTerm) :
   destruct time, delay, delay0, delay1. simpl. simpl in H2.
   symmetry in H2. rewrite H2. ring. inversion H0. rewrite H in H5.
   inversion H5.
-  Qed.
+Qed.
 
 
 Import ComhCoq.lib.Extras.LibTactics.
@@ -698,7 +778,9 @@ of this theorem is not true: sort does over-approximate.*)
 Theorem sort_complete d a p :
   a <> tauAct /\ (discActEnabled p a \/
   exists d' p', delay d' < delay d /\ p -PD- d' -PD> p' /\ discActEnabled p' a)
-  -> sort a d p. introz U.
+  -> sort a d p.
+Proof.
+  introz U.
   (*Action implies sort*)
   andflat L. elimOr2 L0 Q. apply enabledInSort; assumption.
   rename Q into U. decompEx2 U d' p' LD.
@@ -706,7 +788,8 @@ Theorem sort_complete d a p :
   lets ES : (enabledInSort a d'') U2 L. assert (d = d' +d+ d'').
   apply delayEqR. rewrite Heqd''. simpl. rewrite Rplus_comm. assumption.
   rewrite H. eapply sortDeriv. apply enabledInSort. apply U2. assumption.
-  assumption. Qed.
+  assumption.
+Qed.
 
 
 
@@ -727,7 +810,9 @@ Theorem sort_complete d a p :
 
 (** Whenever a process p can do a silent action, it cannot do a delay.*)
 Theorem maximalProgressProc : forall (p : ProcTerm) (d : Delay),
-  discActEnabled p tauAct -> ~timedActEnabled p d. intros.
+  discActEnabled p tauAct -> ~timedActEnabled p d.
+Proof.
+  intros.
   remember tauAct as a. invertClear H. generalize dependent d.
   induction H0; unfold not; intros; try (apply (IHstepDiscProc Heqa d0));
   try inversion H1; try inversion H2. inversion Heqa. inversion Heqa.
@@ -759,14 +844,17 @@ Theorem maximalProgressProc : forall (p : ProcTerm) (d : Delay),
   rewrite H11 in H3. apply Rlt_le_trans with (r2 := d0).
   apply cond_pos. assumption.
   (** Contradiction: Guard timed out but also ill formed.*)
-  rewrite H in H7. inversion H7. Qed.
+  rewrite H in H7. inversion H7.
+Qed.
 
 (** If a process p can delay by d'' to become p'', and there is some d, d' such
 that d'' = d + d', then there is some p' such that p can delay by d to get to p',
 and p' can delay by d' to p''.*)
 Theorem timeSplit : forall (p p'' : ProcTerm) (d d' d'' : Delay),
   p -PD- d'' -PD> p'' -> d'' = d +d+ d' -> exists p',
-  p -PD- d -PD> p' /\ p' -PD- d' -PD> p''. intros.
+  p -PD- d -PD> p' /\ p' -PD- d' -PD> p''.
+Proof.
+  intros.
   generalize dependent d'. generalize dependent d. induction H; intros.
   exists nilProc. split; constructor. exists (c $< l >$ !p).
   split; constructor. exists (c $< l >$ ? p). split; constructor.
@@ -817,35 +905,45 @@ Theorem timeSplit : forall (p p'' : ProcTerm) (d d' d'' : Delay),
   split. constructor. assumption.
   assert (minusTime t d H = (minusTime (minusTime t d0 H2) d' H3)).
   apply timeEqR. simpl. rewrite H1. simpl. ring. rewrite H4. constructor.
-  constructor. exists ($< e >$ p). split; apply stepTpDelIll; assumption. Qed.
+  constructor. exists ($< e >$ p). split; apply stepTpDelIll; assumption.
+Qed.
 
 (** If p can delay by d, then p can delay by any d' strictly less than d.*)
 Lemma delShortenStrict : forall (p : ProcTerm) (d d' : Delay),
   timedActEnabled p d -> d' < d -> timedActEnabled p d'.
+Proof.
   intros. apply RltPlusExistsR in H0.
   invertClear H0. invertClear H1. remember (mkDelay (mkposreal x H2)) as d''.
   assert (d = d' +d+ d''). apply addRaddDel. rewrite Heqd''. apply H0.
   invertClear H. addHyp (timeSplit p p' d' d'' d H3 H1). invertClear H.
-  invertClear H4. eapply tae. apply H. Qed.
+  invertClear H4. eapply tae. apply H.
+Qed.
 
 (** If p can delay by d, then p can delay by any d' less than or equal d.*)
 Lemma delShorten : forall (p : ProcTerm) (d d' : Delay),
-  timedActEnabled p d -> d' <= d -> timedActEnabled p d'. intros.
+  timedActEnabled p d -> d' <= d -> timedActEnabled p d'.
+Proof.
+  intros.
   apply Rle_lt_or_eq_dec in H0. invertClear H0. eapply delShortenStrict.
   apply H. assumption. assert (d' = d). apply delayEqR.
-  assumption. rewrite H0. assumption. Qed.
+  assumption. rewrite H0. assumption.
+Qed.
 
 Lemma taeSumEx (p1 p2 : ProcTerm) : (exists d, timedActEnabled p1 d) ->
   (exists d, timedActEnabled p2 d) -> exists d, timedActEnabled (p1 $+$ p2) d.
+Proof.
   intros. invertClear H. invertClear H0. addHyp (Rle_lt_dec x x0).
   invertClear H0. exists x. apply taeSum. assumption. eapply delShorten.
   apply H. assumption. apply (Rlt_le) in H2. exists x0. apply taeSum.
-  eapply delShorten. apply H1. assumption. assumption. Qed.
+  eapply delShorten. apply H1. assumption. assumption.
+Qed.
 
 (** If a process can delay to another process, then all discrete actions available
 to the original process are available to the derivative.*)
 Theorem persistence : forall (p p' : ProcTerm) (d : Delay) (a : DiscAct),
-  p -PD- d -PD> p' -> discActEnabled p a -> discActEnabled p' a. intros.
+  p -PD- d -PD> p' -> discActEnabled p a -> discActEnabled p' a.
+Proof.
+  intros.
   induction H; try assumption. invertClear H0; invertClear H2.
   assert (discActEnabled p a). eapply dae. apply H4. apply IHstepTimedProc.
   assumption. invertClear H0; invertClear H2.
@@ -875,22 +973,26 @@ Theorem persistence : forall (p p' : ProcTerm) (d : Delay) (a : DiscAct),
   assert (baseTime t = zeroTime).
   rewrite H1 in H7. inversion H7. reflexivity. 
   invertClear H2. apply False_ind. rewrite H9 in H. eapply Rlt_not_le.
-  apply (cond_pos d). apply H. Qed.
+  apply (cond_pos d). apply H.
+Qed.
 
 (** If a process p can delay by d'' to become p'', then there is some p', d, d' such
 that d'' = d + d' and p can delay by d to get to p' and p' can delay by d' to p''.*)
 Theorem timeSplitEx : forall (p p'' : ProcTerm) (d'' : Delay),
   p -PD- d'' -PD> p'' -> exists p', exists d, exists d',
-  d'' = d +d+ d' /\ p -PD- d -PD> p' /\ p' -PD- d' -PD> p''. intros.
+  d'' = d +d+ d' /\ p -PD- d -PD> p' /\ p' -PD- d' -PD> p''.
+Proof.
+  intros.
   addHyp (addDelayExists d''). invertClear H0. invertClear H1.
   rename x into d. rename x0 into d'. addHyp (timeSplit p p'' d d' d'' H H0).
   invertClear H1. exists x. exists d. exists d'. split; assumption.
-  Qed.
+Qed.
 
 (** If a guarded process can delay by d, and the guard evaluates to some t, then
 the guarded construct can delay by that same d.*)
 Lemma taeDelWf : forall (d : Delay) (e : Exp) (t : Time) (p : ProcTerm),
   evalExpFunTime e = Some t -> timedActEnabled p d -> timedActEnabled ($<e>$ p) d.
+Proof.
   intros. invertClear H0. addHyp (Rle_lt_dec d t).
   invertClear H0. apply tae with (p' := $< minusTime t d H2 >$ p).
   constructor. assumption. addHyp (minusDelayAddTime d t H2).
@@ -899,7 +1001,8 @@ Lemma taeDelWf : forall (d : Delay) (e : Exp) (t : Time) (p : ProcTerm),
   invertClear H1. eapply tae. constructor. apply H3.
   assumption. cut (minusDelay d t H2 <= t +dt+ minusDelay d t H2).
   intros. rewrite <- H0 in H3. assumption. simpl. Rplus_le_tac.
-  timeNonneg. Qed.
+  timeNonneg.
+Qed.
 
 (** If the guarded process in a delay guard construct is enabled on d, then so is
 the entire construct. We prove this by a case analysis on the well formedness of the
@@ -907,7 +1010,9 @@ evaluation of the guard expression. If it is well formed, then it evaluates to s
 and so we can apply taeDelWf. Otherwise, we can simply apply the constructor for ill
 formed delay guarded processes.*)
 Theorem taeDel : forall (d : Delay) (e : Exp) (p : ProcTerm),
-  timedActEnabled p d -> timedActEnabled ($<e>$ p) d. intros.
+  timedActEnabled p d -> timedActEnabled ($<e>$ p) d.
+Proof.
+  intros.
   inversion H. remember (evalExpFunTime e) as v. destruct v. 
   symmetry in Heqv. lets LDT : (Rle_or_lt d t). or_flat.
   apply tae with (p' := ($< minusTime t d OR >$ p)).   
@@ -918,7 +1023,8 @@ Theorem taeDel : forall (d : Delay) (e : Exp) (p : ProcTerm),
   inversion H. eapply tae. assert (d = t +dt+ d').
   apply delayEqR. rewrite Heqd'. simpl. apply AND.
   rewrite H3. eapply stepTpDelAdd. apply H2. assumption.
-  econstructor. eapply stepTpDelIll. symmetry. assumption. Qed.
+  econstructor. eapply stepTpDelIll. symmetry. assumption.
+Qed.
 
   
 
@@ -992,7 +1098,9 @@ Inductive minGuard : Delay -> ProcTerm -> Prop :=
 "interesting" case being mgDelEval, in which case we use the transitivity of the Rle relation to
 prove this property.*)
 Lemma minGuardLe : forall (d1 d2 : Delay) (p : ProcTerm),
-  d2 %; p -> d1 <= d2 -> d1 %; p. intros. induction H; try solve [constructor; assumption].
+  d2 %; p -> d1 <= d2 -> d1 %; p.
+Proof.
+  intros. induction H; try solve [constructor; assumption].
   constructor. apply IHminGuard. assumption. assumption. 
   addHyp (IHminGuard1 H0). eapply mgSumL. assumption. apply H1. eapply Rle_trans.
   apply H0. assumption. addHyp (IHminGuard2 H0). eapply mgSumR. apply H.
@@ -1002,12 +1110,15 @@ Lemma minGuardLe : forall (d1 d2 : Delay) (p : ProcTerm),
   assumption. eapply Rle_lt_trans. apply H0. assumption.
   addHyp (IHminGuard H0). eapply mgApp. apply H. assumption.
   eapply mgDelEval. apply H. eapply Rle_trans. apply H0. assumption.
-  apply IHminGuard in H0. apply mgDelTimeout; assumption. Qed.
+  apply IHminGuard in H0. apply mgDelTimeout; assumption.
+Qed.
 
 (** If we can show that minGuard d p, then for all actions, sort a d p implies
 p being able to actually perform the action a now.*)
 Theorem sortMinGuard1 : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
-  d %; p -> sort a d p -> discActEnabled p a. intros. induction H0. eapply dae.
+  d %; p -> sort a d p -> discActEnabled p a.
+Proof.
+  intros. induction H0. eapply dae.
   constructor. assumption. eapply dae. constructor. assumption.
   inversion H. addHyp (IHsort H5). invertClear H7. eapply dae. constructor.
   apply H8. unfold evalBoolExpFunTot. apply evalBoolExpRelFun in H6. rewrite H6.
@@ -1047,66 +1158,91 @@ Theorem sortMinGuard1 : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
   assert (t = zeroTime). rewrite H0 in H5. inversion H5. reflexivity.
   rewrite H7 in H6. assert (d %; p). my_applys_eq H6. apply delayEqR.
   simpl. ring. apply IHsort in H8. inversion H8. do 2 econstructor;
-  eassumption. Qed.
+  eassumption.
+Qed.
   
 
 (** If we can show that minGuard d p, then for all actions, sort a d p is equivalent to
 p being able to actually perform the action a now.*)
 Theorem sortMinGuard2 : forall (a : DiscAct) (d : Delay) (p : ProcTerm),
-  d %; p -> a <> tauAct -> (sort a d p <-> discActEnabled p a). split.
-  apply sortMinGuard1. assumption. intros. apply enabledInSort; assumption. Qed.
+  d %; p -> a <> tauAct -> (sort a d p <-> discActEnabled p a).
+Proof.
+  split.
+  apply sortMinGuard1. assumption. intros. apply enabledInSort; assumption.
+Qed.
 
 (** All input prefixed terms are minGuarded by any delay.*)
 Lemma mgInEx : forall (c : Channel) (l : list Var) (p : ProcTerm),
-  exists d, d %; (c $<l>$ ? p). intros. exists (mkDelay onePos).
-  constructor. Qed.
+  exists d, d %; (c $<l>$ ? p).
+Proof.
+  intros. exists (mkDelay onePos).
+  constructor.
+Qed.
 
 (** All output prefixed terms are minGuarded by any delay.*)
 Lemma mgOutEx : forall (c : Channel) (l : list Exp) (p : ProcTerm),
-  exists d, d %; (c $<l>$ ! p). intros. exists (mkDelay onePos).
-  constructor. Qed.
+  exists d, d %; (c $<l>$ ! p).
+Proof.
+  intros. exists (mkDelay onePos).
+  constructor.
+Qed.
 
 
 (** If both components of a sum are have some minGuard, then so does the whole sum.*)
 Lemma mgSumEx : forall (p1 p2 : ProcTerm),
   (exists d1, d1 %; p1) -> (exists d2, d2 %; p2) ->
-  exists d, d %; (p1 $+$ p2). intros.
+  exists d, d %; (p1 $+$ p2).
+Proof.
+  intros.
   invertClear H. invertClear H0. addHyp (Rle_or_lt x x0). invertClear H0.
   exists x. eapply mgSumL. assumption. apply H. assumption.
-  exists x0. eapply mgSumR. apply H1. assumption. assumption. Qed.
+  exists x0. eapply mgSumR. apply H1. assumption. assumption.
+Qed.
 
 (** If the body of a process definition is minGuard d, then so is the application.*)
 Lemma mgAppEx : forall (x : list Var) (l : list Exp) (h : Name) (p : ProcTerm),
   def h = (x, p) -> (exists d, d %; (subProcTerm (listsToSub x l) p)) ->
-  exists d, d %; (h $(l)$). intros. invertClear H0. exists x0. eapply mgApp.
-  apply H. assumption. Qed.
+  exists d, d %; (h $(l)$).
+Proof.
+  intros. invertClear H0. exists x0. eapply mgApp.
+  apply H. assumption.
+Qed.
 
 (** If the unfolding of an application has some minGuard, then so does the application.*)
 Lemma mgAppAutoEx : forall (l : list Exp) (h : Name),
   (exists d, d %; (unfoldApp h l)) ->
-  exists d, d %; (h $(l)$). intros. rewrite unfoldApp_body in H. remember (def h) as e.
-  destruct e. symmetry in Heqe. eapply mgAppEx. apply Heqe. assumption. Qed.
+  exists d, d %; (h $(l)$).
+Proof.
+  intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply mgAppEx. apply Heqe. assumption.
+Qed.
 
 (** If the then branch of an ifThen construct is minGuard for some amount d,
 then the whole construct is for some amount also.*)
 Lemma mgThenBranchEx : forall (b : BoolExp) (p : ProcTerm),
-  (exists d, d %; p) -> (exists d, d %; (b $> p)). intros.
+  (exists d, d %; p) -> (exists d, d %; (b $> p)).
+Proof.
+  intros.
   remember (evalBoolExpFunTot b). invertClear H. destruct b0.
   exists x. constructor. assumption. unfold evalBoolExpFunTot in Heqb0.
   apply evalBoolExpFunRel. destruct (evalBoolExpFun b); inversion Heqb0.
   reflexivity. exists (mkDelay onePos). apply mgIfFalse. symmetry.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (** If p has a minGuard, then so does the guarded term with p as the guarded process.*)
 Lemma mgDelEx : forall (e : Exp) (p : ProcTerm),
-  (exists d, d %; p) -> exists d, d %; ($<e>$p). intros.
+  (exists d, d %; p) -> exists d, d %; ($<e>$p).
+Proof.
+  intros.
   remember (evalExpFunTime e). destruct o.
   addHyp (Rle_lt_or_eq_dec 0 t (cond_nonneg t)). invertClear H0.
   exists (mkDelay (mkposreal t H1)). eapply mgDelEval. symmetry.
   apply Heqo. apply Rle_refl. invertClear H. exists x.
   apply mgDelTimeout. symmetry. symmetry in H1. apply timeZero in H1.
   rewrite <- H1. assumption. assumption. exists (mkDelay onePos).
-  constructor. symmetry. assumption. Qed.
+  constructor. symmetry. assumption.
+Qed.
   
 
 (**For every process there is some delay that is a minGuard of it.*)
@@ -1133,9 +1269,11 @@ Proof. apply minGuardExists. Qed.
 
 (** An action that is involved in the sort relation is not the tau action.*)
 Lemma sortNotTau (a : DiscAct) (p : ProcTerm) (d : Delay) :
-  sort a d p -> a <> tauAct. unfold not. intros. apply sortInOrOut in H.
+  sort a d p -> a <> tauAct.
+Proof.
+  unfold not. intros. apply sortInOrOut in H.
   invertClear H. invertClear H1. invertClear H; rewrite H1 in H0; inversion H0.
-  Qed.
+Qed.
 
 (** The precondition for parallel delay can be replaced with a simpler precondition
 as long as the delay in question is a minGuard of both components of the parallel.*)
@@ -1143,12 +1281,14 @@ Theorem parPrecMgEquiv : forall (p q : ProcTerm) (d : Delay),
   d %; p -> d %; q -> (
   (forall a : DiscAct, sort a d p -> ~sort (a^) d q) <->
   (forall a : DiscAct, a <> tauAct -> discActEnabled p a -> ~discActEnabled q (a^))).
+Proof.
   intros; split; intros. unfold not; intros. addHyp (complementNotTau a H2).
   eapply enabledInSort in H3; [|assumption]. apply H1 in H3. apply H3. 
   eapply enabledInSort in H4; [|assumption]. apply H4.
   addHyp (sortNotTau a p d H2). apply sortMinGuard1 in H2; [|assumption].
   addHyp (H1 a H3 H2). clear H1. unfold not. intros. apply H4.
-  eapply sortMinGuard1. apply H0. assumption. Qed.
+  eapply sortMinGuard1. apply H0. assumption.
+Qed.
 
 Open Scope nat_scope.
 
@@ -1214,7 +1354,9 @@ Inductive inListProc : ProcTerm -> list ChanStamped -> Prop :=
 
 (** If l and l' are both out lists of p, then l is equal to l'.*)
 Theorem outListUnique (l l' : list ChanStamped) (p : ProcTerm) :
-  outListProc p l -> outListProc p l' -> l = l'. intros.
+  outListProc p l -> outListProc p l' -> l = l'.
+Proof.
+  intros.
   generalize dependent l'. induction H; intros;
   try solve [inversion H0; reflexivity].
   inversion H0. repeat f_equal. eapply evalExpListsUnique; eassumption.
@@ -1230,11 +1372,14 @@ Theorem outListUnique (l l' : list ChanStamped) (p : ProcTerm) :
   subst. reflexivity. apply IHoutListProc. inversion H0. assumption.
   eapply IHoutListProc. inversion H1. assumption. apply False_ind.
   apply H5. assumption. inversion H0. apply False_ind.
-  apply H. assumption. reflexivity. Qed.
+  apply H. assumption. reflexivity.
+Qed.
 
 (** If l and l' are both out lists of p, then l is equal to l'.*)
 Theorem inListUnique (l l' : list ChanStamped) (p : ProcTerm) :
-  inListProc p l -> inListProc p l' -> l = l'. intros.
+  inListProc p l -> inListProc p l' -> l = l'.
+Proof.
+  intros.
   generalize dependent l'. induction H; intros;
   try solve [inversion H0; reflexivity].
   inversion H1. eapply IHinListProc. assumption.
@@ -1247,63 +1392,80 @@ Theorem inListUnique (l l' : list ChanStamped) (p : ProcTerm) :
   apply IHinListProc. inversion H0. assumption.
   eapply IHinListProc. inversion H1. assumption. apply False_ind.
   apply H5. assumption. inversion H0. apply False_ind.
-  apply H. assumption. reflexivity. Qed.
+  apply H. assumption. reflexivity.
+Qed.
 
 (*Annoying workaround to make the following proof go through*)
 Definition chanStampedNil : list ChanStamped := [].
 (** All output prefixed terms have an associated output list.*)
 Lemma outListInEx : forall (c : Channel) (l : list Var) (p : ProcTerm),
   {l' : list ChanStamped | outListProc (c $<l>$ ? p) l'}.
-  intros. exists chanStampedNil. constructor. Qed.
+Proof. intros. exists chanStampedNil. constructor. Qed.
 
 (** All output prefixed terms have an associated output list.*)
 Lemma outListOutEx : forall (c : Channel) (l : list Exp) (p : ProcTerm),
   { l' : list ChanStamped |outListProc (c $<l>$ ! p) l'}.
+Proof.
   intros. addHyp (evalExpListsExDec l).
   invertClear X. invertClear X0. exists [(c, map valTypeOf x)]. eapply outlOutEval.
   apply H. exists chanStampedNil. apply outlOutIll. unfold not. intros. apply H. exists l'.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (** If both components of a sum have some output list, then so does the whole sum.*)
 Lemma outListSumEx : forall (p1 p2 : ProcTerm),
   {l1 | outListProc p1 l1} -> {l2 | outListProc p2 l2} ->
-  {l | outListProc (p1 $+$ p2) l}. intros.
+  {l | outListProc (p1 $+$ p2) l}.
+Proof.
+  intros.
   invertClear H. invertClear H0. exists (x ++ x0). constructor; assumption.
-  Qed.
+Qed.
 
 (** If the body of a process definition has an output list, then so does the application.*)
 Lemma outListAppIndEx : forall (x : list Var) (l : list Exp) (h : Name) (p : ProcTerm),
   def h = (x, p) -> {l' | outListProc (subProcTerm (listsToSub x l) p) l'} ->
-  {l' | outListProc (h $(l)$) l'}. intros. invertClear H0. exists x0. constructor.
-  unfold unfoldApp. rewrite H. apply H1. Qed.
+  {l' | outListProc (h $(l)$) l'}.
+Proof.
+  intros. invertClear H0. exists x0. constructor.
+  unfold unfoldApp. rewrite H. apply H1.
+Qed.
 
 (** If the unfolding of an application has an output list, then so does the application.*)
 Lemma outListAppAutoEx : forall (l : list Exp) (h : Name),
   {l' | outListProc (unfoldApp h l) l'} ->
-  {l' | outListProc (h $(l)$) l'}. intros. rewrite unfoldApp_body in H. remember (def h) as e.
-  destruct e. symmetry in Heqe. eapply outListAppIndEx. apply Heqe. assumption. Qed.
+  {l' | outListProc (h $(l)$) l'}.
+Proof.
+  intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply outListAppIndEx. apply Heqe. assumption.
+Qed.
 
 (** If the then branch of an ifThen construct has some outListProc,
 then the whole construct has one also.*)
 Lemma outListThenBranchEx : forall (b : BoolExp) (p : ProcTerm),
-  {l | outListProc p l} -> {l | outListProc (b $> p) l}. intros.
+  {l | outListProc p l} -> {l | outListProc (b $> p) l}.
+Proof.
+  intros.
   remember (evalBoolExpFunTot b). invertClear H. destruct b0.
   exists x. constructor;[|assumption]. unfold evalBoolExpFunTot in Heqb0.
   apply evalBoolExpFunRel. destruct (evalBoolExpFun b); inversion Heqb0.
   reflexivity. exists chanStampedNil. apply outlIfFalse. symmetry.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (** If p has an output list, then so does the guarded term with p as
 the guarded process.*)
 Lemma outListDelEx : forall (e : Exp) (p : ProcTerm),
-  {l | outListProc p l} -> {l | outListProc ($<e>$p) l}. intros.
+  {l | outListProc p l} -> {l | outListProc ($<e>$p) l}.
+Proof.
+  intros.
   remember (evalExpFunTime e). destruct o.
   addHyp (eqDecTime t zeroTime). invertClear H0. invertClear H.
   exists x. constructor. symmetry. rewrite <- H1. assumption. assumption.
   exists chanStampedNil. apply outlDelGuard. unfold not. intro. apply H1.
   rewrite <- Heqo in H0. inversion H0.
   reflexivity. exists chanStampedNil. apply outlDelGuard. unfold not; intro.
-  rewrite <- Heqo in H0. inversion H0. Qed.
+  rewrite <- Heqo in H0. inversion H0.
+Qed.
 
 
 (**For every process there is a list of output actions for that process.*)
@@ -1328,53 +1490,67 @@ Proof. apply outListEx. Qed.
 (** All input prefixed terms have an associated input list.*)
 Lemma inListInEx : forall (c : Channel) (l : list Var) (p : ProcTerm),
   {l' : list ChanStamped | inListProc (c $<l>$ ? p) l'}.
-  intros. exists [(c, map varType l)]. constructor. Qed.
+Proof. intros. exists [(c, map varType l)]. constructor. Qed.
 
 (** All input prefixed terms have an associated input list.*)
 Lemma inListOutEx : forall (c : Channel) (l : list Exp) (p : ProcTerm),
   { l' : list ChanStamped |inListProc (c $<l>$ ! p) l'}.
-  intros. exists chanStampedNil. constructor. Qed.
+Proof. intros. exists chanStampedNil. constructor. Qed.
 
 (** If both components of a sum have some input list, then so does the whole sum.*)
 Lemma inListSumEx : forall (p1 p2 : ProcTerm),
   {l1 | inListProc p1 l1} -> {l2 | inListProc p2 l2} ->
-  {l | inListProc (p1 $+$ p2) l}. intros.
+  {l | inListProc (p1 $+$ p2) l}.
+Proof.
+  intros.
   invertClear H. invertClear H0. exists (x ++ x0). constructor; assumption.
-  Qed.
+Qed.
 
 (** If the body of a process definition has an input list, then so does the application.*)
 Lemma inListAppIndEx : forall (x : list Var) (l : list Exp) (h : Name) (p : ProcTerm),
   def h = (x, p) -> {l' | inListProc (subProcTerm (listsToSub x l) p) l'} ->
-  {l' | inListProc (h $(l)$) l'}. intros. invertClear H0. exists x0. constructor.
-  unfold unfoldApp. rewrite H. apply H1. Qed.
+  {l' | inListProc (h $(l)$) l'}.
+Proof.
+  intros. invertClear H0. exists x0. constructor.
+  unfold unfoldApp. rewrite H. apply H1.
+Qed.
 
 (** If the unfolding of an application has an input list, then so does the application.*)
 Lemma inListAppAutoEx : forall (l : list Exp) (h : Name),
   {l' | inListProc (unfoldApp h l) l'} ->
-  {l' | inListProc (h $(l)$) l'}. intros. rewrite unfoldApp_body in H. remember (def h) as e.
-  destruct e. symmetry in Heqe. eapply inListAppIndEx. apply Heqe. assumption. Qed.
+  {l' | inListProc (h $(l)$) l'}.
+Proof.
+  intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply inListAppIndEx. apply Heqe. assumption.
+Qed.
 
 (** If the then branch of an ifThen construct has some inListProc,
 then the whole construct has one also.*)
 Lemma inListThenBranchEx : forall (b : BoolExp) (p : ProcTerm),
-  {l | inListProc p l} -> {l | inListProc (b $> p) l}. intros.
+  {l | inListProc p l} -> {l | inListProc (b $> p) l}.
+Proof.
+  intros.
   remember (evalBoolExpFunTot b). invertClear H. destruct b0.
   exists x. constructor;[|assumption]. unfold evalBoolExpFunTot in Heqb0.
   apply evalBoolExpFunRel. destruct (evalBoolExpFun b); inversion Heqb0.
   reflexivity. exists chanStampedNil. apply inlIfFalse. symmetry.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (** If p has an input list, then so does the guarded term with p as
 the guarded process.*)
 Lemma inListDelEx : forall (e : Exp) (p : ProcTerm),
-  {l | inListProc p l} -> {l | inListProc ($<e>$p) l}. intros.
+  {l | inListProc p l} -> {l | inListProc ($<e>$p) l}.
+Proof.
+  intros.
   remember (evalExpFunTime e). destruct o.
   addHyp (eqDecTime t zeroTime). invertClear H0. invertClear H.
   exists x. constructor. symmetry. rewrite <- H1. assumption. assumption.
   exists chanStampedNil. apply inlDelGuard. unfold not. intro. apply H1.
   rewrite <- Heqo in H0. inversion H0.
   reflexivity. exists chanStampedNil. apply inlDelGuard. unfold not; intro.
-  rewrite <- Heqo in H0. inversion H0. Qed.
+  rewrite <- Heqo in H0. inversion H0.
+Qed.
 
 
 (**For every process there is a list of input actions for that process.*)
@@ -1398,16 +1574,19 @@ Proof. apply inListEx. Qed.
 
 (**Equality is decidable on stamped channels.*)
 Lemma eqDecChanStamped (c1 c2 : ChanStamped) :
-  {c1 = c2} + {c1 <> c2}. destruct c1 as [c l], c2 as [c0 l0].
+  {c1 = c2} + {c1 <> c2}.
+Proof.
+  destruct c1 as [c l], c2 as [c0 l0].
   destruct (eqDecChannel c c0) as [E | NE];
     [subst | right; intro H; apply NE; inversion H; reflexivity].
   destruct (list_eq_dec valTypeEqDec l l0) as [E | NE];
     [subst; left; reflexivity | right; intro H; apply NE; inversion H; reflexivity].
-  Qed.
+Qed.
 
 (** It is decidable whether or not an element is in a list of stamped channels.*)
 Lemma inChanStampedDec (s : ChanStamped) (l : list ChanStamped) : 
-  {s _: l} + {~s _: l}. apply in_dec. apply eqDecChanStamped. Qed.
+  {s _: l} + {~s _: l}.
+Proof. apply in_dec. apply eqDecChanStamped. Qed.
 
 
 
@@ -1455,7 +1634,9 @@ Lemma inChanStampedDec (s : ChanStamped) (l : list ChanStamped) :
 enabled on an action that matches the stamped channel.*)
 Theorem outListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   (tys : list ValType) : outListProc p l -> (c, tys) _: l ->
-  exists v, map valTypeOf v = tys /\ discActEnabled p (c ;! v). intros.
+  exists v, map valTypeOf v = tys /\ discActEnabled p (c ;! v).
+Proof.
+  intros.
   induction H; try solve [inversion H0]. exists l'. 
   invertClear H0. invertClear H1. split. reflexivity.
   eapply dae. apply stepDpOut. assumption.
@@ -1483,11 +1664,14 @@ Theorem outListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   assumption. apply IHoutListProc in H0. invertClear H0. exists x.
   invertClear H2. split. assumption. clear H0. rename H3 into H2.
   invertClear H2. eapply dae. constructor. apply H0.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Theorem inListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   (v : list BaseValue): inListProc p l -> (c, map valTypeOf v) _: l ->
-  discActEnabled p (c ;? v). intros.
+  discActEnabled p (c ;? v).
+Proof.
+  intros.
   induction H; try solve [inversion H0]. eapply dae.
   invertClear H0. invertClear H. apply stepDpIn. apply typedVals_map. congruence.
   inversion H. apply IHinListProc in H0.
@@ -1502,7 +1686,8 @@ Theorem inListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   eapply daeApp. symmetry. apply Heqp. unfold unfoldApp in H0.
   rewrite <- Heqp in H0. assumption. apply IHinListProc in H0. invertClear H0.
   eapply dae. constructor. apply H2.
-  assumption. Qed.
+  assumption.
+Qed.
 
 
 
@@ -1510,7 +1695,9 @@ Theorem inListEnabled (c : Channel) (p : ProcTerm) (l : list ChanStamped)
 channel in the output list of that process.*)
 Theorem enabledOutList (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   (v : list BaseValue) :  outListProc p l -> discActEnabled p (c ;! v) ->
-  (c, map valTypeOf v) _: l. intros. invertClear H0. generalize dependent p'.
+  (c, map valTypeOf v) _: l.
+Proof.
+  intros. invertClear H0. generalize dependent p'.
   induction H; intros; try solve [inversion H1]. inversion H1.
   rewrite (evalExpListsUnique _ _ _ H H7). constructor.
   reflexivity. inversion H1. apply False_ind. eapply H.
@@ -1522,13 +1709,16 @@ Theorem enabledOutList (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   apply IHoutListProc2 in H6. apply in_or_app. right. assumption. 
   inversion H1. unfold unfoldApp in IHoutListProc. rewrite H3 in IHoutListProc.
   eapply IHoutListProc. apply H6. invertClear H1. apply IHoutListProc in H4.
-  assumption. inversion H1. false. Qed.
+  assumption. inversion H1. false.
+Qed.
 
 (** If a process is enabled on an input action then there is a matching stamped
 channel in the input list of that process.*)
 Theorem enabledInList (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   (v : list BaseValue) : inListProc p l -> discActEnabled p (c ;? v) ->
-  (c, map valTypeOf v) _: l. intros. invertClear H0. generalize dependent p'.
+  (c, map valTypeOf v) _: l.
+Proof.
+  intros. invertClear H0. generalize dependent p'.
   induction H; intros; try solve [inversion H1]. inversion H1.
   apply typedVals_map in H6. rewrite H6. constructor. reflexivity.
   inversion H1. apply IHinListProc in H4. assumption.
@@ -1539,7 +1729,8 @@ Theorem enabledInList (c : Channel) (p : ProcTerm) (l : list ChanStamped)
   apply IHinListProc2 in H6. apply in_or_app. right. assumption. 
   inversion H1. unfold unfoldApp in IHinListProc. rewrite H3 in IHinListProc.
   eapply IHinListProc. apply H6. invertClear H1. apply IHinListProc in H4.
-  assumption. inversion H1. false. Qed.
+  assumption. inversion H1. false.
+Qed.
 
 (** A way of checking for no synchronisations between p and q by performing intersections
 on their input/output and output/input lists and checking that they evaluate to empty lists.*)
@@ -1551,7 +1742,9 @@ Inductive noSync (p q : ProcTerm) : Prop :=
 
 (**The no sync predicate is decidable.*)
 Theorem noSyncDec (p q : ProcTerm) :
-  decidable (noSync p q). addHyp (inListEx p). addHyp (inListEx q).
+  decidable (noSync p q).
+Proof.
+  addHyp (inListEx p). addHyp (inListEx q).
   addHyp (outListEx p). addHyp (outListEx q). invertClear H.
   invertClear H0. invertClear H1. invertClear H2.
   rename x into l1, x0 into l3, x1 into l2, x2 into l4.
@@ -1568,7 +1761,8 @@ Theorem noSyncDec (p q : ProcTerm) :
   inversion H2. replace l0 with l1 in H8.
   replace l2' with l4 in H8. rewrite H8 in Heqs.
   inversion Heqs. eapply outListUnique. apply H1. assumption.
-  eapply inListUnique. apply H3. assumption. Qed.
+  eapply inListUnique. apply H3. assumption.
+Qed.
 
 (** The precondition for parallel delay can be replaced with a simpler precondition
 involving the input and output lists, as long as the delay in question is a minGuard
@@ -1576,7 +1770,9 @@ of both components of the parallel.*)
 Theorem parPrecMgEquiv2 : forall (p q : ProcTerm) (d : Delay),
   d %; p -> d %; q -> (
   (forall a : DiscAct, sort a d p -> ~sort (a^) d q) <->
-  noSync p q). intros. rewrite parPrecMgEquiv; [|assumption|assumption].
+  noSync p q).
+Proof.
+  intros. rewrite parPrecMgEquiv; [|assumption|assumption].
   (**Left to right.*)
   split. addHyp (inListEx p). addHyp (inListEx q).
   addHyp (outListEx p). addHyp (outListEx q). invertClear H1.
@@ -1615,24 +1811,30 @@ Theorem parPrecMgEquiv2 : forall (p q : ProcTerm) (d : Delay),
   rename l into v. addHyp (enabledOutList c p l2 v H6 H3).
   simpl in H4. addHyp (enabledInList c q l1' v H7 H4).
   addHyp (set_inter_intro eqDecChanStamped (c, map valTypeOf v) l2 l1' H1 H2).
-  rewrite H10 in H11. inversion H11. Qed.
+  rewrite H10 in H11. inversion H11.
+Qed.
 
 (**For any pair of processes, there is a minGuard that is common to both.*)
 Lemma minGuardCommon (p q : ProcTerm) : exists d,
-  d %; p /\ d %; q. addHyp (minGuardExists p). addHyp (minGuardExists q).
+  d %; p /\ d %; q.
+Proof.
+  addHyp (minGuardExists p). addHyp (minGuardExists q).
   invertClear H. invertClear H0. addHyp (Rle_lt_dec x x0).
   invertClear H0. exists x. split. assumption. eapply minGuardLe.
   apply H. assumption. exists x0. apply Rlt_le in H2. split.
-  eapply minGuardLe. apply H1; assumption. assumption. assumption. Qed.
+  eapply minGuardLe. apply H1; assumption. assumption. assumption.
+Qed.
 
 (**For any pair of delay enabled processes, there is a delay that is common to both.*)
 Lemma taeCommon (p1 p2 : ProcTerm) :
   (exists d, timedActEnabled p1 d) -> (exists d, timedActEnabled p2 d) ->
   (exists d, timedActEnabled p1 d /\ timedActEnabled p2 d).
+Proof.
   intros. invertClear H. invertClear H0. addHyp (Rle_lt_dec x x0).
   invertClear H0. exists x. split. assumption. eapply delShorten.
   apply H. assumption. exists x0. apply Rlt_le in H2. split.
-  eapply delShorten. apply H1; assumption. assumption. assumption. Qed.
+  eapply delShorten. apply H1; assumption. assumption. assumption.
+Qed.
    
 
 (** If a process p is time act enabled on d, then it is time act enabled on
@@ -1640,6 +1842,7 @@ any minGuard d' of p less than d.*)
 Lemma taeMinGuardCommon (p1 p2 : ProcTerm) :
   (exists d, timedActEnabled p1 d) -> (exists d, timedActEnabled p2 d) ->
   (exists d, timedActEnabled p1 d /\ timedActEnabled p2 d /\ d %; p1 /\ d %; p2).
+Proof.
   intros. addHyp (taeCommon p1 p2 H H0). clear H. clear H0. invertClear H1.
   invertClear H. addHyp (minGuardCommon p1 p2). invertClear H.
   addHyp (Rle_lt_dec x x0). invertClear H2. invertClear H. exists x.
@@ -1648,12 +1851,14 @@ Lemma taeMinGuardCommon (p1 p2 : ProcTerm) :
   repeat (split; [assumption|]). assumption. assumption. assumption.
   apply Rlt_le in H2. exists x0.
   apply delShorten with (d' := x0) in H0. apply delShorten with (d' := x0) in H1.
-  repeat (split; [assumption|]). assumption. assumption. assumption. Qed.
+  repeat (split; [assumption|]). assumption. assumption. assumption.
+Qed.
 
 (** If the noSync predicate is not true, then there exists some specific synchronisation
 between the component processes.*)
 Lemma noSyncNotExistsSync (p q : ProcTerm) : ~noSync p q ->
   exists a, discActEnabled p a /\ discActEnabled q (a^).
+Proof.
   intros. addHyp (inListEx p). addHyp (inListEx q).
   addHyp (outListEx p). addHyp (outListEx q). invertClear H1.
   invertClear H2. invertClear H3. invertClear H0.
@@ -1679,7 +1884,8 @@ Lemma noSyncNotExistsSync (p q : ProcTerm) : ~noSync p q ->
   unfold set_In in H0, H5. destruct c as [c n].
   addHyp (outListEnabled c q l2 n H2 H5). invertClear H6. invertClear H7.
   rewrite <- H6 in H0. addHyp (inListEnabled c p l4 x H3 H0).
-  exists (c ;? x). split; assumption. Qed.
+  exists (c ;? x). split; assumption.
+Qed.
 
 (**Progress says that a process can either delay or perform a tau.*)
 Definition progress (p : ProcTerm) : Prop :=
@@ -1687,50 +1893,70 @@ Definition progress (p : ProcTerm) : Prop :=
 
 (** All input prefixed terms can progress.*)
 Lemma progressIn : forall (c : Channel) (l : list Var) (p : ProcTerm),
-  progress (c $<l>$ ? p). unfold progress.
-  intros. right. exists (mkDelay onePos). eapply tae. constructor. Qed.
+  progress (c $<l>$ ? p).
+Proof.
+  unfold progress.
+  intros. right. exists (mkDelay onePos). eapply tae. constructor.
+Qed.
 
 (** All output prefixed terms can progress.*)
 Lemma progressOut : forall (c : Channel) (l : list Exp) (p : ProcTerm),
-  progress (c $<l>$ ! p). unfold progress.
-  intros. right. exists (mkDelay onePos). eapply tae. constructor. Qed.
+  progress (c $<l>$ ! p).
+Proof.
+  unfold progress.
+  intros. right. exists (mkDelay onePos). eapply tae. constructor.
+Qed.
 
 (** If both components of a sum can progress, then so can the whole sum.*)
 Lemma progressSum : forall (p1 p2 : ProcTerm),
-  progress p1 -> progress p2 -> progress (p1 $+$ p2). unfold progress. intros.
+  progress p1 -> progress p2 -> progress (p1 $+$ p2).
+Proof.
+  unfold progress. intros.
   invertClear H. left. apply daeSumL. assumption. invertClear H0. left.
-  apply daeSumR. assumption. right. apply taeSumEx; assumption. Qed.
+  apply daeSumR. assumption. right. apply taeSumEx; assumption.
+Qed.
 
 (** If the body of a process definition can progress, then so can the application.*)
 Lemma progressAppInd : forall (x : list Var) (l : list Exp) (h : Name) (p : ProcTerm),
   def h = (x, p) -> progress (subProcTerm (listsToSub x l) p) ->
-  progress (h $(l)$). unfold progress. intros. invertClear H0; [left|right].
+  progress (h $(l)$).
+Proof.
+  unfold progress. intros. invertClear H0; [left|right].
   eapply daeApp. apply H. assumption. inversion H1. exists x0. eapply taeApp.
-  apply H. assumption. Qed.
+  apply H. assumption.
+Qed.
 
 (** If the unfolding of an application can progress, then so can the application.*)
 Lemma progressAppAuto : forall (l : list Exp) (h : Name),
   progress (unfoldApp h l) ->
-  progress (h $(l)$). intros. rewrite unfoldApp_body in H. remember (def h) as e.
-  destruct e. symmetry in Heqe. eapply progressAppInd. apply Heqe. assumption. Qed.
+  progress (h $(l)$).
+Proof.
+  intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply progressAppInd. apply Heqe. assumption.
+Qed.
 
 (** If the then branch of an ifThen construct can progress,
 then the whole construct can also.*)
 Lemma progressThenBranch : forall (b : BoolExp) (p : ProcTerm),
-  progress p -> progress (b $> p). intros.
+  progress p -> progress (b $> p).
+Proof.
+  intros.
   remember (evalBoolExpFunTot b). destruct b0. invertClear H.
   left. apply daeThenBranch. rewrite evalBoolExpTrueTot.
   symmetry. assumption. assumption. right. invertClear H0.
   exists x. apply taeThenBranch. assumption.
   right. exists (mkDelay onePos).
-  eapply tae. apply stepTpIfFalse. symmetry. assumption. Qed.
+  eapply tae. apply stepTpIfFalse. symmetry. assumption.
+Qed.
 
 Open Scope R_scope.
 
 (** If p can progress, then so can the guarded term with p as
 the guarded process.*)
 Lemma progressDel : forall (e : Exp) (p : ProcTerm),
-  progress p -> progress ($<e>$p). intros.
+  progress p -> progress ($<e>$p).
+Proof.
+  intros.
   remember (evalExpFunTime e). destruct o.
   addHyp (eqDecTime t zeroTime). invertClear H0.
   symmetry in Heqo. rewrite H1 in Heqo.
@@ -1743,7 +1969,8 @@ Lemma progressDel : forall (e : Exp) (p : ProcTerm),
   assert (d <= t). rewrite Heqd. apply Rle_refl. exists d.
   eapply tae. apply stepTpDelSub with (H := H2).
   symmetry. apply Heqo. right. exists (mkDelay onePos). eapply tae. eapply stepTpDelIll.
-  symmetry. assumption. Qed.
+  symmetry. assumption.
+Qed.
 
 (** A software process can always do either a tau action or it can delay by some amount
 d.*)
@@ -1787,8 +2014,11 @@ Proof. apply progressSoft. Qed.
 (** If a process cannot perform a tau action, then it can delay by some amount. This is
 a direct corollary of progress.*)
 Corollary patienceSoft (p : ProcTerm) : ~discActEnabled p tauAct -> exists d,
-  timedActEnabled p d. intros. addHyp (progressSoft p). invertClear H0.
-  apply False_ind. apply H. assumption. assumption. Qed.
+  timedActEnabled p d.
+Proof.
+  intros. addHyp (progressSoft p). invertClear H0.
+  apply False_ind. apply H. assumption. assumption.
+Qed.
 
 (** A delay of d' from a guard with d already taken off it is a delay of d + d' from the
 original guard. The guard must evaluate to t: an ill-formed guard idles instead.*)
@@ -1821,6 +2051,7 @@ Qed.
  then p can delay to p'' by the sum of the two original delays.*)
 Theorem delAddSoft (p p' p'' : ProcTerm) (d d' : Delay) :
   p -PD- d -PD> p' -> p' -PD- d' -PD> p'' -> p -PD- d +d+ d' -PD> p''.
+Proof.
   intro. generalize dependent p''. induction H; intros;
   try solve [inversion H; constructor].
   constructor. apply IHstepTimedProc. assumption. assumption.
@@ -1839,12 +2070,14 @@ Theorem delAddSoft (p p' p'' : ProcTerm) (d d' : Delay) :
   rewrite delTimeAddAssoc2. eapply stepTpDelAdd. apply IHstepTimedProc.
   assumption. assumption. eapply delProc_minus_guard; eassumption.  
   inversion H0; [rewrite H in H6; inversion H6 .. | ]. 
-  apply stepTpDelIll. assumption. Qed.  
+  apply stepTpDelIll. assumption.
+Qed.  
 
 (** The passage of time in this universe is linear, i.e. any process can delay by an amount d to
 at most one derivative process.*)
 Theorem timeDeterminacySoft (p p1' p2' : ProcTerm) (d : Delay) :
   p -PD- d -PD> p1' -> p -PD- d -PD> p2' -> p1' = p2'.
+Proof.
   intros. generalize dependent p2'.
   induction H; intros; try solve [inversion H0; reflexivity].
   inversion H1. apply IHstepTimedProc; assumption.
@@ -1879,7 +2112,8 @@ Theorem timeDeterminacySoft (p p1' p2' : ProcTerm) (d : Delay) :
   rewrite H0 in H6. inversion H6.
   (*DEL3*)
   inversion H0; [rewrite H in H6; inversion H6.. | ].
-  reflexivity. Qed.
+  reflexivity.
+Qed.
 
 
 
@@ -2107,7 +2341,9 @@ Qed.
 
 (** What is reachable from a process reachable from p0 is reachable from p0.*)
 Lemma reachableFrom_trans p0 p q : reachableFrom p0 p -> reachableFrom p q -> reachableFrom p0 q.
-Proof. intros R1 R2. induction R2; eauto using reachableFromDisc, reachableFromDel. Qed.
+Proof.
+  intros R1 R2. induction R2; eauto using reachableFromDisc, reachableFromDel.
+Qed.
 
 (** What is reachable from a parallel composition is a parallel composition of processes
 reachable from its components.*)

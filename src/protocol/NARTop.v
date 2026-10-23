@@ -50,7 +50,8 @@ that the time parameter to this relation is always greater than mL + max AN tran
 which is the lower bound for the pre-sent interval.*)
 Theorem currSince_lower_bound (n : Network) (t : Time) (m : Mode)
   (i : nat) (p : reachableProtNet n) : currSince m t i n p ->
-  msgLatency + Rmax adaptNotif transMax < t.  
+  msgLatency + Rmax adaptNotif transMax < t.
+Proof.
   (**Proof: Induction on currSince.*)
   intros. induction H.
   (*It's the base case that requires the most attention here. Well, we notice that
@@ -64,10 +65,11 @@ Theorem currSince_lower_bound (n : Network) (t : Time) (m : Mode)
   (*The inductive cases are the easy ones for once- because
   the parameter t to currSince is non-decreasing over these.*)
   assumption. apply Rplus_lt_weaken_rr. apply Rlt_le. delPos.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma maxAnTrans_positive : 0 <= Rmax adaptNotif transMax.
-  eapply Rle_trans;[ |apply Rmax_l]. timeNonneg. Qed.
+Proof. eapply Rle_trans;[ |apply Rmax_l]. timeNonneg. Qed.
 
 (* If an entity has been awaiting a transition to a mode m for the past t time units,
 and this t is bounded from below by mL + AN, then the entity in question has delivered
@@ -82,7 +84,8 @@ Theorem nextSince_fst_deliv_suff (n : Network) (t : Time) (m : Mode)
   let s' := Rlt_le msgLatency t s in
   exists l0 l1 r,
   delivered ([-[baseMode m, basePosition l0], l1, r-]) (minusTime t msgLatency s') i n p /\ 
-  sufficient m r /\ dist2d l l0 <= speedMax*t. 
+  sufficient m r /\ dist2d l l0 <= speedMax*t.
+Proof.
   intros U0 U1 q. simpl.
   (*Well since mL + AN < t, then mL < t.*)
   assert (msgLatency < t) as MT. eapply Rplus_lt_weaken_lr. apply q.
@@ -101,7 +104,7 @@ Theorem nextSince_fst_deliv_suff (n : Network) (t : Time) (m : Mode)
   apply msgLatency_positive.
   (*Hence by (deliv_next_suff) we get sufficient m r, and we're done.*)
   eapply deliv_next_suff. apply U0. apply DE. simpl. assumption. apply H.
-  Qed.
+Qed.
 
 (*TIDY*)
 
@@ -216,7 +219,8 @@ Theorem nextSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   nextSince m t i n p -> t' < t ->
   exists t'' l,
   t' < (time t'') <= t' + period m /\ t'' <= t /\
-  sent [baseMode m, basePosition l] t'' i n p. 
+  sent [baseMode m, basePosition l] t'' i n p.
+Proof.
   (*The proof should resemble that of currSince_periodic_sent. Here's an illustrative
   intuitive diagram for it:
   nextSince-------------t------------
@@ -276,7 +280,8 @@ Theorem nextSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   rewrite <- ME in H. lets ON : ovWait_nextSince_time OS H. simpl in ON.
   apply Rminus_le_swap_lr. my_applys_eq ON. ring. generalize dependent YL.
   rewrite <- ME. intro YL. lets SD : sentDel p w SE. my_applys_eq SD.
-  timering. Qed.
+  timering.
+Qed.
 
 (** switchBc's only step wakes the broadcaster in its mode.*)
 Local Lemma switchBc_step_wake (m : Mode) p p' c :
@@ -289,7 +294,9 @@ Qed.
 (** The listener never inputs on wake.*)
 Local Lemma listener_wake_in_not p p' v :
   listenerState p -> p -PA- chanWake ;? v -PA> p' -> False.
-Proof. intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra. Qed.
+Proof.
+  intros S T. destruct (listenerState_shape _ S); prot_outProc_in_not_contra.
+Qed.
 
 (** A step in which the overlap component leaves switchBc m for switchCurr wakes the
 broadcaster in mode m.*)
@@ -679,7 +686,9 @@ with the broadcast component contributing an input on trans. Now, it can be show
 (...activation...) that the only state willing to output on trans is tfsBc. But we can show
 elsewhere (tfsBc_not_currSince) that tfsBc implies that we are not currSince, which
 contradicts the hypothesis.*)
-Proof. intros CS NF NSC. exact (bcModeNet_cases _ _ _ (currSince_bcMode _ _ _ _ _ CS NF NSC)). Qed.
+Proof.
+  intros CS NF NSC. exact (bcModeNet_cases _ _ _ (currSince_bcMode _ _ _ _ _ CS NF NSC)).
+Qed.
 
 (** If we're currSince & we can delay, then we're in the bcWait state.*)
 Corollary currSince_del_bcWait (n n' : Network) (m : Mode) (t : Time)
@@ -786,6 +795,7 @@ Theorem bcWait_sent (n : Network) (m : Mode) (x : Time)
   bcWaitStateNet m x i n -> zeroTime < x ->
   exists l q,
   sent [baseMode m, basePosition l] (minusTime (period m) x q) i n p.
+Proof.
   intros. gen x.
   (*Induction on p.*)
   induction p; intros.
@@ -806,7 +816,8 @@ Theorem bcWait_sent (n : Network) (m : Mode) (x : Time)
   apply Rplus_lt_weaken_rl. timeNonneg. simpl.
   delPos. lets IH : IHp BD ZL. decompEx2 IH l q SE. assert (x <= period m) as q0.
   simpl in q. eapply Rplus_le_weaken_lr. apply q. apply Rlt_le. delPos. exists l q0.
-  eapply sentDel in SE. my_applys_eq SE. timering. Qed.
+  eapply sentDel in SE. my_applys_eq SE. timering.
+Qed.
 
 
 (* Let's say an entity has been broadcasting in the current mode m since t time units ago.
@@ -817,7 +828,8 @@ Theorem currSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   (i : nat) (p : reachableProtNet n) :
   currSince m t i n p -> ~ failSafe m -> t' < t ->
   exists t'' l, t' < (time t'')  /\ t'' <= t' + period m /\ t'' <= t /\
-  sent [baseMode m, basePosition l] t'' i n p. 
+  sent [baseMode m, basePosition l] t'' i n p.
+Proof.
   (*Let us start with a little attempt at a sketch of what is to be proven:
 
   currSince-------------t------------
@@ -884,7 +896,8 @@ Theorem currSince_periodic_sent (n : Network) (m : Mode) (t t' : Time)
   replace (minusTime (nonneg (time (period m))) (nonneg (time x)) H4)
   with (delToTime (minusTime (nonneg (time (period m)))
   (nonneg (time (delToTime (x +dt+ d)))) Q +dt+ d)).
-  constructor. assumption. apply timeEqR. simpl. ring. Qed.
+  constructor. assumption. apply timeEqR. simpl. ring.
+Qed.
 
 (*If an entity in position l is currSince m t, then it has delivered a message <m, l0>
 to a sufficient radius r and this happened t - mL time units ago. Also, l0 differs from
@@ -898,7 +911,8 @@ Theorem currSince_fst_deliv_suff (n : Network) (m : Mode) (t : Time)
   let s' := Rlt_le msgLatency t s in
   exists r l0 l1,
   delivered ([-[baseMode m, basePosition l0], l1, r-]) (minusTime t msgLatency s') i n p /\ 
-  sufficient m r /\ dist2d l l0 <= speedMax*t. 
+  sufficient m r /\ dist2d l l0 <= speedMax*t.
+Proof.
   (*Induction on currSince.*)
   intro. generalize dependent l. induction H; intros.
   (*In the base case, we have that the previous entity was nextSince m t and in
@@ -962,7 +976,8 @@ Theorem currSince_fst_deliv_suff (n : Network) (m : Mode) (t : Time)
   and transitivity.*)
   eapply Rle_trans. eapply dist_tri_ineq. simpl. rewrite Rmult_plus_distr_l.
   rewrite Rplus_comm. apply Rplus_le_compat. apply H6. rewrite distSymmetric in H3.
-  apply H3. Qed.
+  apply H3.
+Qed.
 
 (*If an entity in position l is currSince m t, then it has delivered a message <m, l0> to a
 sufficient radius r and this happened t' time units ago, with t' < t in the pre delivery
@@ -974,7 +989,9 @@ Theorem pre_del_suff (n : Network) (m : Mode) (t : Time)
   exists t' r l0 l1,
   delivered ([-[baseMode m, basePosition l0], l1, r-]) t' i n p /\ 
   sufficient m r /\ t' [:] (preDeliveredInterval m) /\ t' < t /\
-  dist2d l l0 <= speedMax*(msgLatency+ t'). intros.
+  dist2d l l0 <= speedMax*(msgLatency+ t').
+Proof.
+  intros.
   match goal with [ H : ~failSafe m |- _ ] => rename H into Q end.
   (*Let us first recall the definition of
   Ipd = (max AN trans, max AN trans + period m + trans m]).*)  
@@ -1088,7 +1105,8 @@ Theorem pre_del_suff (n : Network) (m : Mode) (t : Time)
   simpl in C1. apply Rplus_lt_swap_ll in H18.
   (*Hence we arrive at a contradiction, which is that t'' - AN < t'' - AN*)
   apply False_ind. apply (Rlt_irrefl (t'' - adaptNotif)). eapply Rle_lt_trans.
-  apply C1. assumption. Qed.
+  apply C1. assumption.
+Qed.
   (*So we must accept that the broadcast range was sufficient. This concludes the proof of
   all our sub-goals.*)
 

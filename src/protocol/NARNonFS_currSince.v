@@ -37,7 +37,8 @@ Lemma ovWait_nextSinceState_net m t x y i n :
 Proof.
   intro U. destruct U as [e U1 U2]. destruct U1 as [q l h k U3].
   destruct U3 as [p1 p p3 U4]. econstructor;[ | exact U2].
-  constructor. constructor. econstructor. exact U4. Qed.
+  constructor. constructor. econstructor. exact U4.
+Qed.
 (*Proof: Is there some auto tactic for this? #lift-compound-net-tac*)
 
 (** In an initial network every overlap component is dormant.*)
@@ -81,7 +82,9 @@ Local Definition ovClosedShape (p : ProcTerm) : Prop :=
 Local Lemma ocs_wait p (m : Mode) e2 e3 e4 : p ~p~ ovWait m e2 e3 e4 -> closedExp e2 ->
   ((exists t2, evalExpFunTime e2 = Some t2) <-> (exists t3, evalExpFunTime e3 = Some t3)) ->
   (exists t4, evalExpFunTime e4 = Some t4) -> ovClosedShape p.
-Proof. intros W C L E. right. left. exists m e2 e3 e4. exact (conj W (conj C (conj L E))). Qed.
+Proof.
+  intros W C L E. right. left. exists m e2 e3 e4. exact (conj W (conj C (conj L E))).
+Qed.
 
 Local Lemma ocs_ready p (m : Mode) e2 (l : Position) :
   p ~p~ ovReady m e2 l -> closedExp e2 -> ovClosedShape p.
@@ -334,6 +337,7 @@ Then that entity has been currSince m t.*)
 Theorem nonFS_currSince (m : Mode) (i : nat) (n : Network) 
   (p : reachableProtNet n) : currModeNet m i n -> ~failSafe m ->
   exists t, currSince m t i n p.
+Proof.
   intros.
   (**Proof: Induction on the proof of reachability of n.*)
   induction p.
@@ -409,6 +413,7 @@ Theorem nonFS_currSince (m : Mode) (i : nat) (n : Network)
   apply IHp in H1. invertClear H1. rename x into t.
   (*And now as our existential we take t + d*. And by the delay constructor of
   currSince, we're done.*)
-  exists (t +dt+ d). constructor. assumption. Qed.
+  exists (t +dt+ d). constructor. assumption.
+Qed.
 
 End NARNonFS_currSince.

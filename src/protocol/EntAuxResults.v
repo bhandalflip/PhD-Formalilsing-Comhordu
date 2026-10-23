@@ -1030,11 +1030,15 @@ Qed.
 (** The broadcaster takes neither chanPause nor chanUnpause.*)
 Local Lemma broadcast_pause_in_not p p' : broadcastState p -> p -PA- chanPause *? -PA> p' ->
   False.
-Proof. intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
+Proof.
+  intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
+Qed.
 
 Local Lemma broadcast_unpause_in_not p p' : broadcastState p ->
   p -PA- chanUnpause *? -PA> p' -> False.
-Proof. intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra. Qed.
+Proof.
+  intros S T. destruct (broadcastState_shape _ S); prot_outProc_in_not_contra.
+Qed.
 
 (** A step of the overlap component keeps it in or out of the switch states, unless it is an
 output on chanPause or chanUnpause. Likewise for the listener and paused, with inputs.*)
@@ -1211,10 +1215,12 @@ Qed.
 (** If an entity inputs a message then that message is incoming.*)
 Lemma input_incomingEnt (v : list BaseValue) (e e' : Entity) (l : Position) (r : Distance) :
   e -EA- ([-v, l, r-]) #? ->> e' -> incomingEnt v e'.
+Proof.
   (*Proof: Obvious from the definition of incoming.*)
   introz U. inversion U. constructor. inversion H5.
   constructor. inversion H8. constructor.
-  reflexivity. inversion H10. Qed.
+  reflexivity. inversion H10.
+Qed.
 
 
 (***************************** Urgency *****************************)
@@ -1293,7 +1299,7 @@ Qed.
 (** A process in the gotMsg state can read any position on the channel pos.*)
 Local Lemma gotMsg_pos_in (p : ProcTerm) (m : Mode) (l l0 : Position) :
   gotMsgState m l p -> discActEnabled p (chanPos ;? [basePosition l0]).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 (* end helpers *)
 
 (** The listener reads its position as soon as it has a message, since the position is
@@ -1312,7 +1318,7 @@ Qed.
 (** A process in the gotRange state can read any mode on the channel mCurr.*)
 Local Lemma gotRange_mCurr_in (p : ProcTerm) (m m0 : Mode) (r : Distance) :
   gotRangeState m r p -> discActEnabled p (chanMCurrRead ;? [baseMode m0]).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 (* end helpers *)
 
 Lemma gotRangeStateEnt_urgent (e e' : Entity) (d : Delay) m r :
@@ -1330,12 +1336,12 @@ Qed.
 (** A process in the currComp state can input on mStable.*)
 Local Lemma currComp_mStable_in (p : ProcTerm) (m : Mode) (r : Distance) :
   currCompState m r p -> discActEnabled p (chanMStableRead *?).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 (** A process in the currComp state can input any mode on mNext.*)
 Local Lemma currComp_mNext_in (p : ProcTerm) (m m0 : Mode) (r : Distance) :
   currCompState m r p -> discActEnabled p (chanMNextRead ;? [baseMode m0]).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 (* end helpers *)
 
 Lemma currCompStateEnt_urgent (e e' : Entity) (d : Delay) m r :
@@ -1364,6 +1370,7 @@ Qed.
 
 Lemma tfsNext_urgent : forall (m : Mode) (e e' : Entity) (d : Delay),
   reachableProtEnt e -> tfsNextStateEnt m e -> e -ED- d ->> e' -> False.
+Proof.
   intro m. intros e e' d. introz U.
   (*Need to ensure the current mode equals the parameter to tfsNext.*)
   lets TCM : tfsNext_currMode U U0.
@@ -1402,7 +1409,9 @@ Qed.
 
 Lemma ovAbort_urgent : forall (e e' : Entity) (d : Delay),
   reachableProtEnt e -> ovAbortStateEnt e -> e -ED- d ->> e' 
-  -> False. intros e e' d. introz U.
+  -> False.
+Proof.
+  intros e e' d. introz U.
   lets OUS : ovAbort_unstable U U0.
   urgency_pre_tac2 ovAbortStateEnt ovAbortStateProt ovAbortState.
   (**Proof: Show that the mode state is not stable whenever we
@@ -1449,7 +1458,9 @@ Qed.
 
 Lemma swithcCurr_urgent (m : Mode) : forall (e e' : Entity) (d : Delay),
   reachableProtEnt e -> switchCurrStateEnt e -> e -ED- d ->> e' 
-  -> False. intros e e' d. introz U. lets Q : U.
+  -> False.
+Proof.
+  intros e e' d. introz U. lets Q : U.
   urgency_pre_tac2 switchCurrStateEnt switchCurrStateProt switchCurrState.
   (*Apply (switchCurr-next-Mode) to assert that there is some next mode.*)  
   lets SMS : switchCurr_mState U U0. decompEx2 SMS m1 m2 MS.
@@ -1634,7 +1645,9 @@ with is preservation of the path predicates.*)
 
 Lemma msgAbortPathEnt_urgent e e' d :
   reachableProtEnt e -> msgAbortPathEnt e ->
-  e -ED- d ->> e' -> False. intro.
+  e -ED- d ->> e' -> False.
+Proof.
+  intro.
   introz U. inversion U; subst.
   (*Inversion and then lift individual-stae urgency results.*)
   assert (gotMsgStateEnt m'' l' ([|p, l, h, k|])).
@@ -1648,7 +1661,8 @@ Lemma msgAbortPathEnt_urgent e e' d :
   eapply currCompStateEnt_urgent; eassumption.
   assert (abortOvlpStateEnt ([|p, l, h, k|])).
   econstructor; eassumption.  
-  eapply abortOvlpStateEnt_urgent; eassumption. Qed.
+  eapply abortOvlpStateEnt_urgent; eassumption.
+Qed.
 
 (***************************** Delay Behaviour *****************************)
 
@@ -1802,9 +1816,12 @@ cases that can synch.*)
 (***************************** Lifted State Predicate Results *****************************)
 
 Lemma switchCurr_switch_ent (e : Entity) :
-  switchCurrStateEnt e -> switchStateEnt e. intros. 
+  switchCurrStateEnt e -> switchStateEnt e.
+Proof.
+  intros. 
   inversion H. inversion H0. do 2 constructor.
-  apply switCurSt. assumption. Qed.
+  apply switCurSt. assumption.
+Qed.
 
 (*LOCAL TIDY*)
 

@@ -72,7 +72,9 @@ Ltac taeAuto := repeat taeAutoSing.
 we need to use heavy automation tactics rather than step through all 30 names
 individually. The automation tactic we use is taeAuto.*)
 Theorem delApp : forall (h : Name) (l : list Exp),
-  exists d, timedActEnabled (h $(l)$) d.  intros.
+  exists d, timedActEnabled (h $(l)$) d.
+Proof.
+  intros.
   exists (mkDelay onePos). remember (def h) as e.
   symmetry in Heqe. destruct e as [x p]. destruct h;
   (** This next block of code replaces the application of a name to a generic list of
@@ -82,7 +84,8 @@ Theorem delApp : forall (h : Name) (l : list Exp),
   (eapply taeApp; [apply Heqe|]; addHyp (listSubNormal x l); rename X into H;
   invertClear H; invertClear H0; rename x0 into l'; rewrite H1;
   inversion Heqe; rewrite <- H2 in H; listGen H l'; simpl);
-  taeAuto. Qed.
+  taeAuto.
+Qed.
 
 (******************Channels*******************)
 

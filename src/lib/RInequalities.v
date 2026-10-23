@@ -10,80 +10,80 @@ Ltac Rleltcases d t U :=  let H := fresh in lets H : Rle_or_lt d t;
 
 Lemma not_Rle_lt : forall (r1 r2 : R),
   ~r1 <= r2 -> r2 < r1.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma RltMinusBothSides : forall (r1 r2 : R),
   r2 < r1 -> 0 < (r1 - r2).
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 (**** Rle ****)
 
 Lemma Rle_plus_r : forall (x y : R),
   0 <= y -> x <= x + y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rle_plus_l : forall (x y : R),
   0 <= y -> x <= y + x.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma RleMinusBothSides : forall (r1 r2 : R),
   r2 <= r1 -> 0 <= (r1 - r2).
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rmult_le_0_compat : forall r1 r2 : R,
   0 <= r1 -> 0 <= r2 -> 0 <= r1 * r2.
-  intros. nra. Qed.
+Proof. intros. nra. Qed.
 
 Lemma Rle_zero_plus : forall r1 r2 : R,
   0 <= r1 -> 0 <= r2 -> 0 <= r1 + r2.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma RlePlusExistsR : forall (r1 r2 : R),
   r1 <= r2 -> exists r3, r2 = r1 + r3 /\ 0 <= r3.
-  intros. exists (r2 - r1). split; lra. Qed.
+Proof. intros. exists (r2 - r1). split; lra. Qed.
 
 Lemma RlePlusExistsL : forall (r1 r2 : R),
   r1 <= r2 -> exists r3, r2 = r3 + r1 /\ 0 <= r3.
-  intros. exists (r2 - r1). split; lra. Qed.
+Proof. intros. exists (r2 - r1). split; lra. Qed.
 
 Lemma Rle_or_le : forall (r1 r2 : R), r1 <= r2 \/ r2 <= r1.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_le_swap_rr : forall (x y z : R),
   x <= y + z -> x - z <= y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_le_swap_rl : forall (x y z : R),
   x <= y + z -> x - y <= z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_le_swap_lr : forall (x y z : R),
   x + y <= z -> x <= z - y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_le_swap_ll : forall (x y z : R),
   x + y <= z -> y <= z - x.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rminus_le_swap_rr : forall (x y z : R),
   x <= y - z -> x + z <= y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rminus_le_swap_lr : forall (x y z : R),
   x - y <= z -> x <= z + y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_le_weaken_lr : forall (x y z : R), x + y <= z -> 0 <= y -> x <= z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_le_weaken_ll : forall (x y z : R), x + y <= z -> 0 <= x -> y <= z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_le_weaken_rr : forall (x y z : R), 0 <= z -> x <= y -> x <= y + z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rminus_le_weaken_lr : forall (x y z : R), 0 <= y -> x <= z -> x - y <= z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 (** Tries to solve an inequality on real numbers.*)
 Ltac Rplus_le_tac := 
@@ -125,57 +125,57 @@ Ltac Rplus_le_tac :=
 
 Lemma Rlt_plus_r : forall (x y : R),
   0 < y -> x < x + y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rlt_plus_l : forall (x y : R),
   0 < y -> x < y + x.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rlt_zero_plus : forall r1 r2 : R,
   0 < r1 -> 0 < r2 -> 0 < r1 + r2.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma RltPlusExistsR : forall (r1 r2 : R),
   r1 < r2 -> exists r3, r2 = r1 + r3 /\ 0 < r3.
-  intros. exists (r2 - r1). split; lra. Qed.
+Proof. intros. exists (r2 - r1). split; lra. Qed.
 
 Lemma RltPlusExistsL : forall (r1 r2 : R),
   r1 < r2 -> exists r3, r2 = r3 + r1 /\ 0 < r3.
-  intros. exists (r2 - r1). split; lra. Qed.
+Proof. intros. exists (r2 - r1). split; lra. Qed.
 
 Lemma Rplus_lt_swap_rl : forall (x y z : R),
   x < y + z -> x - y < z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_swap_rr : forall (x y z : R),
   x < y + z -> x - z < y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_swap_ll : forall (x y z : R),
   x + y < z -> y < z - x.
-  intros. lra. Qed.  
+Proof. intros. lra. Qed.  
 
 Lemma Rplus_lt_swap_lr : forall (x y z : R),
   x + y < z -> x < z - y.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_reg_l: forall r r1 r2 : R, r1 + r < r2 + r -> r1 < r2.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_reg_r: forall r r1 r2 : R, r + r1 < r + r2 -> r1 < r2.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_weaken_lr : forall (x y z : R), x + y < z -> 0 <= y -> x < z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_weaken_ll : forall (x y z : R), x + y < z -> 0 <= x -> y < z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_weaken_rr : forall (x y z : R), 0 <= z -> x < y -> x < y + z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 Lemma Rplus_lt_weaken_rl : forall (x y z : R), 0 <= y -> x < z -> x < y + z.
-  intros. lra. Qed.
+Proof. intros. lra. Qed.
 
 (** Tries to solve an inequality on real numbers.*) 
 Ltac Rplus_lt_tac := 

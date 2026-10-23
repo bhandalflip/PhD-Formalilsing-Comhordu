@@ -58,21 +58,23 @@ Ltac foldDist l l0 H := replace (dist_euc (xCoord l) (yCoord l) (xCoord l0) (yCo
 Definition distFun p1 p2 := mkDistance (dist2d p1 p2).
 
 Lemma timeEqNonneg : forall (t1 t2 : Time), (time t1) = (time t2) -> t1 = t2.
-  destruct t1, t2. simpl. intros. f_equal. assumption. Qed.
+Proof. destruct t1, t2. simpl. intros. f_equal. assumption. Qed.
 
 Lemma timeEqR : forall (t1 t2 : Time), (nonneg (time t1)) = (nonneg (time t2)) ->
-  t1 = t2. intros. apply timeEqNonneg. apply nonnegRealEqR. assumption. Qed.
+  t1 = t2.
+Proof. intros. apply timeEqNonneg. apply nonnegRealEqR. assumption. Qed.
 
 Lemma delayEqPos : forall (d1 d2 : Delay), delay d1 = delay d2 -> d1 = d2.
-  destruct d1, d2. simpl. intros. f_equal. apply H. Qed.
+Proof. destruct d1, d2. simpl. intros. f_equal. apply H. Qed.
 
 Lemma delayEqR : forall (d1 d2 : Delay), pos d1 = pos d2 -> d1 = d2.
-  intros. apply delayEqPos. apply posRealEqR. assumption. Qed.
+Proof. intros. apply delayEqPos. apply posRealEqR. assumption. Qed.
 
 Open Scope nat_scope.
 
 Lemma lt_notEq : forall (n m : nat),
-  n < m -> n <> m. intros. lia. Qed.
+  n < m -> n <> m.
+Proof. intros. lia. Qed.
 
 (** Converts a decidable proposition to a boolean.*)
 Definition decToBool {P : Prop} (p : {P} + {~P}) : bool :=
@@ -91,21 +93,30 @@ Definition decToOption {P : Prop} (p : {P} + {~P}) : option P :=
 Open Scope R_scope.
 
 (**Equality is decidable for times.*)
-Lemma eqDecTime : eqDec Time. unfold eqDec. destruct x1, x2.
+Lemma eqDecTime : eqDec Time.
+Proof.
+  unfold eqDec. destruct x1, x2.
   generalize (eqDecNonnegReal time0 time1). intros. inversion H.
   left. f_equal. assumption. right. unfold not; intros. apply H0.
-  inversion H1. reflexivity. Qed.
+  inversion H1. reflexivity.
+Qed.
 
 (** Equality is decidable on Delays.*)
-Lemma eqDecDelay : eqDec Delay. unfold eqDec. destruct x1, x2.
+Lemma eqDecDelay : eqDec Delay.
+Proof.
+  unfold eqDec. destruct x1, x2.
   generalize (eqDecPosReal delay0 delay1). intros. inversion H.
   left. f_equal. assumption. right. unfold not; intros. apply H0.
-  inversion H1. reflexivity. Qed.
+  inversion H1. reflexivity.
+Qed.
 
-Lemma eqDecDistance : eqDec Distance. unfold eqDec. destruct x1, x2.
+Lemma eqDecDistance : eqDec Distance.
+Proof.
+  unfold eqDec. destruct x1, x2.
   generalize (eqDecNonnegReal distance0 distance1). intros. inversion H.
   left. f_equal. assumption. right. unfold not; intros. apply H0.
-  inversion H1. reflexivity. Qed.
+  inversion H1. reflexivity.
+Qed.
 
 (**Returns t1 - t2, or None if t1 < t2.*)
 Definition subtractTime (t1 t2 : Time) : option Time :=
@@ -134,35 +145,51 @@ Notation "t +dt+ d" := (addDelayTime t d) (at level 45).
 Notation "d +d+ d'" := (addDelay d d') (at level 45).
 
 Lemma addDelayComm : forall (d d' : Delay), d +d+ d' = d' +d+ d.
+Proof.
   destruct d, d'. unfold addDelay. repeat f_equal.
-  apply posRealEqR. simpl. apply Rplus_comm. Qed.
+  apply posRealEqR. simpl. apply Rplus_comm.
+Qed.
 
 (**If there is some delays d and d', and they are being
 added with the left one as a time, then they can be added as normal.*)
 Lemma timeDelAddSwitch : forall (d d' : Delay),
-  d +dt+ d' = d +d+ d'. intros. unfold addDelayTime.
+  d +dt+ d' = d +d+ d'.
+Proof.
+  intros. unfold addDelayTime.
   unfold addDelay. f_equal. apply posRealEqR. simpl.
-  destruct d. destruct delay0. reflexivity. Qed.
+  destruct d. destruct delay0. reflexivity.
+Qed.
 
 Lemma delTimeAddAssoc : forall (t : Time) (d d' : Delay),
-  t +dt+ d +dt+ d' = t +dt+ (d +dt+ d'). intros.
+  t +dt+ d +dt+ d' = t +dt+ (d +dt+ d').
+Proof.
+  intros.
   destruct t, d, d'. destruct time0, delay0, delay1.
   unfold addDelayTime. simpl. repeat f_equal.
-  apply posRealEqR. simpl. apply Rplus_assoc. Qed.
+  apply posRealEqR. simpl. apply Rplus_assoc.
+Qed.
 
 Lemma delTimeAddAssoc2 : forall (t : Time) (d d' : Delay),
-  (t +dt+ d) +d+ d' = t +dt+ (d +d+ d'). intros.
-  repeat rewrite <- timeDelAddSwitch. apply delTimeAddAssoc. Qed.
+  (t +dt+ d) +d+ d' = t +dt+ (d +d+ d').
+Proof.
+  intros.
+  repeat rewrite <- timeDelAddSwitch. apply delTimeAddAssoc.
+Qed.
 
 Lemma timeDelAddZeroL : forall (d : Delay),
-  zeroTime +dt+ d = d. unfold zeroTime. destruct d.
+  zeroTime +dt+ d = d.
+Proof.
+  unfold zeroTime. destruct d.
   unfold addDelayTime. f_equal. apply posRealEqR.
-  simpl. ring. Qed.
+  simpl. ring.
+Qed.
 
 (** If a delay d is less than or equal a time t,
 then there is some time t' such that t = t' + d.*)
 Lemma delLeTimeSum : forall (t : Time) (d : Delay),
-  d <= t -> exists t', t = t' +dt+ d. intros.
+  d <= t -> exists t', t = t' +dt+ d.
+Proof.
+  intros.
   assert (exists r, nonneg (time t) = d + r /\ 0 <= r).
   exists (t - d). split. ring. replace 0 with (t - t).
   apply Rplus_le_compat. apply Rle_refl.
@@ -170,7 +197,7 @@ Lemma delLeTimeSum : forall (t : Time) (d : Delay),
   invertClear H0. invertClear H1.
   exists (mkTime (mknonnegreal x H2)). destruct t, d.
   apply timeEqR. simpl. rewrite Rplus_comm. apply H0.
-  Qed.
+Qed.
 
 (** Subtract d2 from d1. Requires a proof that d2 is indeed less than d1 so
 that the result is a delay.*)
@@ -179,27 +206,34 @@ Definition minusDelay (r1 r2 : R) (p : r2 < r1) : Delay :=
 
 (** Subtracting and then adding the same delay gives the same result.*)
 Lemma minusAddDelay : forall (d1 d2 : Delay) (p : d2 < d1),
-  (minusDelay d1 d2 p) +d+ d2 = d1. intros. apply delayEqR. simpl. ring. Qed.
+  (minusDelay d1 d2 p) +d+ d2 = d1.
+Proof. intros. apply delayEqR. simpl. ring. Qed.
 
 (** Adding a time that has been subtracted gives back the original result.*)
 Lemma minusDelayAddTime : forall (d : Delay) (t : Time) (p : t < d),
-  d = t +dt+ (minusDelay d t p). intros. apply delayEqR. simpl. ring. Qed.
+  d = t +dt+ (minusDelay d t p).
+Proof. intros. apply delayEqR. simpl. ring. Qed.
 
 (**The right summand in a sum of delays is less than the total sum.*)
 Lemma addDelayLtR : forall (d1 d2 : Delay),
   d2 < d1 +d+ d2.
-  intros [[r1 P1]] [[r2 P2]]. simpl. lra. Qed.
+Proof. intros [[r1 P1]] [[r2 P2]]. simpl. lra. Qed.
 
 (** Adding and then subtracting the same quantity leaves the original delay.*)
 Lemma addMinusDelay : forall (d1 d2 : Delay),
   exists p, minusDelay (d1 +d+ d2) d2 p = d1.
+Proof.
   intros. exists (addDelayLtR d1 d2). destruct d1, d2.
-  destruct delay0, delay1. apply delayEqR. simpl. ring. Qed.
+  destruct delay0, delay1. apply delayEqR. simpl. ring.
+Qed.
 
 (** Communtativity of times in a sum of three terms.*)
 Lemma timeDelAddComm : forall (t1 t2 : Time) (d : Delay),
-  t1 +dt+ (t2 +dt+ d) = t2 +dt+ (t1 +dt+ d). intros.
-  apply delayEqR. simpl. ring. Qed.
+  t1 +dt+ (t2 +dt+ d) = t2 +dt+ (t1 +dt+ d).
+Proof.
+  intros.
+  apply delayEqR. simpl. ring.
+Qed.
 
 (**Subtract R2 from R1. Requires a proof that R2 is indeed less
 than or equal r1 so that the result is a Time.*)
@@ -210,18 +244,24 @@ Definition minusTime (r1 r2 : R) (p : r2 <= r1) : Time :=
 (** To show that d = d +d+ d' according to the addDel function, it suffices to show that
 d = d + d' i.e. that the real parts and real number addition equates.*)
 Lemma addRaddDel : forall (d d' d'' : Delay),
-  pos d = d' + d'' -> d = d' +d+ d''. intros.
-  apply delayEqR. simpl. apply H. Qed.
+  pos d = d' + d'' -> d = d' +d+ d''.
+Proof.
+  intros.
+  apply delayEqR. simpl. apply H.
+Qed.
 
 (** Every delay has two delays that add up to make it.*)
 Theorem addDelayExists : forall (d : Delay),
-  exists d1 d2, d = d1 +d+ d2. intros.
+  exists d1 d2, d = d1 +d+ d2.
+Proof.
+  intros.
   destruct d as [r]. addHyp (addPosRealExists r). invertClear H.
   invertClear H0. exists (mkDelay x). exists (mkDelay x0).
-  apply addRaddDel. apply H. Qed.
+  apply addRaddDel. apply H.
+Qed.
 
 Lemma RMax_time (t1 t2 : Time) : 0 <= Rmax t1 t2.
-  eapply Rle_trans;[ |apply Rmax_l]. timeNonneg. Qed.
+Proof. eapply Rle_trans;[ |apply Rmax_l]. timeNonneg. Qed.
   
 (*Returns the maximum of two times.*)
 Definition timeMax (t1 t2 : Time) : Time :=
@@ -229,7 +269,7 @@ Definition timeMax (t1 t2 : Time) : Time :=
  
 (*The timeMax function is correct.*)
 Lemma timeMax_RMax : forall (t1 t2 : Time), nonneg (timeMax t1 t2) = Rmax t1 t2.
-  intros. reflexivity. Qed.
+Proof. intros. reflexivity. Qed.
 Notation "t1 +t+ t2" := (addTime t1 t2) (at level 50).
 
 (** Given time t, splits goal into two subgoals based on whether 0 = t or 0 < t*)
@@ -253,13 +293,16 @@ Theorem leftmost : forall (j k : nat) (p : nat -> Prop)
   (K : forall i : nat, decidable (p i)),
   p k -> j <= k ->
   exists j', j <= j' <= k /\ p j' /\
-  forall x : nat, j <= x < j' -> ~ p x. intros j k p K H H0.
+  forall x : nat, j <= x < j' -> ~ p x.
+Proof.
+  intros j k p K H H0.
   assert (D : forall n, (j <= n /\ p n) \/ ~ (j <= n /\ p n)).
   intro n. destruct (le_dec j n), (K n); tauto.
   destruct (dec_inh_nat_subset_has_unique_least_element _ D (ex_intro _ k (conj H0 H)))
     as [j' [[[J Pj] L] _]].
   exists j'. split. split. assumption. apply L. split; assumption.
-  split. assumption. intros x [X1 X2] Px. specialize (L x (conj X1 Px)). lia. Qed.
+  split. assumption. intros x [X1 X2] Px. specialize (L x (conj X1 Px)). lia.
+Qed.
 
 (**If a property p is true of the number j, and j <= k, then there is some
 largest j' between j and k such that p is true at j'.*)
@@ -268,18 +311,23 @@ Theorem rightmost : forall (j k : nat) (p : nat -> Prop)
   p j -> j <= k ->
   exists j', j <= j' <= k /\ p j' /\
   forall x : nat, j' < x <= k -> ~ p x.
+Proof.
   intros j k p K H H0.
   destruct (leftmost j k (fun x => p (j + k - x)) (fun x => K _)) as [x [X [Px L]]];
     [replace (j + k - k) with j by lia; exact H | exact H0 | ].
   exists (j + k - x). split; [lia | split; [exact Px | ]].
   intros y Y Py. apply (L (j + k - y)); [lia | ].
-  replace (j + k - (j + k - y)) with y by lia. exact Py. Qed.
+  replace (j + k - (j + k - y)) with y by lia. exact Py.
+Qed.
 
 Open Scope R_scope.
 
 Lemma plusIntervalZero : forall (i : Interval),
-  i [+] zeroTime = i. intros. destruct i. unfold zeroTime.
-  simpl. f_equal; ring. Qed.
+  i [+] zeroTime = i.
+Proof.
+  intros. destruct i. unfold zeroTime.
+  simpl. f_equal; ring.
+Qed.
 
 Open Scope nat_scope.
 
@@ -290,11 +338,13 @@ Theorem rightmostNeg : forall (j k : nat) (p : nat -> Prop)
   ~p j -> j <= k ->
   exists j', j <= j' <= k /\ ~p j' /\
   forall x : nat, j' < x <= k -> p x.
+Proof.
   intros j k p K H H0.
   destruct (rightmost j k (fun x => ~ p x) (fun x => dec_not _ (K x)) H H0)
     as [j' [J [N L]]].
   exists j'. split; [exact J | split; [exact N | ]].
-  intros x X. apply (not_not _ (K x)), L, X. Qed.
+  intros x X. apply (not_not _ (K x)), L, X.
+Qed.
 
 (**The same theorem as leftmost but with
 negation of P as existential and P as universal properties.*)
@@ -303,11 +353,13 @@ Theorem leftmostNeg : forall (j k : nat) (p : nat -> Prop)
   ~p k -> j <= k ->
   exists j', j <= j' <= k /\ ~p j' /\
   forall x : nat, j <= x < j' -> p x.
+Proof.
   intros j k p K H H0.
   destruct (leftmost j k (fun x => ~ p x) (fun x => dec_not _ (K x)) H H0)
     as [j' [J [N L]]].
   exists j'. split; [exact J | split; [exact N | ]].
-  intros x X. apply (not_not _ (K x)), L, X. Qed.
+  intros x X. apply (not_not _ (K x)), L, X.
+Qed.
 
 (**If p is true at j and j <= k, then there is some rightmost
 j' such that p is true from j to j' and either ~p is true at j'+1 or j' = k.*)
@@ -317,6 +369,7 @@ Theorem rightmostCont : forall (j k : nat) (p : nat -> Prop)
   exists j' , j <= j' <= k /\ 
   forall m : nat, j <= m <= j' -> p m /\
   (~p (S j') \/ j' = k).
+Proof.
   intros j k p K H H0. induction H0 as [ | k L [j' [J F]]].
   - exists j. split; [lia | ]. intros m M.
     replace m with j by lia. split; [exact H | right; reflexivity].
@@ -327,38 +380,48 @@ Theorem rightmostCont : forall (j k : nat) (p : nat -> Prop)
       * exists k. split; [lia | ]. intros m M. split; [apply (F m M) | left; exact P].
     + exists j'. split; [lia | ]. intros m M. destruct (F m M) as [Pm [N | Q]].
       * split; [exact Pm | left; exact N].
-      * contradiction. Qed.
+      * contradiction.
+Qed.
 
 Open Scope R_scope.
 
 (**If u = 0 as a real, then u = zeroTime.*)
 Lemma timeZero : forall (u : Time),
-  (nonneg (time u)) = 0 -> u = zeroTime. intros.
+  (nonneg (time u)) = 0 -> u = zeroTime.
+Proof.
+  intros.
   unfold zeroTime. destruct u. f_equal. destruct time0.
   unfold zeroNonneg. simpl in H. generalize dependent cond_nonneg.
-  rewrite H. intros. f_equal. apply proof_irrelevance. Qed.
+  rewrite H. intros. f_equal. apply proof_irrelevance.
+Qed.
 
 (*****Incl stuff******)
 
 Lemma diff_emp {A : Type} (l : list A)
   (p : forall x y : A, {x = y} + {x <> y}) : set_diff p l [] = [] -> l = [].
+Proof.
   intros. destruct l. reflexivity. inversion H. apply set_add_not_empty in H1.
-  inversion H1. Qed.
+  inversion H1.
+Qed.
 
 Lemma incl_diff_equiv {A : Type} (l1 l2 : list A)
   (p : forall x y : A, {x = y} + {x <> y}) : incl l1 l2 <-> set_diff p l1 l2 = [].
+Proof.
   split.
   - intro I. destruct (set_diff p l1 l2) as [ | a l] eqn:E; [reflexivity | ].
     assert (D : In a (set_diff p l1 l2)) by (rewrite E; left; reflexivity).
     apply set_diff_iff in D. destruct D as [D1 D2]. contradiction (D2 (I a D1)).
   - intros E a A1. destruct (in_dec p a l2) as [A2 | A2]; [exact A2 | ].
     assert (D : In a (set_diff p l1 l2)) by (apply set_diff_iff; split; assumption).
-    rewrite E in D. contradiction. Qed.
+    rewrite E in D. contradiction.
+Qed.
 
 Lemma inter_incl {A : Type} (x y z : set A)
   (p : forall a b : A, {a = b} + {a <> b}) :
   incl x y -> incl (set_inter p x z) (set_inter p y z).
-  intros I a. rewrite !set_inter_iff. intros [X Z]. split; [apply I | ]; assumption. Qed.
+Proof.
+  intros I a. rewrite !set_inter_iff. intros [X Z]. split; [apply I | ]; assumption.
+Qed.
 
 (*****END : Incl stuff******)
 
@@ -368,27 +431,35 @@ Lemma inter_incl {A : Type} (x y z : set A)
 Lemma set_inter_nil_cons {X : Type}
   {p : forall x y : X, {x = y} + {x <> y}} (l1 l2 : list X) (x : X) :
   set_inter p (x :: l1) l2 = [] -> set_inter p l1 l2 = [].
+Proof.
   intros. remember (set_inter p l1 l2). destruct s. reflexivity.
   assert (x0 _: set_inter p l1 l2). rewrite <- Heqs. constructor.
   reflexivity. apply set_inter_elim in H0. invertClear H0.
   assert (x0 _: (x :: l1)). unfold In. right. apply H1.
   assert (x0 _: []). rewrite <- H. apply set_inter_intro.
-  apply H0. assumption. inversion H3. Qed.
+  apply H0. assumption. inversion H3.
+Qed.
 
 Lemma set_inter_nil_in1 {X : Type}
   {p : forall x y : X, {x = y} + {x <> y}} (l1 l2 : list X) (x : X) :
-  set_inter p l1 l2 = [] -> x _: l1 -> ~x _: l2. intros.
+  set_inter p l1 l2 = [] -> x _: l1 -> ~x _: l2.
+Proof.
+  intros.
   generalize dependent l2. induction l1; unfold not; intros.
   inversion H0. inversion H0. assert (a _: []). rewrite <- H.
   apply set_inter_intro. rewrite <- H2 in H0. assumption.
   rewrite H2. assumption. inversion H3.
   eapply IHl1. apply H2. eapply set_inter_nil_cons. apply H.
-  assumption. Qed.  
+  assumption.
+Qed.  
 
 Lemma set_inter_nil_in2 {X : Type}
   {p : forall x y : X, {x = y} + {x <> y}} (l1 l2 : list X) (x : X) :
-  set_inter p l1 l2 = [] -> x _: l2 -> ~x _: l1. unfold not. intros.
-  generalize H0. eapply set_inter_nil_in1. apply H. assumption. Qed.
+  set_inter p l1 l2 = [] -> x _: l2 -> ~x _: l1.
+Proof.
+  unfold not. intros.
+  generalize H0. eapply set_inter_nil_in1. apply H. assumption.
+Qed.
 
 (*****END : Set stuff******)
 

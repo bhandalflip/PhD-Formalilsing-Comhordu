@@ -40,6 +40,7 @@ Theorem sent_outgoing (n : Network) (v : list BaseValue) (t : Time) (i : nat)
   (p : reachableProtNet n) :
   sent v t i n p -> forall q : t < msgLatency,
   outgoing v (minusTime msgLatency t (Rlt_le t msgLatency q)) i n.
+Proof.
   (**Proof: Induction on sent.*)
   intros. induction H.
   (*In the base case we have that h - ioProc<v>? -> h', where h is the interface of the entity
@@ -71,24 +72,29 @@ Theorem sent_outgoing (n : Network) (v : list BaseValue) (t : Time) (i : nat)
   replace (minusTime (nonneg (time msgLatency)) (nonneg (time (delToTime (t +dt+ d))))
   (Rlt_le (nonneg (time (delToTime (t +dt+ d)))) (nonneg (time msgLatency)) q)) with
   (minusTime t' d x). apply H3. clear H1 H3. generalize dependent x. rewrite Heqt'.
-  intros. apply timeEqR. simpl. ring. Qed.
+  intros. apply timeEqR. simpl. ring.
+Qed.
 
 (*If an entity is nextSince m t, then <m, l0> was sent exactly t time units ago for some l0.*)
 (* begin helpers for fst_sent *)
 (*ovWait m' t' x y can input on abort.*)
 Local Lemma ovWait_abort_in p m t x y : ovWaitState m t x y p -> discActEnabled p (chanAbort *?).
-  activation_tac. Qed.
+Proof. activation_tac. Qed.
 
 (*No process is both ovReady and ovWait: ovWait can input on abort but ovReady can't.*)
 Local Lemma ovReady_not_ovWait p m t l m' t' x y :
   ovReadyState m t l p -> ovWaitState m' t' x y p -> False.
+Proof.
   intros U V. apply ovWait_abort_in in V. eapply bisim_dae in V;[ | apply U].
-  inversion V. unfold ovReady in H. repeat invert_trans_rich. Qed.
+  inversion V. unfold ovReady in H. repeat invert_trans_rich.
+Qed.
 
 Local Lemma ovReady_not_ovWait_prot q m t l m' t' x y :
   ovReadyStateProt m t l q -> ovWaitStateProt m' t' x y q -> False.
+Proof.
   intros U V. inversion U; subst. inversion V; subst.
-  eapply ovReady_not_ovWait; eassumption. Qed.
+  eapply ovReady_not_ovWait; eassumption.
+Qed.
 (* end helpers *)
 
 Theorem fst_sent (n : Network) (m : Mode) (t : Time) (i : nat)
@@ -118,7 +124,7 @@ Proof.
   then the appropriate constructor of sent.*)
   destruct IHnextSince as [l0 S]. exists l0. constructor. assumption.
   destruct IHnextSince as [l0 S]. exists l0. constructor. assumption.
-  Qed.
+Qed.
 
 (* If an entity has sent a message v mL time units ago, then said message is in the output
 queue of the interface component with timestamp 0 or it has been delivered 0 time units ago.*)
@@ -126,6 +132,7 @@ Theorem sent_out_del (n : Network) (v : list BaseValue) (i : nat)
   (p : reachableProtNet n) : sent v msgLatency i n p ->
   outgoing v zeroTime i n \/
   exists r l, delivered ([-v, l, r-]) zeroTime i n p.
+Proof.
   (**Proof: By induction on sent.*)
   introz U. remember msgLatency as mL. induction U.
   (*The base case fails because it gives the contradiction mL = 0, while mL
@@ -164,7 +171,8 @@ Theorem sent_out_del (n : Network) (v : list BaseValue) (i : nat)
   lets OGD : outgoing_del w OD. invertClear OGD.
   (*And we get a term equivalent to outgoing v 0 i n, as required.*)  
   my_applys_eq H0. apply timeEqR. simpl. destruct d; destruct delay.
-  simpl. ring. Qed.
+  simpl. ring.
+Qed.
 
 (* If an entity has sent a message v t time units ago, and that time is greater than the
 message latency, then said message was delivered to some radius, and the delivery time
@@ -173,6 +181,7 @@ Theorem sent_delivered (n : Network) (v : list BaseValue) (t : Time) (i : nat)
   (p : reachableProtNet n) : sent v t i n p -> forall q : msgLatency < t,
   exists r l,
   delivered ([-v, l, r-]) (minusTime t msgLatency (Rlt_le msgLatency t q)) i n p.
+Proof.
   (**Proof: Induction on sent. Well the base case can be immediately discarded due to the
   contradiction of t = 0 and mL < t, given that mL is positive.*)
   intros. induction H. contradict q. apply Rle_not_lt. simpl. timeNonneg.
@@ -228,7 +237,7 @@ Theorem sent_delivered (n : Network) (v : list BaseValue) (t : Time) (i : nat)
   message delivery as per the operational semantics of the network calculus, in which an
   arbitrary radius may be chosen for message delivery in order to model arbitrary variations
   in coverage.*)
-  Qed.
+Qed.
 
 (* If a message <m, l0> was sent t time units ago by some entity, then the distance
 between l0 and the position of that entity is at most Smax*t.*)
@@ -236,6 +245,7 @@ Theorem sent_pos_bound (n : Network) (m : Mode) (t : Time) (i : nat)
   (l l0 : Position) (p : reachableProtNet n) :
   sent [baseMode m, basePosition l0] t i n p -> inPosNet l i n ->
   dist2d l l0 <= speedMax*t.
+Proof.
   (**Proof: By induction on the proof of sent.*)
   intros. generalize dependent l. induction H; intros.
   rename H3 into QQ. rename H2 into H3. rename H1 into H2. rename H0 into H1.
@@ -283,7 +293,8 @@ Theorem sent_pos_bound (n : Network) (m : Mode) (t : Time) (i : nat)
   is at most Smax*t + Smax*d = Smax*(t + d), which is exactly the goal because the time
   parameter of sent for the current state is (t + d).*)
   addHyp (dist_tri_ineq l l1 l0). eapply Rle_trans. apply H2. simpl. rewrite Rmult_plus_distr_l.
-  rewrite Rplus_comm. simpl in H1, H3. apply Rplus_le_compat; assumption. Qed.
+  rewrite Rplus_comm. simpl in H1, H3. apply Rplus_le_compat; assumption.
+Qed.
 
 (* If an entity is nextSince m for t time units and t is greater than the message latency,
 then for some l0 it has delivered a message <m, l0> to some r at t - mL time units ago,
@@ -295,6 +306,7 @@ Theorem fst_delivered (n : Network) (m : Mode) (t : Time) (i : nat)
   delivered ([-[baseMode m, basePosition l0], l1, r-])
   (minusTime t msgLatency (Rlt_le msgLatency t q)) i n p /\
   dist2d l l0 <= speedMax*t.
+Proof.
   (*Proof: We call on (fst_sent) to achieve sent <m, l0> r t i n p.*)
   introz U. lets FS : fst_sent U. invertClearAs2 FS l0 SEN.
   (*Now we use (sent_pos_bound) to get that |l - l0| <= Smax*t.*)
@@ -304,6 +316,7 @@ Theorem fst_delivered (n : Network) (m : Mode) (t : Time) (i : nat)
   (*Now we fill in the existentials.*)
   exists l0 x0 x.
   (*The rest follows from assumptions.*)
-  split; assumption. Qed.
+  split; assumption.
+Qed.
 
 End NARMsgPosition.

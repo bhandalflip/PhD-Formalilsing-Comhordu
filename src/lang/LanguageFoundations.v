@@ -29,10 +29,13 @@ Inductive ValType : Type :=
 
 (** Equality on value types is decidable.*)
 Definition valTypeEqDec (t t' : ValType) : {t = t'} + {t <> t'}.
-  decide equality. Defined.
+Proof. decide equality. Defined.
 
-Lemma eqDecValType : eqDec ValType. unfold eqDec. intros.
-  destruct (valTypeEqDec x1 x2); [left | right]; assumption. Qed.
+Lemma eqDecValType : eqDec ValType.
+Proof.
+  unfold eqDec. intros.
+  destruct (valTypeEqDec x1 x2); [left | right]; assumption.
+Qed.
 
 (** A countably infinite set of variables of each type, indexed by natural numbers. The
 type of a variable is the type of the values an input may bind it to: the variables of an
@@ -44,12 +47,14 @@ Inductive Var : Type :=
 Definition varType (x : Var) : ValType :=
   match x with var t _ => t end.
 
-Lemma eqDecVar : eqDec Var. unfold eqDec. destruct x1 as [t n], x2 as [t' n'].
+Lemma eqDecVar : eqDec Var.
+Proof.
+  unfold eqDec. destruct x1 as [t n], x2 as [t' n'].
   destruct (valTypeEqDec t t') as [E | NE];
     [subst t' | right; intro H; apply NE; inversion H; reflexivity].
   destruct (eq_nat_dec n n') as [E | NE];
     [subst n'; left; reflexivity | right; intro H; apply NE; inversion H; reflexivity].
-  Qed.
+Qed.
 
 (** A base value is a mode, a time, a position, a distance, a delay or a non-negative real.
 We use coercions to reduce constructor verbosity.*)
@@ -62,7 +67,9 @@ Inductive BaseValue : Type:=
   | baseNonneg :> nonnegreal -> BaseValue.
 
 (** Equality on base values is decidable.*)
-Lemma eqDecBase : eqDec BaseValue. unfold eqDec. unfold decidable.
+Lemma eqDecBase : eqDec BaseValue.
+Proof.
+  unfold eqDec. unfold decidable.
   intros. destruct x1, x2; try solve [right; unfold not; intros; inversion H].
   addHyp (eqDecMode m m0). invertClear H. rewrite H0. left. reflexivity.
   right. unfold not. intros. apply H0. invertClear H. reflexivity.
@@ -75,7 +82,8 @@ Lemma eqDecBase : eqDec BaseValue. unfold eqDec. unfold decidable.
   addHyp (eqDecDelay d d0). invertClear H. rewrite H0. left. reflexivity.
   right. unfold not. intros. apply H0. invertClear H. reflexivity. 
   addHyp (eqDecNonnegReal n n0). invertClear H. rewrite H0. left. reflexivity.
-  right. unfold not. intros. apply H0. invertClear H. reflexivity. Qed.
+  right. unfold not. intros. apply H0. invertClear H. reflexivity.
+Qed.
 
 (** The type of a base value.*)
 Definition valTypeOf (b : BaseValue) : ValType :=
@@ -90,16 +98,16 @@ Definition valTypeOf (b : BaseValue) : ValType :=
 
 (** A value of type mode is a mode, and likewise for the other types.*)
 Lemma valTypeOf_mode b : valTypeOf b = vtMode -> exists m, b = baseMode m.
-  destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
+Proof. destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
 
 Lemma valTypeOf_time b : valTypeOf b = vtTime -> exists t, b = baseTime t.
-  destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
+Proof. destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
 
 Lemma valTypeOf_position b : valTypeOf b = vtPosition -> exists l, b = basePosition l.
-  destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
+Proof. destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
 
 Lemma valTypeOf_distance b : valTypeOf b = vtDistance -> exists r, b = baseDistance r.
-  destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
+Proof. destruct b; simpl; intro H; inversion H. eexists. reflexivity. Qed.
 
 (** The values vs are typed for the variables xs: there is one value per variable, and each
 value has its variable's type. An input binds its variables only to such values, so a
@@ -109,28 +117,30 @@ Definition typedVals (xs : list Var) (vs : list BaseValue) : Prop :=
 
 (** Typed values are exactly the value lists whose types are the variables' types.*)
 Lemma typedVals_map xs vs : typedVals xs vs <-> map valTypeOf vs = map varType xs.
+Proof.
   unfold typedVals. split.
   - intro H. induction H; simpl; [reflexivity | f_equal; assumption].
   - revert vs. induction xs as [ | x xs IH]; intros vs E; destruct vs as [ | v vs];
     simpl in E; try discriminate; constructor; inversion E; auto.
-  Qed.
+Qed.
 
 Lemma typedVals_length xs vs : typedVals xs vs -> length vs = length xs.
-  intro H. apply Forall2_length in H. symmetry. assumption. Qed.
+Proof. intro H. apply Forall2_length in H. symmetry. assumption. Qed.
 
 Lemma typedVals_dec xs vs : {typedVals xs vs} + {~typedVals xs vs}.
+Proof.
   destruct (list_eq_dec valTypeEqDec (map valTypeOf vs) (map varType xs)) as [E | NE].
   - left. apply typedVals_map. assumption.
   - right. intro H. apply NE. apply typedVals_map. assumption.
-  Qed.
+Qed.
 
 (** Inversion of typed values on the shape of the variable list.*)
 Lemma typedVals_nil_inv vs : typedVals [] vs -> vs = [].
-  intro H. inversion H. reflexivity. Qed.
+Proof. intro H. inversion H. reflexivity. Qed.
 
 Lemma typedVals_cons_inv x xs vs : typedVals (x :: xs) vs ->
   exists v vs', vs = v :: vs' /\ valTypeOf v = varType x /\ typedVals xs vs'.
-  intro H. inversion H; subst. eauto. Qed.
+Proof. intro H. inversion H; subst. eauto. Qed.
 
 
 (** A simple expression language over the base types.*)
@@ -146,7 +156,9 @@ Inductive Exp : Type :=
   | eFailSafeSucc : Exp -> Exp.
 
 (** Equality is decidable on expressions.*)
-Lemma eqDecExp : eqDec Exp. unfold eqDec. induction x1;
+Lemma eqDecExp : eqDec Exp.
+Proof.
+  unfold eqDec. induction x1;
   induction x2; try solve [right; unfold not; intros; inversion H];
   try solve [addHyp (IHx1_1 x2_1); invertClear H; [rewrite H0;
   addHyp (IHx1_2 x2_2); invertClear H; [rewrite H1;
@@ -158,7 +170,8 @@ Lemma eqDecExp : eqDec Exp. unfold eqDec. induction x1;
   addHyp (eqDecVar v v0). invertClear H. left. rewrite H0. reflexivity.
   right. unfold not. intros. apply H0. inversion H. reflexivity.
   addHyp (eqDecBase b b0). invertClear H. left. rewrite H0. reflexivity.
-  right. unfold not. intros. apply H0. inversion H. reflexivity. Qed.
+  right. unfold not. intros. apply H0. inversion H. reflexivity.
+Qed.
 
 
 
@@ -172,9 +185,12 @@ Inductive Channel : Type :=
   | chanAbort.
 
 (** Equality on channels is decidable.*)
-Lemma eqDecChannel : eqDec Channel. unfold eqDec.
+Lemma eqDecChannel : eqDec Channel.
+Proof.
+  unfold eqDec.
   destruct x1, x2; try solve [right; unfold not; intros; inversion H];
-  left; reflexivity. Qed.
+  left; reflexivity.
+Qed.
 
 (** The direction in which a channel is used: an input reads it and an output writes it.*)
 Inductive Direction : Type := read | write.
@@ -217,24 +233,29 @@ Fixpoint subExp (s : Subst) (e : Exp) : Exp :=
 (**If one number is less than another, then they are not equal.*)
 Lemma lt_neq_nat : forall n m : nat,
   n < m -> n <> m.
+Proof.
   induction n. destruct m. intros. inversion H.
   intros. unfold not. intros. inversion H0.
   intros. apply Nat.lt_succ_lt_pred in H. destruct m. inversion H.
   simpl in H. apply IHn in H. unfold not. intros. apply H.
-  inversion H0. reflexivity. Qed.
+  inversion H0. reflexivity.
+Qed.
 
 (**Given any two numbers, they are either equal or not.*)
 Lemma natDec : forall n m : nat,
-  {n = m} + {n <> m}. intros.
+  {n = m} + {n <> m}.
+Proof.
+  intros.
   assert ({n < m} + {n = m} + {m < n}).
   apply lt_eq_lt_dec. inversion H.
   inversion H0. apply lt_neq_nat in H1. right. apply H1.
   left. apply H1. right. apply lt_neq_nat in H0. unfold not.
-  intros. apply H0. symmetry. assumption. Qed.
+  intros. apply H0. symmetry. assumption.
+Qed.
 
 (**Given any two variables, they are either equal or not.*)
 Lemma varEqDec : forall x y : Var, {x = y} + {x <> y}.
-  decide equality; first [apply natDec | apply valTypeEqDec]. Qed.
+Proof. decide equality; first [apply natDec | apply valTypeEqDec]. Qed.
 
 (**True if the arguments are equal, false otherwise.*)
 Definition varEq (v1 v2 : Var) : bool :=
@@ -290,9 +311,12 @@ Inductive evalBaseNonneg : BaseValue -> nonnegreal -> Prop :=
 Notation "b \_/ r" := (evalBaseNonneg b r) (at level 45).
 
 Lemma evalBaseNonneg_unique b r1 r2 :
-  b \_/ r1 -> b \_/ r2 -> r1 = r2. intros.
+  b \_/ r1 -> b \_/ r2 -> r1 = r2.
+Proof.
+  intros.
   inversion H; inversion H0; inversion H3; subst;
-  inversion H5; reflexivity. Qed.
+  inversion H5; reflexivity.
+Qed.
 
 Definition evalBaseNonnegFun (b : BaseValue) : option nonnegreal :=
   match b with
@@ -305,13 +329,15 @@ Definition evalBaseNonnegFun (b : BaseValue) : option nonnegreal :=
 
 Lemma evalBaseNonneg_rel_fun b r :
   b \_/ r -> evalBaseNonnegFun b = Some r.
-  intros. inversion H; simpl; reflexivity. Qed.
+Proof. intros. inversion H; simpl; reflexivity. Qed.
 
 Lemma evalBaseNonneg_fun_rel b r :
   evalBaseNonnegFun b = Some r -> b \_/ r.
+Proof.
   intros. destruct b; inversion H; simpl;
   match goal with |- ?f ?x \_/ _ =>
-  destruct x end; inversion H1; constructor. Qed.
+  destruct x end; inversion H1; constructor.
+Qed.
 
 (**Evaluation on terms of Exp. Note that only closed terms will actually evaluate to
 something. If we can prove evalExp e b then e evaluates to b.*)
@@ -441,19 +467,24 @@ Ltac evalBaseNonneg_fun_rel_tac := repeat evalBaseNonneg_fun_rel_step.
 (** If e evaluates to b via the evaluation relation then it does so also by the evalution
 function.*)
 Theorem evalExpRelFun : forall (e : Exp) (b : BaseValue),
-  evalExp e b -> evalExpFun e = Some b. intros.
+  evalExp e b -> evalExpFun e = Some b.
+Proof.
+  intros.
   induction H; simpl; try rewrite IHevalExp;
   try rewrite IHevalExp1; try rewrite IHevalExp2;
   unfold option_map; try rewrite H1; simpl; try reflexivity; try
   (evalBaseNonneg_rel_fun_tac; rewrite H1; rewrite H2; reflexivity).
   unfold modeTransRelOpt. destruct (modeTransRelDec m1 m2).
   simpl. repeat f_equal. apply proof_irrelevance.
-  false. Qed.
+  false.
+Qed.
 
 (** If e evaluates to b via the evaluation function then it does so
 also by the evalution relation.*)
 Theorem evalExpFunRel : forall (e : Exp) (b : BaseValue),
-  evalExpFun e = Some b -> evalExp e b. intros. generalize dependent b.
+  evalExpFun e = Some b -> evalExp e b.
+Proof.
+  intros. generalize dependent b.
   induction e; intros. inversion H. inversion H. constructor. 
   (** Subtract case.*)
   inversion H.
@@ -502,7 +533,7 @@ Theorem evalExpFunRel : forall (e : Exp) (b : BaseValue),
   inversion H. remember (evalExpFun e) as ev. destruct ev.
   addHyp (IHe b0 (eq_refl (Some b0))). clear IHe.
   destruct b0; inversion H1. constructor. assumption. inversion H1.
-  Qed.
+Qed.
 
 (** A function that tries to evaluate the expression e into a time or fails.*)
 Definition evalExpFunTime (e : Exp) : option Time :=
@@ -521,7 +552,9 @@ Proof.
 Qed.
 
 Lemma evalExpFunTime_period (m : Mode) : evalExpFunTime (ePeriod m) = Some (period m).
-Proof. unfold evalExpFunTime. simpl. destruct (period m) as [r]. reflexivity. Qed.
+Proof.
+  unfold evalExpFunTime. simpl. destruct (period m) as [r]. reflexivity.
+Qed.
 
 (** Subtracting the period of a mode from a time expression gives the truncated difference.*)
 Lemma evalExpFunTime_subtract_period (m : Mode) (e : Exp) (t : Time) :
@@ -552,7 +585,9 @@ Inductive BoolExp : Type :=
   | bPossInc : Exp -> Exp -> Exp -> BoolExp.
 
 (** Equality is decidable on boolean expressions.*)
-Lemma eqDecBoolExp : eqDec BoolExp. unfold eqDec.
+Lemma eqDecBoolExp : eqDec BoolExp.
+Proof.
+  unfold eqDec.
   induction x1; induction x2; try solve [addHyp (eqDecExp e e1);
   addHyp (eqDecExp e0 e2); invertClear H; [invertClear H0; [
   rewrite H, H1; left; reflexivity | right; unfold not; intros;
@@ -567,7 +602,8 @@ Lemma eqDecBoolExp : eqDec BoolExp. unfold eqDec.
   left. reflexivity. right. unfold not. intros. apply H0.
   invertClear H1. reflexivity. right. unfold not. intros.
   apply H. invertClear H0. reflexivity. right. unfold not.
-  intros. apply H2. invertClear H. reflexivity. Qed.
+  intros. apply H2. invertClear H. reflexivity.
+Qed.
 
 (**This essentially lifts the substitution function for the expression language up
 to the boolean expression language.*)
@@ -662,9 +698,12 @@ Notation "!~ b" := (bNot b) (at level 25).
 (** The evaluation relation on expressions is a partial function i.e.
 every expression evaluates to at most one value.*)
 Theorem evalExpUnique : forall (e : Exp) (b1 b2 : BaseValue),
-  evalExp e b1 -> evalExp e b2 -> b1 = b2. intros.
+  evalExp e b1 -> evalExp e b2 -> b1 = b2.
+Proof.
+  intros.
   apply evalExpRelFun in H. apply evalExpRelFun in H0.
-  rewrite H in H0. inversion H0. reflexivity. Qed.
+  rewrite H in H0. inversion H0. reflexivity.
+Qed.
 
 (**The boolean expression relation is sound with respect to the function.*)
 Theorem evalBoolExpRelFun : forall (e : BoolExp) (b : bool),
@@ -686,7 +725,9 @@ Qed.
 
 (**The boolean expression function is sound with respect to the relation.*)
 Theorem evalBoolExpFunRel : forall (e : BoolExp) (b : bool),
-  evalBoolExpFun e = Some b -> evalBoolExp e b. induction e; intros.
+  evalBoolExpFun e = Some b -> evalBoolExp e b.
+Proof.
+  induction e; intros.
   (** bSufficient case*)
   simpl in H. destruct (evalExpFun e) as [b1 | ] eqn:E1; [ | discriminate].
   destruct b1; try discriminate. destruct (evalExpFun e0) as [b2 | ] eqn:E2; [ | discriminate].
@@ -715,25 +756,31 @@ Theorem evalBoolExpFunRel : forall (e : BoolExp) (b : bool),
   injection H as H. subst b. eapply bevalPossInc; [apply evalExpFunRel; exact E1
     | apply evalExpFunRel; exact E2 | apply evalExpFunRel; exact E3
     | apply evalBaseNonneg_fun_rel; exact E4].
-  Qed.
+Qed.
   
 
 
 (** The evaluation relation on boolean expressions is a partial function i.e.
 every expression evaluates to at most one boolean.*)
 Theorem evalBoolExpUnique : forall (e : BoolExp) (b1 b2 : bool),
-  evalBoolExp e b1 -> evalBoolExp e b2 -> b1 = b2. intros.
+  evalBoolExp e b1 -> evalBoolExp e b2 -> b1 = b2.
+Proof.
+  intros.
   apply evalBoolExpRelFun in H. apply evalBoolExpRelFun in H0.
-  rewrite H in H0. inversion H0. reflexivity. Qed.
+  rewrite H in H0. inversion H0. reflexivity.
+Qed.
 
 (** If the evaluation of the bool exp function is true, then the total function will
 evaluate to true, and vice versa.*)
 Theorem evalBoolExpTrueTot : forall (e : BoolExp),
-  evalBoolExp e true <-> evalBoolExpFunTot e = true. intros.
+  evalBoolExp e true <-> evalBoolExpFunTot e = true.
+Proof.
+  intros.
   split; intros. apply evalBoolExpRelFun in H. unfold evalBoolExpFunTot.
   rewrite H. reflexivity. unfold evalBoolExpFunTot in H.
   remember (evalBoolExpFun e) as b. destruct b. apply evalBoolExpFunRel.
-  rewrite H in Heqb. symmetry. assumption. inversion H. Qed.
+  rewrite H in Heqb. symmetry. assumption. inversion H.
+Qed.
 
 (**A discrete action is either an input of values on a channel, an output of
 values on a channel or a silent (tau) action.*)
@@ -756,14 +803,18 @@ Definition complement (a : DiscAct) : DiscAct :=
 Notation "a ^" := (complement a) (at level 25).
 
 (** The complement function cancels itself out.*)
-Lemma complementInvol (a : DiscAct) : a^^ = a. destruct a; reflexivity. Qed.
+Lemma complementInvol (a : DiscAct) : a^^ = a.
+Proof. destruct a; reflexivity. Qed.
 
 Lemma complementNotTau (a : DiscAct) : a <> tauAct -> a^ <> tauAct.
-  unfold not. intros. apply H. destruct a; inversion H0; reflexivity. Qed.
+Proof. unfold not. intros. apply H. destruct a; inversion H0; reflexivity. Qed.
 
 Lemma evalExpRelFunEquiv (e : Exp) (b : BaseValue) :
-  evalExp e b <-> evalExpFun e = Some b. split;
-  [apply evalExpRelFun | apply evalExpFunRel]. Qed.
+  evalExp e b <-> evalExpFun e = Some b.
+Proof.
+  split;
+  [apply evalExpRelFun | apply evalExpFunRel].
+Qed.
 
 Ltac evalExp_rel_fun_step := match goal with
   [V : _ |_| _ |- _] => apply evalExpRelFun in V end.
@@ -779,6 +830,7 @@ Ltac evalExp_fun_rel_tac := repeat evalExp_fun_rel_step.
 
 Lemma evalExp_evalExpFunTime (e : Exp) (t : Time) :
   evalExp e t -> evalExpFunTime e = Some t.
+Proof.
   intros. destruct e; inversion H.
   unfold evalExpFunTime; simpl. destruct t. reflexivity.
   (*Wait time case.*)
@@ -791,41 +843,51 @@ Lemma evalExp_evalExpFunTime (e : Exp) (t : Time) :
   (*Period case.*)
   evalExp_rel_fun_tac.
   unfold evalExpFunTime. rewrite H. destruct t. simpl.
-  repeat f_equal. symmetry. assumption. Qed.
+  repeat f_equal. symmetry. assumption.
+Qed.
 
 (** A list of expressions evaluates to at most one list of values.*)
 Lemma evalExpListsUnique (l : list Exp) (l1 l2 : list BaseValue) :
   evalExpLists l l1 -> evalExpLists l l2 -> l1 = l2.
+Proof.
   intro H. revert l2. induction H; intros l3 H3; inversion H3; subst.
   reflexivity. f_equal. eapply evalExpUnique; eassumption.
-  apply IHevalExpLists. assumption. Qed.
+  apply IHevalExpLists. assumption.
+Qed.
 
 (** If one list evaluated to another, then the lengths
 match.*)
 Lemma evalExpListsLength (l : list Exp) : forall (l' : list BaseValue),
-  evalExpLists l l' -> length l = length l'. induction l; intros.
+  evalExpLists l l' -> length l = length l'.
+Proof.
+  induction l; intros.
   inversion H. reflexivity. inversion H. simpl. f_equal.
-  apply IHl. assumption. Qed.
+  apply IHl. assumption.
+Qed.
 
 (** Evaluation on expressions is decidable.*)
 Lemma evalExpDec (e : Exp) (b : BaseValue) : decidable (evalExp e b).
+Proof.
   remember (evalExpFun e). destruct o. addHyp (eqDecBase b b0).
   invertClear H. left. apply evalExpFunRel. rewrite H0. symmetry.
   assumption. right. unfold not. intros. apply evalExpRelFun in H.
   rewrite H in Heqo. apply H0. inversion Heqo. reflexivity.
   right. unfold not. intro. apply evalExpRelFun in H. rewrite H in Heqo.
-  inversion Heqo. Qed.
+  inversion Heqo.
+Qed.
 
 (** Evaluation on lists of expressions is decidable.*)
 Lemma evalExpListsDec (l : list Exp) (l' : list BaseValue) :
-  decidable (evalExpLists l l'). generalize dependent l'.
+  decidable (evalExpLists l l').
+Proof.
+  generalize dependent l'.
   induction l; intros; destruct l';
   try solve [right; unfold not; intro; inversion H].
   left. constructor. addHyp (evalExpDec a b). invertClear H.
   addHyp (IHl l'). invertClear H. left. constructor; assumption.
   right. unfold not. intro. invertClear H. apply H1. assumption.
   right. unfold not. intro. invertClear H. apply H0. assumption.
-  Qed.
+Qed.
 
 (** A functional version of eval exp for lists.*)
 Fixpoint evalExpListsFun (l : list Exp) : option (list BaseValue) :=
@@ -837,46 +899,58 @@ Fixpoint evalExpListsFun (l : list Exp) : option (list BaseValue) :=
 (** The evaluation function on lists implies the relation.*)
 Theorem evalExpListsFunRel (l : list Exp) : forall (l' : list BaseValue),
   evalExpListsFun l = Some l' -> evalExpLists l l'.
+Proof.
   induction l; intros; inversion H. constructor.
   remember (evalExpFun a). destruct o.
   remember (evalExpListsFun l). destruct o.
   unfold optionMap2 in H1. simpl in H1. inversion H1.
   constructor. apply evalExpFunRel. symmetry. assumption.
   apply IHl. reflexivity. unfold optionMap2 in H1. inversion H1.
-  unfold optionMap2 in H1. inversion H1. Qed.
+  unfold optionMap2 in H1. inversion H1.
+Qed.
   
 (** The evaluation relation on lists implies the function.*)
 Theorem evalExpListsRelFun (l : list Exp) : forall (l' : list BaseValue),
-  evalExpLists l l' -> evalExpListsFun l = Some l'. induction l; intros.
+  evalExpLists l l' -> evalExpListsFun l = Some l'.
+Proof.
+  induction l; intros.
   inversion H. reflexivity. inversion H. simpl. unfold optionMap2.
   unfold option_map. remember (evalExpFun a). destruct o.
   apply IHl in H4. rewrite H4. repeat f_equal. eapply evalExpUnique.
   eapply evalExpFunRel. symmetry. apply Heqo. assumption.
   symmetry in Heqo. apply evalExpRelFun in H2. rewrite H2 in Heqo.
-  inversion Heqo. Qed.
+  inversion Heqo.
+Qed.
 
 (** l either evaluates to something or not.*)
 Lemma evalExpListsExDec (l : list Exp) :
   {l' : list BaseValue | (evalExpLists l l')} +
   {~exists l', (evalExpLists l l')}.
+Proof.
   remember (evalExpListsFun l). destruct o; [left | right].
   symmetry in Heqo. apply evalExpListsFunRel in Heqo. exists l0.
   assumption. unfold not. intros. invertClear H.
   apply evalExpListsRelFun in H0. rewrite H0 in Heqo. inversion Heqo.
-  Qed.
+Qed.
 
 (** If f updated by x onto y is applied to x, then the result is y.*)
 Lemma updateAppEq : forall (X : Type) (f : Var -> X) (x : Var) (y : X),
-  update f x y x = y. intros. unfold update. unfold varEq.
+  update f x y x = y.
+Proof.
+  intros. unfold update. unfold varEq.
   remember (varEqDec x x) as e. destruct e. reflexivity.
-  apply False_ind. apply n. reflexivity. Qed.
+  apply False_ind. apply n. reflexivity.
+Qed.
 
 (** If f updated by x to y is applied to z and z is not equal to x, then the
 result is (f z).*)
 Lemma updateAppNeq : forall (X : Type) (f : Var -> X) (x z : Var) (y : X),
-  x <> z -> update f x y z = f z. intros. unfold update. unfold varEq.
+  x <> z -> update f x y z = f z.
+Proof.
+  intros. unfold update. unfold varEq.
   remember (varEqDec x z) as e. destruct e. apply False_ind. apply H.
-  assumption. reflexivity. Qed.
+  assumption. reflexivity.
+Qed.
 
 (** Lift a variable to a list of variables.*)
 Coercion liftVarList (v : Var) : list Var := [v].
@@ -895,12 +969,15 @@ Definition liftListVarExp (l : list Var) : list Exp :=
 
 (** The substitution of l -> liftListVarExp l is equal to the identity substitution.*)
 Lemma listSubRefl : forall (l : list Var),
-  listsToSub l (liftListVarExp l) = idSubst. induction l;
+  listsToSub l (liftListVarExp l) = idSubst.
+Proof.
+  induction l;
   apply functional_extensionality; intros. reflexivity.
   addHyp (eqDecVar a x). invertClear H. rewrite H0.
   simpl. rewrite updateAppEq. reflexivity. simpl.
   rewrite updateAppNeq. rewrite IHl. reflexivity.
-  assumption. Qed.
+  assumption.
+Qed.
   
 
 (**Every list substitution has a "normal" form. That is, if we have a substitution
@@ -908,7 +985,9 @@ x -> l, then there is some l' which is the same length as x such that the substi
 x -> l' is equal to x -> l (according to functional extensionality).*)
 Theorem listSubNormal : forall (x : list Var) (l : list Exp),
   {l' : list Exp | length l' = length x /\
-  listsToSub x l = listsToSub x l'}. induction x; intros.
+  listsToSub x l = listsToSub x l'}.
+Proof.
+  induction x; intros.
   exists (@nil Exp). destruct l; split; reflexivity. destruct l.
   (** In the case where target list is empty, the equivalent substitution is just
    the source list.*)
@@ -917,31 +996,42 @@ Theorem listSubNormal : forall (x : list Var) (l : list Exp),
   (** In the case where the target list is not empty, we can proceed by induction.*)
   addHyp (IHx l). clear IHx. invertClear X. invertClear H. rename x0 into l'.
   exists (e :: l'). split. simpl. f_equal. assumption. simpl.
-  rewrite H1. reflexivity. Qed.
+  rewrite H1. reflexivity.
+Qed.
 
 Lemma idSubExp : forall (e : Exp),
-  subExp idSubst e = e. intros. induction e;
+  subExp idSubst e = e.
+Proof.
+  intros. induction e;
   simpl; try rewrite IHe1; try rewrite IHe2; try reflexivity.
-  rewrite IHe. reflexivity. rewrite IHe. reflexivity. Qed.
+  rewrite IHe. reflexivity. rewrite IHe. reflexivity.
+Qed.
 
 (**The identity substitution leaves lists unchanged.*)
 Lemma idSubList : forall (l : list Exp),
-  listSub idSubst l = l. intros. induction l. reflexivity.
-  simpl. rewrite IHl. rewrite (idSubExp a). reflexivity. Qed.
+  listSub idSubst l = l.
+Proof.
+  intros. induction l. reflexivity.
+  simpl. rewrite IHl. rewrite (idSubExp a). reflexivity.
+Qed.
 
 Lemma idSubBoolExp : forall (b : BoolExp),
-  subBoolExp idSubst b = b. induction b.
+  subBoolExp idSubst b = b.
+Proof.
+  induction b.
   simpl. rewrite (idSubExp e0). rewrite (idSubExp e).
   reflexivity. simpl. rewrite IHb. reflexivity.
   simpl. rewrite (idSubExp e0). rewrite (idSubExp e).
   reflexivity. simpl. rewrite (idSubExp e0).
   rewrite (idSubExp e1). rewrite (idSubExp e). reflexivity.
-  Qed. 
+Qed. 
 
 Lemma resetPreservesId : forall (l : list Var),
-  resetSub idSubst l = idSubst. intros. extensionality x.
+  resetSub idSubst l = idSubst.
+Proof.
+  intros. extensionality x.
   unfold resetSub. unfold idSubst. destruct (inVarList x); reflexivity.
-  Qed.
+Qed.
 
 Notation "( a , b )" := (pair a b).
 
@@ -1004,16 +1094,21 @@ Fixpoint bindApp (l : list (Var * Exp)) (x : Var) : Exp :=
 
 Lemma bindListToSubCons (x : Var) (e : Exp) (l : list (Var * Exp)) :
   bindListToSub ((x, e) :: l) = update (bindListToSub l) x e.
+Proof.
   unfold bindListToSub. unfold splitSrc. unfold splitTgt. simpl.
-  destruct (split l). simpl. reflexivity. Qed.
+  destruct (split l). simpl. reflexivity.
+Qed.
 
 (** Proof that the bindApp function is correct w.r.t. the substitution conversion.*)
 Theorem bindApp_subst (l : list (Var * Exp)) (x : Var) :
-  bindApp l x = (bindListToSub l) x. induction l. unfold bindListToSub.
+  bindApp l x = (bindListToSub l) x.
+Proof.
+  induction l. unfold bindListToSub.
   simpl. reflexivity. destruct a. rewrite bindListToSubCons. simpl.
   remember (eqDecVar x v). destruct s. rewrite e0. rewrite updateAppEq.
   reflexivity. rewrite updateAppNeq. assumption. unfold not. intro. apply n.
-  symmetry. assumption. Qed.
+  symmetry. assumption.
+Qed.
 
 
 
@@ -1025,27 +1120,39 @@ Inductive firstOcc (x : Var) (e : Exp) : list (Var * Exp) -> Prop :=
     firstOcc x e l -> x <> y -> firstOcc x e ((y, e') :: l).
 
 Lemma firstOcc_unique (x : Var) (e e' : Exp) (l : list (Var * Exp)) :
-  firstOcc x e l -> firstOcc x e' l -> e = e'. intros.
+  firstOcc x e l -> firstOcc x e' l -> e = e'.
+Proof.
+  intros.
   induction H; inversion H0. reflexivity. apply False_ind.
   apply H4. reflexivity. apply False_ind. apply H1. assumption.
-  apply IHfirstOcc. assumption. Qed.
+  apply IHfirstOcc. assumption.
+Qed.
 
 Lemma splitSrcCons (x : list (Var*Exp)) (a : Var) (e : Exp):
-  splitSrc ((a, e) :: x) = a :: (splitSrc x). unfold splitSrc.
-  simpl. destruct (split x). simpl. reflexivity. Qed.
+  splitSrc ((a, e) :: x) = a :: (splitSrc x).
+Proof.
+  unfold splitSrc.
+  simpl. destruct (split x). simpl. reflexivity.
+Qed.
 
 Lemma firstOcc_splitSrc (x : Var) (e : Exp) (l : list (Var * Exp)) :
-  firstOcc x e l -> x _: splitSrc l. intros. induction H.
+  firstOcc x e l -> x _: splitSrc l.
+Proof.
+  intros. induction H.
   rewrite splitSrcCons. left. reflexivity. rewrite splitSrcCons.
-  right. assumption. Qed.
+  right. assumption.
+Qed.
 
 Lemma splitSrc_firstOcc_ex (x : Var) (l : list (Var * Exp)) :
-  x _: splitSrc l -> exists e, firstOcc x e l. induction l; intros.
+  x _: splitSrc l -> exists e, firstOcc x e l.
+Proof.
+  induction l; intros.
   inversion H. destruct a. rewrite splitSrcCons in H.
   addHyp (eqDecVar x v). invertClear H0. exists e. rewrite H1.
   constructor. elim H; intro. apply False_ind. apply H1. symmetry.
   assumption. addHyp (IHl H0). invertClear H2.
-  exists x0. constructor;assumption. Qed.
+  exists x0. constructor;assumption.
+Qed.
 
 (** A preorder on binding lists that puts one list before the other if the latter
 agrees with the former on all variables in the source of the former.*)
@@ -1055,32 +1162,41 @@ Notation "l1 <[] l2" := (preordBindList l1 l2) (at level 70).
 
 (**The empty list is the bottom element of the lattice.*)
 Lemma preord_emp (l : list (Var * Exp)) :
-  [] <[] l. unfold preordBindList. intros.
-  inversion H. Qed.
+  [] <[] l.
+Proof.
+  unfold preordBindList. intros.
+  inversion H.
+Qed.
 
 (** The preorder that has been defined is reflexive.*)
 Lemma preordBindList_refl (l : list (Var * Exp)) : l <[] l.
-  induction l; unfold preordBindList; intros; assumption. Qed.
+Proof. induction l; unfold preordBindList; intros; assumption. Qed.
 
 (*TOGO: COMH BASICS*)
 Lemma incl_hd_eq {A : Type} (l1 l2 : list A) (x : A) :
-  incl l1 l2 -> incl (x :: l1) (x :: l2). unfold incl. intros.
+  incl l1 l2 -> incl (x :: l1) (x :: l2).
+Proof.
+  unfold incl. intros.
   inversion H0. rewrite H1. constructor. reflexivity.
-  apply in_cons. apply H. apply H1. Qed.
+  apply in_cons. apply H. apply H1.
+Qed.
 
 (** If one binding list is less than another according to the preorder,
 then the source of the former is contained in the source of the latter
 according to incl.*)
 Lemma pre_incl_splitSrc (l1 l2 : list (Var * Exp)) :
-  l1 <[] l2 -> incl (splitSrc l1) (splitSrc l2). intro.
+  l1 <[] l2 -> incl (splitSrc l1) (splitSrc l2).
+Proof.
+  intro.
   unfold incl. intros. apply splitSrc_firstOcc_ex in H0.
   invertClear H0. apply H in H1. eapply firstOcc_splitSrc.
-  apply H1. Qed.
+  apply H1.
+Qed.
 
 (** The preorder that has been defined is transitive.*)
 Lemma preordBindList_trans (l1 l2 l3: list (Var * Exp)) :
   l1 <[] l2 -> l2 <[] l3 -> l1 <[] l3.
-  unfold preordBindList. intros. apply H0. apply H. assumption. Qed.
+Proof. unfold preordBindList. intros. apply H0. apply H. assumption. Qed.
 
 (** Gives back a list whose elements are those of l minus the ones containing a
 variable from l'.*)
@@ -1093,45 +1209,61 @@ Fixpoint excludeSrc (l : list (Var * Exp)) (l' : list Var) : list (Var * Exp) :=
 
 (** The source of l with l' excluded is included within the source of l.*)
 Lemma excludeSrc_incl (l : list (Var * Exp)) (l' : list Var) : 
-  incl (splitSrc (excludeSrc l l')) (splitSrc l). induction l.
+  incl (splitSrc (excludeSrc l l')) (splitSrc l).
+Proof.
+  induction l.
   simpl. apply incl_refl. simpl. destruct a. remember (in_dec eqDecVar v l').
   destruct s. rewrite splitSrcCons. apply incl_tl. assumption.
   rewrite splitSrcCons. apply incl_cons. rewrite splitSrcCons. constructor.
-  reflexivity. rewrite splitSrcCons. apply incl_tl. assumption. Qed.
+  reflexivity. rewrite splitSrcCons. apply incl_tl. assumption.
+Qed.
 
 Lemma set_inter_nil {A : Type} (l : list A)
   (p : forall (x y : A), {x = y} + {x <> y}) : set_inter p l [] = [].
-  induction l. reflexivity. simpl. assumption. Qed. 
+Proof. induction l. reflexivity. simpl. assumption. Qed. 
 
 (**If we exclude l' from l, then the source of the resultant list has no elements in
 common with l'.*)
 Lemma excludeSrc_inter_emp (l : list (Var * Exp)) (l' : list Var) : 
-  set_inter eqDecVar (splitSrc (excludeSrc l l')) l' = []. induction l.
+  set_inter eqDecVar (splitSrc (excludeSrc l l')) l' = [].
+Proof.
+  induction l.
   reflexivity. unfold excludeSrc. destruct a. remember (in_dec eqDecVar v l').
   destruct s. apply IHl. rewrite splitSrcCons. unfold set_inter.
   addHyp (set_mem_complete2 eqDecVar v l' n). rewrite H.
-  apply IHl. Qed.
+  apply IHl.
+Qed.
 
 Lemma exclude_nil (l : list (Var * Exp)) : 
-  excludeSrc l [] = l. induction l. reflexivity.
-  simpl. rewrite IHl. destruct a. reflexivity. Qed.
+  excludeSrc l [] = l.
+Proof.
+  induction l. reflexivity.
+  simpl. rewrite IHl. destruct a. reflexivity.
+Qed.
 
 Lemma exclude_in_splitSrc (v : Var) (x : list Var) (l : list (Var * Exp)) :
-  v _: x -> ~v _: splitSrc (excludeSrc l x). intros. induction l.
+  v _: x -> ~v _: splitSrc (excludeSrc l x).
+Proof.
+  intros. induction l.
   unfold not. intros. inversion H0. unfold not. intros.
   destruct a. simpl in H0. remember (in_dec eqDecVar v0 x).
   destruct s. apply IHl. assumption. rewrite splitSrcCons in H0.
   inversion H0. apply n. rewrite H1. assumption. apply IHl.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma pre_notIn_cons (x : Var) (e : Exp) (l l' : list (Var * Exp)) :
-  ~x _: splitSrc l -> l <[] l' -> l <[] ((x, e) :: l'). unfold preordBindList.
+  ~x _: splitSrc l -> l <[] l' -> l <[] ((x, e) :: l').
+Proof.
+  unfold preordBindList.
   intros. addHyp H1. rename H2 into Q. apply H0 in H1. constructor. assumption.
   unfold not. intros. apply H. rewrite <- H2. eapply firstOcc_splitSrc. apply Q.
-  Qed.
+Qed.
 
 Lemma exclude_preord (l' : list Var) (l : list (Var * Exp)) :
-  (excludeSrc l l') <[] l. unfold preordBindList. intros.
+  (excludeSrc l l') <[] l.
+Proof.
+  unfold preordBindList. intros.
   generalize dependent l'. induction l; intros. inversion H.
   destruct a. simpl in H. remember (in_dec eqDecVar v l').
   destruct s. assert (x <> v). unfold not. intro.
@@ -1139,16 +1271,20 @@ Lemma exclude_preord (l' : list Var) (l : list (Var * Exp)) :
   eapply exclude_in_splitSrc. apply i. apply H.
   constructor;[|assumption]. eapply IHl. apply H.
   inversion H. constructor. constructor;[|assumption].
-  eapply IHl. apply H2. Qed.
+  eapply IHl. apply H2.
+Qed.
 
 Lemma preord_exclude (l1 l2 : list (Var * Exp)) (x : list Var) :
   preordBindList l1 (excludeSrc l2 x) -> preordBindList l1 l2.
+Proof.
   intros. eapply preordBindList_trans. apply H.
-  apply exclude_preord. Qed.
+  apply exclude_preord.
+Qed.
 
 Lemma exclude_firstOcc (x : Var) (e : Exp)
   (l1 : list (Var * Exp)) (l2 : list Var) :
   firstOcc x e (excludeSrc l1 l2) -> firstOcc x e l1.
+Proof.
   intros. assert (~x _: l2). unfold not. intros.
   apply firstOcc_splitSrc in H. eapply exclude_in_splitSrc.
   apply H0. apply H. induction l1. inversion H. destruct a. simpl in H.
@@ -1160,11 +1296,13 @@ Lemma exclude_firstOcc (x : Var) (e : Exp)
   apply IHl1. remember (in_dec eqDecVar v l2).
   destruct s. assumption. inversion H.
   apply False_ind. apply H2. assumption.
-  assumption. Qed.
+  assumption.
+Qed.
  
 Lemma firstOcc_notIn_exclude (x : Var) (e : Exp)
   (l1 : list (Var * Exp)) (l2 : list Var) :
   firstOcc x e l1 -> ~x _: l2 -> firstOcc x e (excludeSrc l1 l2).
+Proof.
   intros. induction l1. inversion H. simpl. destruct a.
   remember (in_dec eqDecVar v l2). destruct s. apply IHl1.
   inversion H. apply False_ind. apply H0. rewrite H2.
@@ -1173,49 +1311,62 @@ Lemma firstOcc_notIn_exclude (x : Var) (e : Exp)
   rewrite H2. constructor. apply False_ind. apply H6.
   reflexivity. constructor. apply IHl1. invertClear H.
   apply False_ind. apply H2. assumption. assumption.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma preord_cons_excl (v : Var) (e : Exp) (l1 l2 : list (Var * Exp)) :
   l1 <[] ((v, e) :: l2) -> (excludeSrc l1 [v]) <[] l2.
+Proof.
   unfold preordBindList. intros. assert (~x _: [v]).
   apply firstOcc_splitSrc in H0. unfold not. intro.
   eapply exclude_in_splitSrc. apply H1. apply H0.
   apply exclude_firstOcc in H0.
   apply H in H0. inversion H0. rewrite H3 in H1.
   apply False_ind. apply H1. left. reflexivity.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (** If (v, e) is the first occurrence of v in l1, then the question of whether l1
 is less than l2 by the preorder is the same as the question as to whether l1 with
 v excluded is less than l2.*)
 Lemma fst_pre_cons_excl (v : Var) (e : Exp) (l1 l2 : list (Var * Exp)) :
   firstOcc v e l1 -> (l1 <[] ((v, e) :: l2) <->
-  excludeSrc l1 v <[] l2). intros. split. apply preord_cons_excl.
+  excludeSrc l1 v <[] l2).
+Proof.
+  intros. split. apply preord_cons_excl.
   unfold preordBindList. intros. addHyp (in_dec eqDecVar x [v]).
   invertClear H2. invertClear H3;[|inversion H2].
   rewrite H2 in H. replace e0 with e. rewrite H2. constructor.
   eapply firstOcc_unique. apply H. assumption. constructor.
   apply H0. eapply firstOcc_notIn_exclude; assumption.
-  unfold not. intro. apply H3. rewrite H2. left. reflexivity. Qed. 
+  unfold not. intro. apply H3. rewrite H2. left. reflexivity.
+Qed. 
 
 Lemma in_src_ex_firstOcc (v : Var) (l : list (Var * Exp)) :
-  v _: splitSrc l -> exists e, firstOcc v e l. intros.
+  v _: splitSrc l -> exists e, firstOcc v e l.
+Proof.
+  intros.
   induction l. inversion H. destruct a. rewrite splitSrcCons in H.
   addHyp (eqDecVar v v0). invertClear H0. rewrite H1. exists e.
   constructor. elim H; intros. apply False_ind. apply H1.
   rewrite H0. reflexivity. apply IHl in H0. invertClear H0.
-  exists x. constructor; assumption. Qed.
+  exists x. constructor; assumption.
+Qed.
 
 Lemma notIn_src_cons_eq (v : Var) (e : Exp) (l1 l2 : list (Var * Exp)) :
   ~ v _: (splitSrc l1) -> (l1<[](v, e) :: l2 <-> l1 <[] l2).
+Proof.
   intros. split; unfold preordBindList; intros.
   addHyp H1. apply H0 in H1. invertClear H1. apply firstOcc_splitSrc in H2.
   apply False_ind. apply H. rewrite <- H4. assumption. assumption.
   constructor. apply H0. assumption. unfold not. intro.
-  apply H. rewrite <- H2. eapply firstOcc_splitSrc. apply H1. Qed.
+  apply H. rewrite <- H2. eapply firstOcc_splitSrc. apply H1.
+Qed.
 
 Theorem dec_preordBindList (l1 l2 : list (Var * Exp)) :
-  decidable (l1 <[] l2). generalize dependent l1. 
+  decidable (l1 <[] l2).
+Proof.
+  generalize dependent l1. 
   induction l2; intros. destruct l1. left. apply preord_emp.
   right. unfold not. intros. destruct p.
   assert (firstOcc v e []). apply H. constructor. inversion H0.
@@ -1228,7 +1379,8 @@ Theorem dec_preordBindList (l1 l2 : list (Var * Exp)) :
   intros. apply H0 in H. inversion H. apply H1.
   rewrite H3. reflexivity. apply H6. reflexivity.
   unfold decidable. rewrite notIn_src_cons_eq;[|assumption].
-  apply IHl2. Qed.
+  apply IHl2.
+Qed.
   
 (**Builds the identity bindings list for a given source list x.*)
 Fixpoint idBindList (x : list Var) : list (Var * Exp) :=
@@ -1240,7 +1392,9 @@ Fixpoint idBindList (x : list Var) : list (Var * Exp) :=
 (**The identity bind list as created by the said function gives
 rise to the identity substitution.*)
 Lemma idBindList_idSub (x : list Var) :
-  bindListToSub (idBindList x) = idSubst. apply functional_extensionality.
+  bindListToSub (idBindList x) = idSubst.
+Proof.
+  apply functional_extensionality.
   intros. remember (idBindList x) as l. generalize dependent l.
   induction x; intros. unfold bindListToSub.
   simpl. simpl in Heql. rewrite Heql. reflexivity.
@@ -1248,45 +1402,67 @@ Lemma idBindList_idSub (x : list Var) :
   simpl. rewrite bindListToSubCons. addHyp (eqDecVar a x0).
   invertClear H2. rewrite H3. rewrite updateAppEq. unfold idSubst.
   reflexivity. rewrite updateAppNeq;[|assumption]. rewrite <- H1.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (** The source of the identity bindings list built from x is itself x.*)
 Lemma srcIdBindList (x : list Var) : splitSrc (idBindList x) = x.
+Proof.
   induction x. reflexivity. simpl. rewrite splitSrcCons. f_equal.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma preord_emp_eq (l : list (Var * Exp)) : 
-  l<[][] -> l = []. unfold preordBindList. intros.
+  l<[][] -> l = [].
+Proof.
+  unfold preordBindList. intros.
   destruct l. reflexivity. destruct p.
   cut (firstOcc v e []). intros. inversion H0.
-  apply H. constructor. Qed.
+  apply H. constructor.
+Qed.
 
 Lemma bindApp_cons_eq (x : Var) (e : Exp) (l : list (Var * Exp)) :
-  bindApp ((x, e) :: l) x = e. unfold bindApp. remember (eqDecVar x x).
-  destruct s. reflexivity. apply False_ind. apply n. reflexivity. Qed.
+  bindApp ((x, e) :: l) x = e.
+Proof.
+  unfold bindApp. remember (eqDecVar x x).
+  destruct s. reflexivity. apply False_ind. apply n. reflexivity.
+Qed.
 
 Lemma bindApp_cons_neq (x y : Var) (e : Exp) (l : list (Var * Exp)) :
-  x <> y -> bindApp ((x, e) :: l) y = bindApp l y. intros.
+  x <> y -> bindApp ((x, e) :: l) y = bindApp l y.
+Proof.
+  intros.
   unfold bindApp. remember (eqDecVar y x).
   destruct s. apply False_ind. apply H. rewrite e0. reflexivity.
-  reflexivity. Qed.
+  reflexivity.
+Qed.
 
 Lemma firstOcc_bindApp (x : Var) (e : Exp) (l : list (Var * Exp)) :
-  firstOcc x e l -> bindApp l x = e. intros. induction H.
+  firstOcc x e l -> bindApp l x = e.
+Proof.
+  intros. induction H.
   apply bindApp_cons_eq. rewrite <- IHfirstOcc. apply bindApp_cons_neq.
-  unfold not. intros. apply H0. rewrite H1. reflexivity. Qed.
+  unfold not. intros. apply H0. rewrite H1. reflexivity.
+Qed.
 
 Lemma firstOcc_cons_eq (x : Var) (e e' : Exp) (l : list (Var * Exp)) : 
-  firstOcc x e' ((x, e) :: l) -> e = e'. intros. inversion H.
-  reflexivity. apply False_ind. apply H4. reflexivity. Qed.
+  firstOcc x e' ((x, e) :: l) -> e = e'.
+Proof.
+  intros. inversion H.
+  reflexivity. apply False_ind. apply H4. reflexivity.
+Qed.
 
 Lemma excl_cons (x : Var) (e : Exp) (l1 : list (Var * Exp)) (l2 : list Var) :
   ~x _: l2 -> excludeSrc ((x, e) :: l1) l2 = (x, e) :: excludeSrc l1 l2.
+Proof.
   intros. simpl. remember (in_dec eqDecVar x l2). destruct s.
-  apply False_ind. apply H. assumption. reflexivity. Qed.
+  apply False_ind. apply H. assumption. reflexivity.
+Qed.
 
 Lemma notIn_bindApp_excl (x : Var) (l1 : list (Var * Exp)) (l2 : list Var) :
-  ~x _: l2 -> bindApp l1 x = bindApp (excludeSrc l1 l2) x. intros.
+  ~x _: l2 -> bindApp l1 x = bindApp (excludeSrc l1 l2) x.
+Proof.
+  intros.
   induction l1. reflexivity. destruct a. addHyp (eqDecVar v x).
   invertClear H0. rewrite H1. rewrite excl_cons.
   repeat rewrite bindApp_cons_eq. reflexivity. assumption.
@@ -1294,21 +1470,26 @@ Lemma notIn_bindApp_excl (x : Var) (l1 : list (Var * Exp)) (l2 : list Var) :
   apply False_ind. apply H1. symmetry. assumption.
   remember (in_dec eqDecVar v l2). destruct s.
   rewrite IHl1. reflexivity. rewrite bindApp_cons_neq.
-  rewrite IHl1. reflexivity. assumption. Qed.
+  rewrite IHl1. reflexivity. assumption.
+Qed.
 
 Lemma in_splitSrc_excl (x : Var) (l1 : list (Var * Exp)) (l2 : list Var) :
-  ~x _: l2 -> x _: splitSrc l1 -> x _: splitSrc (excludeSrc l1 l2). intros.
+  ~x _: l2 -> x _: splitSrc l1 -> x _: splitSrc (excludeSrc l1 l2).
+Proof.
+  intros.
   induction l1. inversion H0. destruct a. simpl. remember (in_dec eqDecVar v l2).
   destruct s. apply IHl1. rewrite splitSrcCons in H0. inversion H0.
   apply False_ind. apply H. rewrite <- H1. assumption. apply H1.
   rewrite splitSrcCons. rewrite splitSrcCons in H0. inversion H0.
   rewrite H1. constructor. reflexivity. right. apply IHl1.
-  apply H1. Qed.
+  apply H1.
+Qed.
 
 (** If l1 <[] l2 then the substitutions generated by l1 and l2 are equivalent
 for all variables in the source of l1.*)
 Theorem preord_subst (l1 l2 : list (Var * Exp)) (x : Var) :
   l1 <[] l2 -> x _: splitSrc l1 -> (bindListToSub l1) x = (bindListToSub l2) x.
+Proof.
   intros. repeat rewrite <- bindApp_subst.
   generalize dependent l1. induction l2; intros. apply preord_emp_eq in H.
   rewrite H. reflexivity. destruct a. addHyp (eqDecVar v x). invertClear H1.
@@ -1320,7 +1501,8 @@ Theorem preord_subst (l1 l2 : list (Var * Exp)) (x : Var) :
   apply IHl2. assumption. apply in_splitSrc_excl. unfold not.
   intros. apply H2. inversion H1. assumption. inversion H3.
   assumption. unfold not. intros. apply H2. inversion H1.
-  assumption. inversion H3. Qed.
+  assumption. inversion H3.
+Qed.
 
 (** Takes the binding list l and restricts its source to x, preserving any
 bindings of l based in x and acting as the identity otherwise.*)
@@ -1333,40 +1515,51 @@ Fixpoint restrictSrc (l : list (Var * Exp)) (x : list Var) :
 
 (** The source of the restrict source function is actually correct.*)
 Lemma restrictSrc_source (l : list (Var * Exp)) (x : list Var) :
-  splitSrc (restrictSrc l x) = x. induction x. unfold splitSrc.
+  splitSrc (restrictSrc l x) = x.
+Proof.
+  induction x. unfold splitSrc.
   simpl. reflexivity. simpl. rewrite splitSrcCons. f_equal.
-  assumption. Qed.
+  assumption.
+Qed.
     
 Lemma restrictSrc_in (y : Var) (x : list Var) (l : list (Var * Exp)) :
   y _: x -> (bindListToSub (restrictSrc l x)) y = (bindListToSub l) y.
+Proof.
   intro. induction x; inversion H. rewrite <- H0. simpl.
   rewrite bindListToSubCons. rewrite updateAppEq. reflexivity.
   apply IHx in H0. clear IHx. simpl. rewrite bindListToSubCons.
   addHyp (eqDecVar a y). invertClear H1. rewrite H2.
   rewrite updateAppEq. reflexivity. rewrite updateAppNeq;assumption.
-  Qed.
+Qed.
 
 Lemma listSub_notIn (x : Var) (l : list Var) (l' : list Exp) :
-  ~x _: l -> (listsToSub l l') x = (eVar x). intros.
+  ~x _: l -> (listsToSub l l') x = (eVar x).
+Proof.
+  intros.
   generalize dependent l'. induction l; intros.
   simpl. destruct l'; reflexivity. destruct l'. reflexivity.
   simpl. rewrite updateAppNeq. apply IHl. unfold not. intro.
   apply H. apply in_cons. assumption. unfold not. intro.
-  apply H. rewrite H0. constructor. reflexivity. Qed.
+  apply H. rewrite H0. constructor. reflexivity.
+Qed.
 
 (** If the source of l is included in x, then restricting l to x will yield a binding list
 whose corresponding substitution is the same as that of l.*)
 Lemma restrictSrc_incl_subEq (l : list (Var * Exp)) (x : list Var) :
   incl (splitSrc l) x -> bindListToSub (restrictSrc l x) = bindListToSub l.
+Proof.
   intros. apply functional_extensionality. intros.
   addHyp (in_dec eqDecVar x0 x). invertClear H0.
   rewrite restrictSrc_in;[reflexivity|assumption].
   unfold bindListToSub. rewrite listSub_notIn. rewrite listSub_notIn.
   reflexivity. unfold not. intros. apply H1. apply H. assumption.
-  unfold not. rewrite restrictSrc_source. intro. apply H1. assumption. Qed.
+  unfold not. rewrite restrictSrc_source. intro. apply H1. assumption.
+Qed.
 
 Lemma inVarList_in (x : Var) (l : list Var) :
-  inVarList x l = true <-> x _: l. split; intros.
+  inVarList x l = true <-> x _: l.
+Proof.
+  split; intros.
   induction l. inversion H. inversion H.
   remember (varEq x a). destruct b. constructor.
   unfold varEq in Heqb. remember (varEqDec x a).
@@ -1378,30 +1571,37 @@ Lemma inVarList_in (x : Var) (l : list Var) :
   remember (varEqDec x x). destruct s. inversion Heqb.
   apply False_ind. apply n. reflexivity. 
   apply IHl in H0. simpl. remember (varEq x a).
-  destruct b. reflexivity. assumption. Qed.
+  destruct b. reflexivity. assumption.
+Qed.
 
 Lemma preord_inter_exclude (l l' : list (Var * Exp)) (x : list Var) :
   set_inter eqDecVar (splitSrc l) x = [] -> preordBindList l l' ->
-  preordBindList l (excludeSrc l' x). 
+  preordBindList l (excludeSrc l' x).
+Proof.
   unfold preordBindList. intros. apply firstOcc_notIn_exclude.
   apply H0. assumption. unfold not. intros.
   apply firstOcc_splitSrc in H1. eapply set_inter_nil_in1.
-  apply H. apply H1. assumption. Qed.
+  apply H. apply H1. assumption.
+Qed.
 
 Definition joinBindList (l l1 l2 : list (Var * Exp)) : Prop :=
   preordBindList l1 l /\ preordBindList l2 l.
 
 Lemma joinBindList_symm (l l1 l2 : list (Var * Exp)) :
-  joinBindList l l1 l2 -> joinBindList l l2 l1. intros.
-  inversion H. split; assumption. Qed.
+  joinBindList l l1 l2 -> joinBindList l l2 l1.
+Proof.
+  intros.
+  inversion H. split; assumption.
+Qed.
 
 Lemma dec_joinBindList (l l1 l2 : list (Var * Exp)) :
   decidable (joinBindList l l1 l2).
+Proof.
   addHyp (dec_preordBindList l1 l). addHyp (dec_preordBindList l2 l).
   invertClear H. invertClear H0. left. split; assumption.
   right. unfold not. intro. invertClear H0. apply H. assumption.
   right. unfold not. intro. invertClear H. apply H1. assumption.
-  Qed.
+Qed.
 
 (** Normalise the list l, by removing all redundant pairs (x, e) that are
 preceded in the list, and thus overwritten, by (x, e').*)
@@ -1412,7 +1612,9 @@ Fixpoint normBindList (l : list (Var * Exp)) : list (Var * Exp) :=
   end.
 
 Lemma src_norm_in_equiv (x : Var) (l : list (Var * Exp)) :
-  x _: splitSrc (normBindList l) <-> x _: splitSrc l. induction l.
+  x _: splitSrc (normBindList l) <-> x _: splitSrc l.
+Proof.
+  induction l.
   reflexivity. simpl. destruct a. repeat rewrite splitSrcCons.
   addHyp (eqDecVar x v). invertClear H. rewrite H0.
   simpl. split; intro Q; invertClear Q; left; reflexivity.
@@ -1421,10 +1623,12 @@ Lemma src_norm_in_equiv (x : Var) (l : list (Var * Exp)) :
   rewrite <- IHl. apply excludeSrc_incl in H1. assumption.
   right. apply in_splitSrc_excl. unfold not. intros.
   apply H0. inversion H2. symmetry. assumption. inversion H3.
-  rewrite IHl. assumption. Qed.
+  rewrite IHl. assumption.
+Qed.
 
 Lemma norm_sub_equiv (l : list (Var * Exp)) :
   bindListToSub l = bindListToSub (normBindList l).
+Proof.
   apply functional_extensionality. intros.
   repeat rewrite <- bindApp_subst. induction l; simpl.
   reflexivity. destruct a. remember (eqDecVar x v).
@@ -1434,13 +1638,15 @@ Lemma norm_sub_equiv (l : list (Var * Exp)) :
   rewrite bindApp_cons_neq;[|unfold not; intro; apply n;
   symmetry; assumption].
   rewrite <- notIn_bindApp_excl. apply IHl. assumption.
-  Qed.
+Qed.
 
 (**An alternative characterisation of the preorder.*)
 Theorem preordBindListAlt (l1 l2 : list (Var * Exp)) :
   l1 <[] l2 <->
   (forall x : Var, x _: (splitSrc l1) -> x _: (splitSrc l2) /\
-  (bindListToSub l1) x = (bindListToSub l2) x). split; intros.
+  (bindListToSub l1) x = (bindListToSub l2) x).
+Proof.
+  split; intros.
   (*Left to right*)
   split. eapply pre_incl_splitSrc. apply H. assumption.
   repeat rewrite <- bindApp_subst. apply in_src_ex_firstOcc in H0.
@@ -1455,14 +1661,17 @@ Theorem preordBindListAlt (l1 l2 : list (Var * Exp)) :
   apply H2. repeat rewrite <- bindApp_subst in H3.
   assert (bindApp l1 x = e). apply firstOcc_bindApp. assumption.
   assert (bindApp l2 x = e'). apply firstOcc_bindApp. assumption.
-  rewrite <- H1. rewrite <- H4. assumption. Qed.
+  rewrite <- H1. rewrite <- H4. assumption.
+Qed.
 
 Lemma preord_norm (l1 : list (Var * Exp)) :
   l1 <[] (normBindList l1) /\ (normBindList l1) <[] l1.
+Proof.
   repeat rewrite preordBindListAlt.
   split; intros;[rewrite src_norm_in_equiv; rewrite <- norm_sub_equiv
   | rewrite <- src_norm_in_equiv; rewrite <- norm_sub_equiv];(split;
-  [assumption|reflexivity]). Qed.
+  [assumption|reflexivity]).
+Qed.
 
 (** lubBindList l l1 l2 roughly means that l is a least upper bound
 for bind lists l1 and l2.*)
@@ -1473,74 +1682,103 @@ Inductive lubBindList : list (Var * Exp) -> list (Var * Exp) ->
     lubBindList (normBindList (excludeSrc l1 (splitSrc l2) ++ l2)) l1 l2.
 
 Lemma lubPreordFst (l l1 l2 : list (Var * Exp)) :
-  lubBindList l l1 l2 -> preordBindList l1 l. intro. inversion H.
-  inversion H0. assumption. Qed.
+  lubBindList l l1 l2 -> preordBindList l1 l.
+Proof.
+  intro. inversion H.
+  inversion H0. assumption.
+Qed.
 
 Lemma lubPreordSnd (l l1 l2 : list (Var * Exp)) :
-  lubBindList l l1 l2 -> preordBindList l2 l. intro. inversion H.
-  inversion H0. assumption. Qed.
+  lubBindList l l1 l2 -> preordBindList l2 l.
+Proof.
+  intro. inversion H.
+  inversion H0. assumption.
+Qed.
 
 Lemma lubBindListUnique (l l' l1 l2 : list (Var * Exp)) :
   lubBindList l l1 l2 -> lubBindList l' l1 l2 ->
-  l = l'. intros. inversion H. inversion H0. reflexivity. Qed.
+  l = l'.
+Proof. intros. inversion H. inversion H0. reflexivity. Qed.
 
 (** The existence of a least upper bound for any pair of binding lists is
 a decidable property.*)
 Lemma decLubBindList (l1 l2 : list (Var * Exp)) :
-  decidable (exists l, lubBindList l l1 l2). 
+  decidable (exists l, lubBindList l l1 l2).
+Proof.
   addHyp (dec_joinBindList (normBindList (excludeSrc l1 (splitSrc l2) ++ l2)) l1 l2).
   invertClear H. left. exists (normBindList (excludeSrc l1 (splitSrc l2) ++ l2)).
   constructor. assumption. right. unfold not. intros. invertClear H.
-  invertClear H1. apply H0. assumption. Qed. 
+  invertClear H1. apply H0. assumption.
+Qed. 
 
 Lemma notIn_bindList_id (x : Var) (l : list (Var * Exp)) :
-  ~x _: (splitSrc l) -> eVar x = bindListToSub l x. intros.
+  ~x _: (splitSrc l) -> eVar x = bindListToSub l x.
+Proof.
+  intros.
   rewrite <- bindApp_subst. induction l. simpl. reflexivity.
   simpl. destruct a. remember (eqDecVar x v). destruct s.
   apply False_ind. apply H. rewrite e0. rewrite splitSrcCons.
   constructor. reflexivity. apply IHl. unfold not. intros.
-  apply H. rewrite splitSrcCons. right. assumption. Qed.
+  apply H. rewrite splitSrcCons. right. assumption.
+Qed.
 
 Lemma excludeSrc_in_cons_eq (v : Var) (l1 : list (Var * Exp))
   (l2 : list Var) (e : Exp) :
   v _: l2 -> excludeSrc ((v, e) :: l1) l2 = excludeSrc l1 l2.
+Proof.
   intros. simpl. remember (in_dec eqDecVar v l2). destruct s.
-  reflexivity. apply False_ind. apply n. assumption. Qed.
+  reflexivity. apply False_ind. apply n. assumption.
+Qed.
 
 Lemma append_firstOcc (x : Var) (e : Exp) (l1 l2 : list (Var * Exp)) :
   firstOcc x e (l1 ++ l2) -> firstOcc x e l1 \/ firstOcc x e l2.
+Proof.
   intros. induction l1. right. apply H. inversion H. left.
   constructor. apply IHl1 in H2. invertClear H2. left.
-  constructor; assumption. right. assumption. Qed.
+  constructor; assumption. right. assumption.
+Qed.
 
 Lemma firstOcc_append (x : Var) (e : Exp) (l1 l2 : list (Var * Exp)) :
-  firstOcc x e l1 -> firstOcc x e (l1 ++ l2). intros. induction H;
-  simpl; constructor; try assumption. Qed.
+  firstOcc x e l1 -> firstOcc x e (l1 ++ l2).
+Proof.
+  intros. induction H;
+  simpl; constructor; try assumption.
+Qed.
 
 Lemma lubBindList_pre_join (l l1 l2 : list (Var * Exp)) :
   joinBindList l l1 l2 -> (normBindList (excludeSrc l1 (splitSrc l2) ++ l2)) <[] l.
+Proof.
   intros. addHyp (preord_norm (excludeSrc l1 (splitSrc l2) ++ l2)).
   invertClear H0. clear H1. eapply preordBindList_trans;[apply H2 |].
   clear H2. invertClear H. unfold preordBindList. intros.
   apply append_firstOcc in H. invertClear H. apply exclude_firstOcc in H2.
-  apply H0. assumption. apply H1. assumption. Qed.
+  apply H0. assumption. apply H1. assumption.
+Qed.
 
 Lemma firstOcc_exclude_append (x : Var) (e : Exp) (l1 l2 : list (Var * Exp)) :
   firstOcc x e l2 ->
-  firstOcc x e (excludeSrc l1 (splitSrc l2) ++ l2). intros.
+  firstOcc x e (excludeSrc l1 (splitSrc l2) ++ l2).
+Proof.
+  intros.
   induction l1. apply H. destruct a. simpl. remember (in_dec eqDecVar v (splitSrc l2)).
   destruct s. assumption. cut (x <> v). intros. constructor;[|assumption].
   apply IHl1. unfold not. intros. apply n. rewrite <- H0.
-  eapply firstOcc_splitSrc. apply H. Qed.
+  eapply firstOcc_splitSrc. apply H.
+Qed.
   
 Lemma join_firstOcc_eq (x : Var) (e e' : Exp) (l l1 l2 : list (Var * Exp)) :
   joinBindList l l1 l2 -> firstOcc x e l1 -> firstOcc x e' l2 ->
-  e = e'. intros. invertClear H. apply H2 in H0. apply H3 in H1.
-  eapply firstOcc_unique. apply H0. assumption. Qed.
+  e = e'.
+Proof.
+  intros. invertClear H. apply H2 in H0. apply H3 in H1.
+  eapply firstOcc_unique. apply H0. assumption.
+Qed.
 
 Lemma join_lubBindList_ex (l l1 l2 : list (Var * Exp)) :
   joinBindList l l1 l2 -> exists l',
-  lubBindList l' l1 l2 /\ preordBindList l' l. intros.
+  lubBindList l' l1 l2 /\ preordBindList l' l.
+Proof.
+  intros.
   exists (normBindList (excludeSrc l1 (splitSrc l2) ++ l2)).
   split;[|apply lubBindList_pre_join;assumption]. constructor.
   addHyp (preord_norm (excludeSrc l1 (splitSrc l2) ++ l2)).
@@ -1554,23 +1792,28 @@ Lemma join_lubBindList_ex (l l1 l2 : list (Var * Exp)) :
   apply H. apply H0. assumption. apply firstOcc_append.
   apply firstOcc_notIn_exclude; assumption.
   clear H1. unfold preordBindList. intros.
-  apply firstOcc_exclude_append. assumption. Qed.
+  apply firstOcc_exclude_append. assumption.
+Qed.
 
 (** If a substitution based on a list l is reset on the list of variables x, and none
 of these variables of x is in the source of l, then the substitution remains unchanged
 after the reset operation.*)
 Theorem reset_id (l : list (Var * Exp)) (x : list Var) :
   set_inter eqDecVar (splitSrc l) x = [] ->
-  resetSub (bindListToSub l) x = (bindListToSub l). intros.
+  resetSub (bindListToSub l) x = (bindListToSub l).
+Proof.
+  intros.
   apply functional_extensionality. intros. unfold resetSub.
   remember (inVarList x0 x). destruct b. apply notIn_bindList_id.
   eapply set_inter_nil_in2. apply H. rewrite <- inVarList_in.
-  symmetry. assumption. reflexivity. Qed.
+  symmetry. assumption. reflexivity.
+Qed.
 
 (**The substitution formed after excluding x from l is the same as
 that formed from l with x reset.*)
 Lemma exclude_reset (l : list (Var * Exp)) (x : list Var) : 
   bindListToSub (excludeSrc l x) = resetSub (bindListToSub l) x.
+Proof.
   apply functional_extensionality. intros. induction l.
   simpl. rewrite reset_id. reflexivity. reflexivity.
   destruct a. simpl. remember (in_dec eqDecVar v x). destruct s.
@@ -1586,7 +1829,8 @@ Lemma exclude_reset (l : list (Var * Exp)) (x : list Var) :
   apply n. assumption. rewrite updateAppEq. reflexivity.
   rewrite updateAppNeq;[|assumption]. rewrite IHl.
   unfold resetSub. remember (inVarList x0 x). destruct b.
-  reflexivity. rewrite updateAppNeq;[|assumption]. reflexivity. Qed.
+  reflexivity. rewrite updateAppNeq;[|assumption]. reflexivity.
+Qed.
 
 (** A characterisation of the matching problem for expressions. This says that
 the e1 is equal to the e2 with the substitution l applied.*)
@@ -1616,16 +1860,20 @@ Inductive matchExp : Exp -> Exp -> list (Var * Exp) -> Prop :=
 (** There is at most one "minimal" solution to the matching problem for expressions,
 as characterised by the matchExp relation.*)
 Lemma matchExpUnique (e1 e2 : Exp) (l1 l2 : list (Var * Exp)) :
-  matchExp e1 e2 l1 -> matchExp e1 e2 l2 -> l1 = l2. intros.
+  matchExp e1 e2 l1 -> matchExp e1 e2 l2 -> l1 = l2.
+Proof.
+  intros.
   generalize dependent l2. induction H; intros;
   try (inversion H2; eapply lubBindListUnique; [apply H1|];
   replace l1 with l4; [replace l2 with l5;[assumption|]|];
   [symmetry; eapply IHmatchExp2; assumption | symmetry; apply IHmatchExp1;
   assumption]); try (inversion H0; reflexivity); try
-  (apply IHmatchExp; inversion H0; assumption). Qed.
+  (apply IHmatchExp; inversion H0; assumption).
+Qed.
 
 Lemma decMatchExp (e1 e2 : Exp) :
   decidable (exists l, matchExp e1 e2 l).
+Proof.
   (*Just did a swap because I had matchExp matching the wrong way originally
    before I did this proof, then I changed it around, but wanted to keep the
    hard earned proof script.*)
@@ -1664,11 +1912,14 @@ Lemma decMatchExp (e1 e2 : Exp) :
   addHyp (IHe2 e1). clear IHe2. invertClear H. invertClear H0.
   left. exists x. constructor. assumption.
   right. unfold not. intro. apply H0. invertClear H. exists x.
-  invertClear H1. assumption. Qed.
+  invertClear H1. assumption.
+Qed.
 
 Lemma matchExpSubEquivPre (e1 e2 : Exp) (l l' : list (Var * Exp)) :
   matchExp e1 e2 l -> preordBindList l l' ->
-  e1 = subExp (bindListToSub l') e2. intros.
+  e1 = subExp (bindListToSub l') e2.
+Proof.
+  intros.
   generalize dependent l'. induction H; intros; simpl;
   try (f_equal;[apply IHmatchExp1; eapply preordBindList_trans;[|apply H2];
   eapply lubPreordFst; apply H1 |
@@ -1678,7 +1929,8 @@ Lemma matchExpSubEquivPre (e1 e2 : Exp) (l l' : list (Var * Exp)) :
   rewrite bindListToSubCons. rewrite updateAppEq. reflexivity.
   rewrite splitSrcCons. constructor. reflexivity.
   reflexivity. f_equal. apply IHmatchExp. assumption.
-  f_equal. apply IHmatchExp. assumption. Qed.
+  f_equal. apply IHmatchExp. assumption.
+Qed.
   
 (**The free variables of an expression- drill down to all the eVar constructors.*)
 Fixpoint freeVarsExp (e : Exp) : set Var :=
@@ -1704,10 +1956,13 @@ Fixpoint freeVarsListExpAlt (l : list Exp) : set Var :=
   end.
 
 Lemma freeVarsListAlt_correct (l : list Exp) :
-  freeVarsListExp l = freeVarsListExpAlt l. induction l.
+  freeVarsListExp l = freeVarsListExpAlt l.
+Proof.
+  induction l.
   reflexivity. simpl. unfold freeVarsListExp. simpl.
   f_equal. rewrite <- IHl. unfold freeVarsListExp.
-  reflexivity. Qed.
+  reflexivity.
+Qed.
 
 Fixpoint freeVarsBoolExp (b : BoolExp) : set Var :=
   match b with
@@ -1721,62 +1976,86 @@ Fixpoint freeVarsBoolExp (b : BoolExp) : set Var :=
 (**TO GO: COMH BASICS.*)
 Lemma in_cons_not {X : Type} (p : forall (a b : X), {a = b} + {a <> b})
   (x y : X) (l : list X) :
-  x _: (y :: l) -> x = y \/ x <> y /\ x _: l. intros.
+  x _: (y :: l) -> x = y \/ x <> y /\ x _: l.
+Proof.
+  intros.
   addHyp (p x y). invertClear H0. left. assumption.
   right. inversion H. apply False_ind. apply H1. rewrite H0.
-  reflexivity. split; assumption. Qed.
+  reflexivity. split; assumption.
+Qed.
 
 Lemma in_cons_not_var (x y : Var) (l : list Var) :
-  x _: (y :: l) -> x = y \/ x <> y /\ x _: l. apply in_cons_not.
-  apply eqDecVar. Qed.
+  x _: (y :: l) -> x = y \/ x <> y /\ x _: l.
+Proof.
+  apply in_cons_not.
+  apply eqDecVar.
+Qed.
 
 Lemma firstOcc_res_exp_sub (v : Var) (e : Exp) (l : list (Var * Exp)) (x : list Var) :
-  firstOcc v e (restrictSrc l x) -> e = (bindListToSub l) v. intros.
-  induction x; inversion H. reflexivity. apply IHx. assumption. Qed.
+  firstOcc v e (restrictSrc l x) -> e = (bindListToSub l) v.
+Proof.
+  intros.
+  induction x; inversion H. reflexivity. apply IHx. assumption.
+Qed.
 
 Lemma in_firstOcc_res (v : Var) (l : list (Var * Exp)) (x : list Var) :
-  v _: x -> firstOcc v ((bindListToSub l) v) (restrictSrc l x). intros.
+  v _: x -> firstOcc v ((bindListToSub l) v) (restrictSrc l x).
+Proof.
+  intros.
   induction x. inversion H. simpl. apply in_cons_not_var in H.
   invertClear H. rewrite H0. constructor. invertClear H0.
-  constructor; [|assumption]. apply IHx. assumption. Qed.
+  constructor; [|assumption]. apply IHx. assumption.
+Qed.
 
 Lemma firstOcc_restrict_incl (v : Var) (e : Exp) (l : list (Var * Exp)) (x y : list Var) :
   firstOcc v e (restrictSrc l x) -> incl x y -> firstOcc v e (restrictSrc l y).
+Proof.
   intros. addHyp H. apply firstOcc_res_exp_sub in H. rewrite H.
   apply in_firstOcc_res. apply H0. apply firstOcc_splitSrc in H1.
-  rewrite restrictSrc_source in H1. assumption. Qed. 
+  rewrite restrictSrc_source in H1. assumption.
+Qed. 
 
 Lemma preord_res_splitSrc (l1 l2 : list (Var * Exp)) :
   l1 <[] l2 -> l1 <[] (restrictSrc l2 (splitSrc l2)).
+Proof.
   repeat rewrite preordBindListAlt. intros. apply H in H0.
   clear H. invertClear H0. rewrite restrictSrc_source.
   rewrite H1. split. assumption. symmetry.
   rewrite restrictSrc_incl_subEq. reflexivity.
-  apply incl_refl. Qed.
+  apply incl_refl.
+Qed.
 
 Lemma preord_restrict_union1 (l l' : list (Var * Exp)) (x y : list Var) :
   l <[] restrictSrc l' x -> l <[] restrictSrc l' (set_union eqDecVar x y).
+Proof.
   intros. unfold preordBindList. intros. apply H in H0.
   eapply firstOcc_restrict_incl. apply H0. unfold incl.
-  intros. apply set_union_intro1. apply H1. Qed.
+  intros. apply set_union_intro1. apply H1.
+Qed.
   
 Lemma preord_restrict_union2 (l l' : list (Var * Exp)) (x y : list Var) :
-  l <[] restrictSrc l' y -> l <[] restrictSrc l' (set_union eqDecVar x y). 
+  l <[] restrictSrc l' y -> l <[] restrictSrc l' (set_union eqDecVar x y).
+Proof.
   intros. unfold preordBindList. intros. apply H in H0.
   eapply firstOcc_restrict_incl. apply H0. unfold incl.
-  intros. apply set_union_intro2. apply H1. Qed.
+  intros. apply set_union_intro2. apply H1.
+Qed.
 
 Lemma lub_join_preordBindList (l l' l1 l2 : list (Var * Exp)) : 
-  lubBindList l l1 l2 -> joinBindList l' l1 l2 -> l <[] l'. intros.
+  lubBindList l l1 l2 -> joinBindList l' l1 l2 -> l <[] l'.
+Proof.
+  intros.
   apply join_lubBindList_ex in H0. invertClear H0. invertClear H1.
   replace l with x. assumption. eapply lubBindListUnique.
-  apply H0. assumption. Qed.
+  apply H0. assumption.
+Qed.
 
 (** Any Exp e with substitution from bindList x applied can be matched by some 
 bindList z to e, where z is less than x in the preorder.*)
 Theorem sub_matchExp_ex (e : Exp) (l : list (Var * Exp)) :
   exists z, matchExp (subExp (bindListToSub l) e) e z
   /\ z <[] (restrictSrc l (freeVarsExp e)).
+Proof.
   induction e; simpl;
   (*Some processing of the inductive hypothesis for those cases with 2.*)
   try (invertClear IHe1; invertClear IHe2; rename x into l1; rename x0 into l2;
@@ -1793,7 +2072,8 @@ Theorem sub_matchExp_ex (e : Exp) (l : list (Var * Exp)) :
   exists l'; split;[|assumption]; constructor; apply H0).
   rewrite <- bindApp_subst. exists [(v, (bindApp l v))]; split. 
   constructor. apply preordBindList_refl.
-  exists (@nil (Var * Exp)). split. constructor. apply preordBindList_refl. Qed.
+  exists (@nil (Var * Exp)). split. constructor. apply preordBindList_refl.
+Qed.
 
 (** A characterisation of the matching problem for a list of expressions. This says that
 the list l1 is equal to the list l2 with the substitution l applied.*)
@@ -1822,17 +2102,22 @@ Inductive matchBoolExp : BoolExp -> BoolExp -> list (Var * Exp) -> Prop :=
 (** There is at most one "minimal" solution to the matching problem for
 lists of expressions as characterised by the matchExpLists relation.*)
 Lemma matchExpListsUnique (e1 e2 : list Exp) (l1 l2 : list (Var * Exp)) :
-  matchExpLists e1 e2 l1 -> matchExpLists e1 e2 l2 -> l1 = l2. intros.
+  matchExpLists e1 e2 l1 -> matchExpLists e1 e2 l2 -> l1 = l2.
+Proof.
+  intros.
   generalize dependent l2; induction H; intros. inversion H0.
   reflexivity. inversion H2. apply IHmatchExpLists in H9.
   rewrite <- H9 in H10. replace x0 with x1 in H10.
   eapply lubBindListUnique. apply H1. assumption.
-  eapply matchExpUnique. apply H. assumption. Qed.
+  eapply matchExpUnique. apply H. assumption.
+Qed.
 
 (** There is at most one "minimal" solution to the matching problem for
 boolean expressions, as characterised by the matchExp relation.*)
 Lemma matchBoolExpUnique (e1 e2 : BoolExp) (l1 l2 : list (Var * Exp)) :
-  matchBoolExp e1 e2 l1 -> matchBoolExp e1 e2 l2 -> l1 = l2. intros.
+  matchBoolExp e1 e2 l1 -> matchBoolExp e1 e2 l2 -> l1 = l2.
+Proof.
+  intros.
   induction H; inversion H0; try
   (eapply lubBindListUnique; [apply H2|]; replace l1 with l4; [replace l0 with l5;
   [apply H10|eapply matchExpUnique; [apply H9 | apply H1]]|
@@ -1843,10 +2128,12 @@ Lemma matchBoolExpUnique (e1 e2 : BoolExp) (l1 l2 : list (Var * Exp)) :
   eapply lubBindListUnique. apply H3. replace l1 with l5.
   replace l0 with l6. assumption. eapply matchExpUnique.
   apply H13. assumption. eapply matchExpUnique. apply H11.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma decMatchBoolExp (e1 e2 : BoolExp) :
   decidable (exists l, matchBoolExp e1 e2 l).
+Proof.
   generalize dependent e2; induction e1;
   intros; destruct e2; try solve [right; unfold not; intros;
   inversion H; inversion H0].
@@ -1903,10 +2190,12 @@ Lemma decMatchBoolExp (e1 e2 : BoolExp) :
   right. unfold not. intros. apply H1. inversion H0. inversion H2.
   exists l2. assumption.
   right. unfold not. intros. apply H0. inversion H. inversion H1.
-  exists l1. assumption. Qed.
+  exists l1. assumption.
+Qed.
 
 Lemma decMatchExpLists (e1 e2 : list Exp) :
   decidable (exists l, matchExpLists e1 e2 l).
+Proof.
   generalize dependent e2. induction e1; intros; destruct e2;
   try solve [right; unfold not; intros; inversion H; inversion H0].
   left. exists (@nil (Var*Exp)). constructor.
@@ -1922,50 +2211,66 @@ Lemma decMatchExpLists (e1 e2 : list Exp) :
   right. unfold not. intros. apply H1. invertClear H0.
   invertClear H2. exists x1. assumption.
   right. unfold not. intros. apply H0. invertClear H.
-  invertClear H1. exists x2. assumption. Qed.
+  invertClear H1. exists x2. assumption.
+Qed.
 
 (**TO GO: COMH BASICS*)
 Lemma split_append_fst {A B : Type} (l1 l2 : list (A * B)) :
   fst (split (l1 ++ l2)) = fst (split l1) ++ fst (split l2).
+Proof.
   induction l1. reflexivity. destruct a. simpl.
   remember (split (l1 ++ l2)). destruct p.
   remember (split l1). destruct p. simpl. f_equal.
-  apply IHl1. Qed.
+  apply IHl1.
+Qed.
 
 (**TO GO: COMH BASICS*)
 Lemma split_append_snd {A B : Type} (l1 l2 : list (A * B)) :
   snd (split (l1 ++ l2)) = snd (split l1) ++ snd (split l2).
+Proof.
   induction l1. reflexivity. destruct a. simpl.
   remember (split (l1 ++ l2)). destruct p.
   remember (split l1). destruct p. simpl. f_equal.
-  apply IHl1. Qed.
+  apply IHl1.
+Qed.
 
 Lemma bindSub_app_id (l1 l2 : list (Var * Exp)) :
   bindListToSub l1 = idSubst -> bindListToSub l2 = idSubst ->
-  bindListToSub (l1 ++ l2) = idSubst. intros.
+  bindListToSub (l1 ++ l2) = idSubst.
+Proof.
+  intros.
   apply functional_extensionality. intros.
   assert (bindListToSub l1 x = idSubst x). rewrite H. reflexivity.
   clear H. induction l1. rewrite <- H0. simpl. reflexivity.
   destruct a. rewrite <- bindApp_subst in H1. rewrite <- bindApp_subst.
   simpl. simpl in H1. remember (eqDecVar x v). rewrite <- H1.
   destruct s. reflexivity. rewrite H1. rewrite bindApp_subst.
-  apply IHl1. rewrite <- bindApp_subst. assumption. Qed.
+  apply IHl1. rewrite <- bindApp_subst. assumption.
+Qed.
   
 Lemma notIn_src_bindApp_id (x : Var) (l : list (Var * Exp)) :
-  ~ x _: splitSrc l -> bindApp l x = idSubst x. intros.
+  ~ x _: splitSrc l -> bindApp l x = idSubst x.
+Proof.
+  intros.
   induction l. reflexivity. destruct a. simpl.
   remember (eqDecVar x v). rewrite splitSrcCons in H. destruct s.
   rewrite e0 in H. apply False_ind. apply H. 
   left. reflexivity. apply IHl. unfold not. intros.
-  apply H. right. assumption. Qed.
+  apply H. right. assumption.
+Qed.
 
 (**TO GO: Comh Basics*)
 Lemma in_sing {X : Type} (x y : X) :
-  x _: [y] -> x = y. intros. inversion H. rewrite H0.
-  reflexivity. inversion H0. Qed.
+  x _: [y] -> x = y.
+Proof.
+  intros. inversion H. rewrite H0.
+  reflexivity. inversion H0.
+Qed.
 
 Lemma restrict_nil_id (l : list (Var * Exp)) (x : list Var) :
-  l<[]restrictSrc [] x -> bindListToSub l = idSubst. intros.
+  l<[]restrictSrc [] x -> bindListToSub l = idSubst.
+Proof.
+  intros.
   generalize dependent l. induction x; intros.
   apply preord_emp_eq in H. rewrite H. reflexivity.
   simpl in H. unfold bindListToSub in H. simpl in H.
@@ -1979,22 +2284,28 @@ Lemma restrict_nil_id (l : list (Var * Exp)) (x : list Var) :
   rewrite H1. assumption. apply preord_cons_excl in H. apply IHx in H.
   rewrite <- bindApp_subst. rewrite notIn_bindApp_excl with (l2 := [a]).
   rewrite bindApp_subst. rewrite H. reflexivity. unfold not. intros.
-  apply H1. apply in_sing; assumption. Qed.
+  apply H1. apply in_sing; assumption.
+Qed.
 
 Lemma matchExp_refl (e : Exp) :
   exists z, matchExp e e z /\ (bindListToSub z = idSubst).
+Proof.
   addHyp (sub_matchExp_ex e []). invertClear H. invertClear H0.
   exists x. rewrite idSubExp in H. split. apply H.
-  eapply restrict_nil_id. apply H1. Qed.
+  eapply restrict_nil_id. apply H1.
+Qed.
 
 Lemma incl_restrict_refl (l : list (Var * Exp)) (x y : list Var) :
-  incl x y -> restrictSrc l x <[] restrictSrc l y. intros.
+  incl x y -> restrictSrc l x <[] restrictSrc l y.
+Proof.
+  intros.
   rewrite preordBindListAlt. intros.
   assert (x0 _: x). erewrite <- restrictSrc_source. apply H0.
   assert (x0 _: y). apply H. assumption.
   assert (x0 _: splitSrc (restrictSrc l y)). rewrite restrictSrc_source.
   assumption. split. assumption. repeat (rewrite restrictSrc_in;[|assumption]).
-  reflexivity. Qed.
+  reflexivity.
+Qed.
 
 (** Any list l with substitution from bindList x applied can be matched by some 
 bindList z to l, where z is less than x in the preorder.*)
@@ -2002,6 +2313,7 @@ Theorem sub_matchLists_ex (l : list Exp) (x : list (Var * Exp)) :
   exists z, matchExpLists
   (listSub (bindListToSub x) l) l z /\
   preordBindList z (restrictSrc x (freeVarsListExp l)).
+Proof.
   induction l. exists (@nil (Var * Exp)). split. constructor.
   apply preord_emp. invertClear IHl. invertClear H. simpl.
   addHyp (sub_matchExp_ex a x). invertClear H. invertClear H2.
@@ -2014,7 +2326,8 @@ Theorem sub_matchLists_ex (l : list Exp) (x : list (Var * Exp)) :
   apply H5. rewrite Heql0. apply incl_restrict_refl.
   unfold freeVarsListExp. simpl. unfold incl. intros.
   apply set_union_elim in H4. invertClear H4. apply set_union_intro2.
-  assumption. apply set_union_intro1. assumption. Qed.
+  assumption. apply set_union_intro1. assumption.
+Qed.
 
 
 
@@ -2037,15 +2350,20 @@ Theorem sub_matchLists_ex (l : list Exp) (x : list (Var * Exp)) :
 
 
 Lemma joinBinList_comm (l1 l2 l3 : list (Var * Exp)) :
-  joinBindList l1 l2 l3 -> joinBindList l1 l3 l2. intros.
-  invertClear H. split; assumption. Qed. 
+  joinBindList l1 l2 l3 -> joinBindList l1 l3 l2.
+Proof.
+  intros.
+  invertClear H. split; assumption.
+Qed. 
 
 (** Any boolexp b with substitution from bindList x applied can be matched by some 
 bindList z to b, where z is less than x in the preorder.*)
 Theorem sub_matchBool_ex (b : BoolExp) (x : list (Var * Exp)) :
   exists z, matchBoolExp
   (subBoolExp (bindListToSub x) b) b z
-  /\ preordBindList z (restrictSrc x (freeVarsBoolExp b)). induction b; simpl;
+  /\ preordBindList z (restrictSrc x (freeVarsBoolExp b)).
+Proof.
+  induction b; simpl;
   try(
   addHyp (sub_matchExp_ex e x); addHyp (sub_matchExp_ex e0 x);
   invertClear H; invertClear H0; invertClear H1; invertClear H;
@@ -2075,25 +2393,34 @@ Theorem sub_matchBool_ex (b : BoolExp) (x : list (Var * Exp)) :
   assert (joinBindList z'' x3 x2). split; assumption.
   apply join_lubBindList_ex in H6. invertClear H6. invertClear H8.
   exists x4. split. econstructor. apply H1. apply H2. apply H.
-  apply H0. assumption. assumption. Qed.
+  apply H0. assumption. assumption.
+Qed.
 
 Lemma matchListsSubEquivPre (l1 l2 : list Exp) (z z' : list (Var * Exp)) :
   matchExpLists l1 l2 z -> preordBindList z z' ->
-  l1 = listSub (bindListToSub z') l2. intro. 
+  l1 = listSub (bindListToSub z') l2.
+Proof.
+  intro. 
   induction H; intros. reflexivity. assert (x2 <[] z' /\ x1 <[] z').
   invertClear H1. invertClear H3. split; eapply preordBindList_trans.
   apply H7. rewrite <- H5. rewrite <- H6. rewrite H4.
   assumption. apply H1. rewrite <- H5. rewrite <- H6. rewrite H4.
   assumption. invertClear H3. simpl. f_equal. eapply matchExpSubEquivPre.
-  apply H. assumption. apply IHmatchExpLists. assumption. Qed.
+  apply H. assumption. apply IHmatchExpLists. assumption.
+Qed.
 
 Lemma matchListsSubEquiv (e1 e2 : list Exp) (l : list (Var * Exp)) :
-  matchExpLists e1 e2 l -> e1 = listSub (bindListToSub l) e2. intros.
-  eapply matchListsSubEquivPre. apply H. apply preordBindList_refl. Qed.
+  matchExpLists e1 e2 l -> e1 = listSub (bindListToSub l) e2.
+Proof.
+  intros.
+  eapply matchListsSubEquivPre. apply H. apply preordBindList_refl.
+Qed.
 
 Lemma matchBoolExpSubEquivPre (e1 e2 : BoolExp) (l l' : list (Var * Exp)) :
   matchBoolExp e1 e2 l -> preordBindList l l' ->
-  e1 = subBoolExp (bindListToSub l') e2. intros. induction H;
+  e1 = subBoolExp (bindListToSub l') e2.
+Proof.
+  intros. induction H;
   try (invertClear H2; rewrite H5 in H4; rewrite H6 in H4; rewrite H4 in H3;
   clear H4 H5 H6; invertClear H3; addHyp (preordBindList_trans l1 l l' H2 H0);
   addHyp (preordBindList_trans l2 l l' H4 H0); simpl;
@@ -2107,12 +2434,15 @@ Lemma matchBoolExpSubEquivPre (e1 e2 : BoolExp) (l l' : list (Var * Exp)) :
   addHyp (preordBindList_trans l2 l l' H6 H5).
   addHyp (preordBindList_trans l1 l l' H3 H5).
   simpl. f_equal; eapply matchExpSubEquivPre. apply H. assumption.
-  apply H1. assumption. apply H2. assumption. Qed.
+  apply H1. assumption. apply H2. assumption.
+Qed.
 
 Lemma subExp_restrict_eq (l1 l2 : list (Var * Exp)) (e : Exp) :
   subExp (bindListToSub l2) e = subExp (bindListToSub l1) e -> 
   subExp (bindListToSub l2) e =
-  subExp (bindListToSub (restrictSrc l1 (splitSrc l2))) e. intros.
+  subExp (bindListToSub (restrictSrc l1 (splitSrc l2))) e.
+Proof.
+  intros.
   induction e; simpl; try reflexivity; try
   (inversion H; (f_equal;[apply IHe1 | apply IHe2]);assumption).
   addHyp (in_dec eqDecVar v (splitSrc l2)).
@@ -2120,40 +2450,51 @@ Lemma subExp_restrict_eq (l1 l2 : list (Var * Exp)) (e : Exp) :
   addHyp H1. rewrite <- (restrictSrc_source l1 (splitSrc l2)) in H0.
   repeat (rewrite <- notIn_bindList_id;[|assumption]). reflexivity.
   f_equal. apply IHe. inversion H. reflexivity.
-  f_equal. apply IHe. inversion H. reflexivity. Qed.
+  f_equal. apply IHe. inversion H. reflexivity.
+Qed.
 
 Lemma subBoolExp_restrict_eq (l1 l2 : list (Var * Exp)) (b : BoolExp) :
   subBoolExp (bindListToSub l2) b = subBoolExp (bindListToSub l1) b ->
   subBoolExp (bindListToSub l2) b =
   subBoolExp (bindListToSub (restrictSrc l1 (splitSrc l2))) b.
+Proof.
   intros. induction b; simpl; inversion H; f_equal;
   try (apply subExp_restrict_eq; assumption).
-  apply IHb. assumption. Qed.
+  apply IHb. assumption.
+Qed.
 
 Lemma listSub_restrict_eq (l1 l2 : list (Var * Exp)) (l : list Exp) :
   listSub (bindListToSub l2) l = listSub (bindListToSub l1) l ->
   listSub (bindListToSub l2) l =
-  listSub (bindListToSub (restrictSrc l1 (splitSrc l2))) l. intros.
+  listSub (bindListToSub (restrictSrc l1 (splitSrc l2))) l.
+Proof.
+  intros.
   induction l. reflexivity. simpl. f_equal. invertClear H.
   apply subExp_restrict_eq; assumption. apply IHl.
-  inversion H. reflexivity. Qed.
+  inversion H. reflexivity.
+Qed.
  
 (** Exclude distributes over restrict*)
 Lemma res_excl_distr (l1 l2 : list (Var * Exp)) (l : list Var) :
   restrictSrc (excludeSrc l1 l) (splitSrc (excludeSrc l2 l)) =
   excludeSrc (restrictSrc l1 (splitSrc l2)) l.
+Proof.
   induction l2. reflexivity. simpl. destruct a;
   rewrite splitSrcCons. simpl. remember (in_dec eqDecVar v l).
   destruct s. assumption. rewrite splitSrcCons. simpl.
   f_equal. f_equal. repeat rewrite <- bindApp_subst.
   symmetry. apply notIn_bindApp_excl. assumption.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma in_exclude_sub_eq (v : Var) (x : list Var) (l : list (Var * Exp)) :
-  v _: x -> bindListToSub (excludeSrc l x) v = v. intros.
+  v _: x -> bindListToSub (excludeSrc l x) v = v.
+Proof.
+  intros.
   rewrite <- bindApp_subst. cut (bindApp (excludeSrc l x) v = idSubst v).
   intros. unfold idSubst in H0. apply H0. apply notIn_src_bindApp_id.
-  apply exclude_in_splitSrc. assumption. Qed.
+  apply exclude_in_splitSrc. assumption.
+Qed.
 
 (** passiveSrc x l, read x is passive in the source of l, or just x is passive in l,
 means that all variables in x are only mapped to themselves by l.*)
@@ -2164,52 +2505,70 @@ Inductive passiveSrc : list Var -> list (Var * Exp) -> Prop :=
   | psrcConsNotIn (x : list Var) (v : Var) (l : list (Var * Exp)) :
     passiveSrc x l -> ~v _: (splitSrc l) -> passiveSrc (v :: x) l.
 
-Lemma passive_nil (x : list Var) : passiveSrc x []. induction x. constructor.
-  apply psrcConsNotIn. assumption. unfold not. intros. inversion H. Qed.
+Lemma passive_nil (x : list Var) : passiveSrc x [].
+Proof.
+  induction x. constructor.
+  apply psrcConsNotIn. assumption. unfold not. intros. inversion H.
+Qed.
 
 Lemma passive_tl (a : Var) (x : list Var) (l : list (Var * Exp)) : 
-  passiveSrc (a :: x) l -> passiveSrc x l. intros. inversion H; assumption.
-  Qed.
+  passiveSrc (a :: x) l -> passiveSrc x l.
+Proof.
+  intros. inversion H; assumption.
+Qed.
 
 Lemma passive_cons_eq (v : Var) (x : list Var) (l : list (Var * Exp)) : 
-  passiveSrc x l -> passiveSrc x ((v, eVar v) :: l). intros.
+  passiveSrc x l -> passiveSrc x ((v, eVar v) :: l).
+Proof.
+  intros.
   induction x. constructor. addHyp (eqDecVar a v). invertClear H0.
   rewrite H1. eapply psrcConsFstOcc. apply IHx. eapply passive_tl;apply H.
   constructor. inversion H. constructor. apply IHx. assumption.
   constructor;assumption. apply psrcConsNotIn. apply IHx. assumption.
   unfold not. intros. rewrite splitSrcCons in H6. inversion H6.
-  apply H1. symmetry. assumption. apply H5. assumption. Qed.
+  apply H1. symmetry. assumption. apply H5. assumption.
+Qed.
 
 (**To Go: COMH BASICS*)
 Lemma notIn_cons {X : Type} (x y : X) (l : list X) : 
-  ~ x _: (y :: l) -> ~ x _: l. intros. unfold not. intros. apply H.
-  apply in_cons. assumption. Qed.
+  ~ x _: (y :: l) -> ~ x _: l.
+Proof.
+  intros. unfold not. intros. apply H.
+  apply in_cons. assumption.
+Qed.
 
 Lemma passive_cons_notIn (v : Var) (e : Exp) (x : list Var) (l : list (Var * Exp)) : 
-  passiveSrc x l -> ~v _: x -> passiveSrc x ((v, e) :: l). intros.
+  passiveSrc x l -> ~v _: x -> passiveSrc x ((v, e) :: l).
+Proof.
+  intros.
   induction x. constructor. inversion H. constructor. apply IHx.
   assumption. eapply notIn_cons. apply H0. constructor. assumption.
   unfold not. intros. apply H0. left. assumption. apply psrcConsNotIn.
   apply IHx. assumption. eapply notIn_cons. apply H0. unfold not.
   intros. apply H5. rewrite splitSrcCons in H6. invertClear H6.
   apply False_ind. apply H0. left. symmetry. assumption.
-  apply H7. Qed.
+  apply H7.
+Qed.
 
 Lemma notIn_src_excl (v : Var) (x : list Var) (l : list (Var * Exp)) :
   ~ v _: splitSrc l -> 
   bindListToSub (excludeSrc l (v :: x)) = bindListToSub (excludeSrc l x).
+Proof.
   intros. induction l. reflexivity. destruct a. rewrite splitSrcCons in H.
   assert (bindListToSub (excludeSrc l (v :: x)) = bindListToSub (excludeSrc l x)).
   apply IHl. unfold not. intros. apply H. right. assumption. clear IHl.
   simpl. remember (eqDecVar v v0). destruct s. remember (in_dec eqDecVar v0 x).
   destruct s. apply H0. rewrite e0 in H. apply False_ind. apply H. left.
   reflexivity. remember (in_dec eqDecVar v0 x). destruct s. apply H0.
-  repeat rewrite bindListToSubCons. f_equal. assumption. Qed.
+  repeat rewrite bindListToSubCons. f_equal. assumption.
+Qed.
 
 (** If all members of x are mapped to themselves by l, then x is passive in l.*)
 Lemma idSrc_passive (x : list Var) (l : list (Var * Exp)) :
   (forall v : Var, v _: x -> (bindListToSub l) v = eVar v) ->
-  passiveSrc x l. intros. induction x. constructor.
+  passiveSrc x l.
+Proof.
+  intros. induction x. constructor.
   assert ((forall v : Var, v _: x -> bindListToSub l v = v)). intros.
   apply H. right. assumption. apply IHx in H0. clear IHx.
   addHyp (in_dec eqDecVar a (splitSrc l)). invertClear H1.
@@ -2217,12 +2576,14 @@ Lemma idSrc_passive (x : list Var) (l : list (Var * Exp)) :
   apply firstOcc_bindApp in H1. rewrite bindApp_subst in H1.
   assert (bindListToSub l a = a). apply H. left. reflexivity.
   rewrite H3 in H1. rewrite <- H1 in H2. clear H1 H3.
-  constructor; assumption. apply psrcConsNotIn; assumption. Qed.
+  constructor; assumption. apply psrcConsNotIn; assumption.
+Qed.
 
 (** If x is passive in l, then excluding it from l yields the same substitution
 function, and vice versa.*)
 Theorem passiveSrc_exclude_equiv (x : list Var) (l : list (Var * Exp)) :
   passiveSrc x l <-> bindListToSub (excludeSrc l x) = bindListToSub l.
+Proof.
   split; intros. induction x. rewrite exclude_nil. reflexivity.
   apply functional_extensionality. intros. inversion H.
   rewrite <- IHx; [|assumption]. 
@@ -2238,10 +2599,13 @@ Theorem passiveSrc_exclude_equiv (x : list Var) (l : list (Var * Exp)) :
   assumption.
   (*Right to left*)
   apply idSrc_passive. intros. rewrite <- H. apply in_exclude_sub_eq.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Theorem dec_passiveSrc (x : list Var) (l : list (Var * Exp)) :
-  decidable (passiveSrc x l). induction x. left. constructor.
+  decidable (passiveSrc x l).
+Proof.
+  induction x. left. constructor.
   invertClear IHx. addHyp (in_dec eqDecVar a (splitSrc l)).
   invertClear H0. addHyp H1. apply splitSrc_firstOcc_ex in H0.
   invertClear H0. addHyp (eqDecExp a x0). invertClear H0.
@@ -2250,46 +2614,60 @@ Theorem dec_passiveSrc (x : list Var) (l : list (Var * Exp)) :
   eapply firstOcc_unique. apply H8. assumption.
   apply H8. assumption. left. apply psrcConsNotIn; assumption.
   right. unfold not. intros. apply H. eapply passive_tl.
-  apply H0. Qed.
+  apply H0.
+Qed.
 
 Lemma passive_in_firstOcc_eq (v : Var) (e : Exp) (x : list Var)
   (l : list (Var * Exp)) :
   passiveSrc x l -> v _: x -> firstOcc v e l -> e = eVar v.
+Proof.
   intros. induction H. inversion H0. apply in_cons_not_var in H0.
   invertClear H0. eapply firstOcc_unique. apply H1. repeat rewrite H3.
   assumption. invertClear H3. apply IHpassiveSrc; assumption.
   apply in_cons_not_var in H0.
   invertClear H0. apply False_ind. apply H2. rewrite <- H3.
   eapply firstOcc_splitSrc. apply H1. invertClear H3.
-  apply IHpassiveSrc; assumption. Qed.
+  apply IHpassiveSrc; assumption.
+Qed.
 
 Lemma in_firstOcc_id (v : Var) (x : list Var) :
-  v _: x -> firstOcc v v (idBindList x). intros. induction x.
+  v _: x -> firstOcc v v (idBindList x).
+Proof.
+  intros. induction x.
   inversion H. apply in_cons_not_var in H. invertClear H.
   simpl. repeat rewrite H0. constructor. invertClear H0.
-  simpl. constructor. apply IHx. assumption. assumption. Qed.
+  simpl. constructor. apply IHx. assumption. assumption.
+Qed.
 
 Lemma firstOcc_notIn_append (v : Var) (e : Exp) (l1 l2 : list (Var * Exp)) :
-  firstOcc v e l2 -> ~v _: (splitSrc l1) -> firstOcc v e (l1 ++ l2). intros.
+  firstOcc v e l2 -> ~v _: (splitSrc l1) -> firstOcc v e (l1 ++ l2).
+Proof.
+  intros.
   induction l1. apply H. destruct a. assert (~ v _: splitSrc l1). unfold not.
   intros. apply H0. rewrite splitSrcCons. right. assumption. apply IHl1 in H1.
   simpl. constructor. assumption. unfold not. intro. apply H0.
-  rewrite splitSrcCons. left. rewrite H2. reflexivity. Qed.
+  rewrite splitSrcCons. left. rewrite H2. reflexivity.
+Qed.
 
 Lemma passive_excl_id (x : list Var) (l l' : list (Var * Exp)) :
   passiveSrc x l -> (excludeSrc l x) <[] l' ->
-  l <[] (idBindList x) ++ l'. intros. unfold preordBindList. intros.
+  l <[] (idBindList x) ++ l'.
+Proof.
+  intros. unfold preordBindList. intros.
   addHyp (in_dec eqDecVar x0 x). invertClear H2.
   assert (e = eVar x0). eapply passive_in_firstOcc_eq.
   apply H. assumption. assumption. rewrite H2. clear H2.
   apply firstOcc_append. apply in_firstOcc_id. assumption.
   apply firstOcc_notIn_append. apply H0.
   apply firstOcc_notIn_exclude; assumption. rewrite srcIdBindList.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma notEq_sub_excl_eq (v v' : Var) (x : list Var) (l : list (Var * Exp)) :
   v <> v' -> bindListToSub (excludeSrc l x) v' =
-  bindListToSub (excludeSrc l (v :: x)) v'. intros. induction l.
+  bindListToSub (excludeSrc l (v :: x)) v'.
+Proof.
+  intros. induction l.
   reflexivity. destruct a. simpl. remember (in_dec eqDecVar v0 x).
   destruct s. remember (eqDecVar v v0). destruct s. apply IHl.
   apply IHl. remember (eqDecVar v v0). destruct s.
@@ -2298,75 +2676,98 @@ Lemma notEq_sub_excl_eq (v v' : Var) (x : list Var) (l : list (Var * Exp)) :
   repeat rewrite bindListToSubCons. addHyp (eqDecVar v0 v').
   invertClear H0. repeat rewrite H1. repeat rewrite updateAppEq.
   reflexivity. repeat (rewrite updateAppNeq;[|assumption]).
-  apply IHl. Qed.
+  apply IHl.
+Qed.
 
 Lemma id_app_excl_sub_eq (x : list Var) (l : list (Var * Exp)) :
   bindListToSub (idBindList x ++ l) = bindListToSub (excludeSrc l x).
+Proof.
   apply functional_extensionality. intros.
   induction x. rewrite exclude_nil. reflexivity.
   simpl. rewrite bindListToSubCons. addHyp (eqDecVar a x0).
   invertClear H. rewrite H0. rewrite updateAppEq.
   rewrite in_exclude_sub_eq. reflexivity. left. reflexivity.
   rewrite updateAppNeq;[|assumption]. rewrite IHx.
-  apply notEq_sub_excl_eq. assumption. Qed.
+  apply notEq_sub_excl_eq. assumption.
+Qed.
 
 Lemma excludeSrc_idem (x : list Var) (l : list (Var * Exp)) :
-  (excludeSrc l x) = (excludeSrc (excludeSrc l x) x). induction l.
+  (excludeSrc l x) = (excludeSrc (excludeSrc l x) x).
+Proof.
+  induction l.
   reflexivity. destruct a. simpl. remember (in_dec eqDecVar v x).
   destruct s. assumption. simpl. remember (in_dec eqDecVar v x).
   destruct s. apply False_ind. apply n. assumption.
-  f_equal. assumption. Qed.
+  f_equal. assumption.
+Qed.
 
 Lemma notIn_restrict (v : Var) (x : list Var) (l : list (Var * Exp)) :
-  ~ v _: x -> bindListToSub (restrictSrc l x) v = v. intros.
+  ~ v _: x -> bindListToSub (restrictSrc l x) v = v.
+Proof.
+  intros.
   induction x. reflexivity. addHyp H. apply notIn_cons in H.
   apply IHx in H. clear IHx. simpl. rewrite <- bindApp_subst.
   simpl. remember (eqDecVar v a). destruct s. apply False_ind.
   apply H0. left. rewrite e. reflexivity. rewrite bindApp_subst.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma pre_excl_res_id (v : Var) (x w : list Var)
   (l1 l2 : list (Var * Exp)) :
   l1 <[] (restrictSrc (excludeSrc l2 x) w) -> v _: x ->
   (bindListToSub l1) v = v.
+Proof.
   intros. rename H0 into Q. rewrite preordBindListAlt in H.
   addHyp (in_dec eqDecVar v (splitSrc l1)).
   invertClear H0. apply H in H1. invertClear H1. rewrite H2.
   addHyp (in_dec eqDecVar v w). invertClear H1.
   rewrite restrictSrc_in;[|assumption]. apply in_exclude_sub_eq.
   assumption. apply notIn_restrict; assumption.
-  symmetry. apply notIn_bindList_id. assumption. Qed.
+  symmetry. apply notIn_bindList_id. assumption.
+Qed.
 
 Lemma pre_excl_res_passive (x w : list Var)
   (l1 l2 : list (Var * Exp)) :
   l1 <[] (restrictSrc (excludeSrc l2 x) w) ->
-  passiveSrc x l1. intros. apply idSrc_passive. intros.
-  eapply pre_excl_res_id. apply H. assumption. Qed.
+  passiveSrc x l1.
+Proof.
+  intros. apply idSrc_passive. intros.
+  eapply pre_excl_res_id. apply H. assumption.
+Qed.
 
 Lemma preordBindList_cons (a : Var * Exp) (l l' : list (Var * Exp)):
-  l <[] l' -> a :: l <[] a :: l'. unfold preordBindList. intros.
+  l <[] l' -> a :: l <[] a :: l'.
+Proof.
+  unfold preordBindList. intros.
   inversion H0. constructor. constructor. apply H. assumption.
-  assumption. Qed.
+  assumption.
+Qed.
   
 Lemma exclude_restrict_cons (v : Var) (e : Exp) (x w : list Var) (l : list (Var * Exp)) :
   v _: x -> excludeSrc (restrictSrc ((v, e) :: l) w) x = excludeSrc (restrictSrc l w) x.
+Proof.
   induction w. reflexivity. simpl. remember (in_dec eqDecVar a x). destruct s.
   assumption. intros. addHyp H. apply IHw in H.
   replace (bindListToSub ((v, e) :: l) a) with
   (bindListToSub l a). f_equal. assumption. rewrite bindListToSubCons.
   rewrite updateAppNeq. reflexivity. unfold not. intros. apply n.
-  rewrite <- H1. assumption. Qed.
+  rewrite <- H1. assumption.
+Qed.
 
 Lemma notIn_sub_excl (v : Var) (x : list Var) (l : list (Var * Exp)) :
   ~v _: x -> bindListToSub (excludeSrc l x) v = bindListToSub l v.
+Proof.
   intros. repeat rewrite <- bindApp_subst. rewrite <- notIn_bindApp_excl.
-  reflexivity. assumption. Qed.
+  reflexivity. assumption.
+Qed.
 
 Lemma excl_res_distr (x w : list Var) (l : list (Var * Exp)) :
   excludeSrc (restrictSrc (excludeSrc l x) w) x = excludeSrc (restrictSrc l w) x.
+Proof.
   induction w. reflexivity. simpl. remember (in_dec eqDecVar a x).
   destruct s. assumption. f_equal. f_equal. apply notIn_sub_excl. assumption.
-  assumption. Qed.
+  assumption.
+Qed.
 
 (********Equivalence stuff***************)
 
@@ -2376,101 +2777,152 @@ Definition set_equal {A : Type} (l1 l2 : set A) : Prop :=
 Notation "a ={}= b" := (set_equal a b) (at level 70).
 
 Lemma set_equal_not {A : Type} (l1 l2 : set A) : 
-  l1 ={}= l2  -> forall a : A, ~a _: l1 <-> ~a _: l2. intros.
+  l1 ={}= l2  -> forall a : A, ~a _: l1 <-> ~a _: l2.
+Proof.
+  intros.
   addHyp (H a). invertClear H0. 
   unfold not; split; intros; apply H0. apply H2.
-  assumption. apply H1. assumption. Qed.
+  assumption. apply H1. assumption.
+Qed.
 
 Lemma set_equal_refl {A : Type} (l : set A) : 
-  l ={}= l. unfold set_equal. intros. reflexivity. Qed.
+  l ={}= l.
+Proof. unfold set_equal. intros. reflexivity. Qed.
 
 Lemma set_equal_trans {A : Type} (l1 l2 l3 : set A) : 
-  l1 ={}= l2  -> l2 ={}= l3  -> l1 ={}= l3. intros.
+  l1 ={}= l2  -> l2 ={}= l3  -> l1 ={}= l3.
+Proof.
+  intros.
   unfold set_equal. intros. addHyp (H a). addHyp (H0 a).
-  clear H H0. rewrite H1. assumption. Qed.
+  clear H H0. rewrite H1. assumption.
+Qed.
 
 Lemma set_equal_symm {A : Type} (l1 l2 : set A) : 
-  l1 ={}= l2  -> l2 ={}= l1. unfold set_equal. intros.
-  symmetry. apply H. Qed.
+  l1 ={}= l2  -> l2 ={}= l1.
+Proof.
+  unfold set_equal. intros.
+  symmetry. apply H.
+Qed.
 
 Lemma set_equal_nil_l {A : Type} (l2 : set A) : 
-  [] ={}= l2  -> l2 = []. intros. destruct l2.
+  [] ={}= l2  -> l2 = [].
+Proof.
+  intros. destruct l2.
   reflexivity. cut (a _: []). intros. inversion H0.
-  addHyp (H a). rewrite H0. left. reflexivity. Qed.
+  addHyp (H a). rewrite H0. left. reflexivity.
+Qed.
 
 Lemma set_equal_nil_r {A : Type} (l1 : set A) : 
-  l1 ={}= []  -> l1 = []. intros. apply set_equal_symm in H.
-  apply set_equal_nil_l. assumption. Qed.
+  l1 ={}= []  -> l1 = [].
+Proof.
+  intros. apply set_equal_symm in H.
+  apply set_equal_nil_l. assumption.
+Qed.
 
 Lemma set_equal_union_app {A : Type} (p : forall a b : A, {a = b} + {a <> b})
   (l1 l2 : set A) : 
-  set_union p l1 l2 ={}= l1 ++ l2. unfold set_equal. intros. split; intros.
+  set_union p l1 l2 ={}= l1 ++ l2.
+Proof.
+  unfold set_equal. intros. split; intros.
   apply set_union_elim in H. apply in_or_app. apply H.
-  apply set_union_intro. apply in_app_or. apply H. Qed.
+  apply set_union_intro. apply in_app_or. apply H.
+Qed.
 
 Definition equivBindList (l1 l2 : list (Var * Exp)) : Prop :=
   l1 <[] l2 /\ l2 <[] l1.
 Notation "a =[]= b" := (equivBindList a b) (at level 70).
 
 Lemma equiv_preordBindList_l (l1 l1' l2 : list (Var * Exp)) : 
-  l1 <[] l2 -> l1 =[]= l1' -> l1' <[] l2. intros. invertClear H0.
-  eapply preordBindList_trans. apply H2. assumption. Qed.
+  l1 <[] l2 -> l1 =[]= l1' -> l1' <[] l2.
+Proof.
+  intros. invertClear H0.
+  eapply preordBindList_trans. apply H2. assumption.
+Qed.
 
 Lemma equiv_preordBindList_r (l1 l2 l2' : list (Var * Exp)) : 
-  l1 <[] l2 -> l2 =[]= l2' -> l1 <[] l2'. intros. invertClear H0.
-  eapply preordBindList_trans. apply H. assumption. Qed.
+  l1 <[] l2 -> l2 =[]= l2' -> l1 <[] l2'.
+Proof.
+  intros. invertClear H0.
+  eapply preordBindList_trans. apply H. assumption.
+Qed.
 
 Lemma equivBindList_symm (l1 l2 : list (Var * Exp)) : 
-  l1 =[]= l2 -> l2 =[]= l1. intros. invertClear H.
-  split; assumption. Qed.
+  l1 =[]= l2 -> l2 =[]= l1.
+Proof.
+  intros. invertClear H.
+  split; assumption.
+Qed.
 
 Lemma equivBindList_trans (l1 l2 l3 : list (Var * Exp)) : 
-  l1 =[]= l2 -> l2 =[]= l3 -> l1 =[]= l3. intros. 
+  l1 =[]= l2 -> l2 =[]= l3 -> l1 =[]= l3.
+Proof.
+  intros. 
   apply equivBindList_symm in H. split.
   eapply equiv_preordBindList_l;[|apply H]. invertClear H0.
   assumption. eapply equiv_preordBindList_r;[|apply H].
-  invertClear H0. assumption. Qed.
+  invertClear H0. assumption.
+Qed.
   
 Lemma equivBindList_refl (l : list (Var * Exp)) : 
-  l =[]= l. split; apply preordBindList_refl. Qed.
+  l =[]= l.
+Proof. split; apply preordBindList_refl. Qed.
 
 Lemma firstOcc_exclude_notIn (v : Var) (e : Exp) (x : list Var)
   (l : list (Var * Exp)) :
-  firstOcc v e (excludeSrc l x) -> ~ v _: x. intros.
+  firstOcc v e (excludeSrc l x) -> ~ v _: x.
+Proof.
+  intros.
   addHyp (in_dec eqDecVar v x). invertClear H0.
   apply exclude_in_splitSrc with (l := l) in H1. unfold not.
   intros. apply H1. eapply firstOcc_splitSrc. apply H.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma preord_exclude_pres (l l' : list (Var * Exp)) (x : list Var) :
-  l <[] l' -> excludeSrc l x <[] excludeSrc l' x. intros.
+  l <[] l' -> excludeSrc l x <[] excludeSrc l' x.
+Proof.
+  intros.
   unfold preordBindList. intros. addHyp H0. apply exclude_firstOcc in H0.
   apply H in H0. apply firstOcc_exclude_notIn in H1.
-  apply firstOcc_notIn_exclude; assumption. Qed. 
+  apply firstOcc_notIn_exclude; assumption.
+Qed. 
 
 Lemma equivBindList_cons (a : Var * Exp) (l l' : list (Var * Exp)):
-  l =[]= l' -> a :: l =[]= a :: l'. intros. split;
-  apply preordBindList_cons; apply H. Qed.
+  l =[]= l' -> a :: l =[]= a :: l'.
+Proof.
+  intros. split;
+  apply preordBindList_cons; apply H.
+Qed.
 
 Lemma equivBindList_exclude (l l' : list (Var * Exp)) (x : list Var) : 
-  l =[]= l' -> excludeSrc l x =[]= excludeSrc l' x. intros.
-  invertClear H. split; apply preord_exclude_pres; assumption. Qed.
+  l =[]= l' -> excludeSrc l x =[]= excludeSrc l' x.
+Proof.
+  intros.
+  invertClear H. split; apply preord_exclude_pres; assumption.
+Qed.
   
 Lemma equivBindList_splitSrc (l l' : list (Var * Exp)) : 
-  l =[]= l' -> splitSrc l ={}= splitSrc l'. intros.
+  l =[]= l' -> splitSrc l ={}= splitSrc l'.
+Proof.
+  intros.
   invertClear H. rewrite preordBindListAlt in H0, H1.
   unfold set_equal. intros. addHyp (H0 a). addHyp (H1 a).
   clear H0 H1. split. intros. apply H in H0. invertClear H0.
   assumption. intros. apply H2 in H0. invertClear H0.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma equivBindList_join (l l' l1 l2 : list (Var * Exp)) : 
   l =[]= l' -> joinBindList l l1 l2 -> joinBindList l' l1 l2.
+Proof.
   intros. split;
-  (eapply equiv_preordBindList_r; [apply H0 | apply H]). Qed.
+  (eapply equiv_preordBindList_r; [apply H0 | apply H]).
+Qed.
 
 Lemma equivBindList_restrict (l l' : list (Var * Exp)) (x : list Var) : 
-  l =[]= l' -> restrictSrc l x = restrictSrc l' x. intros.
+  l =[]= l' -> restrictSrc l x = restrictSrc l' x.
+Proof.
+  intros.
   addHyp H. rename H0 into Q. apply equivBindList_splitSrc in Q.
   invertClear H. rewrite preordBindListAlt in H0, H1.
   induction x. reflexivity. simpl. f_equal; [| assumption].
@@ -2479,32 +2931,44 @@ Lemma equivBindList_restrict (l l' : list (Var * Exp)) (x : list Var) :
   invertClear H0. apply H. assumption. addHyp H1.
   rewrite set_equal_not in H0;[|apply Q].
   repeat (rewrite <- notIn_bindList_id;[|assumption]).
-  reflexivity. Qed.
+  reflexivity.
+Qed.
 
 Lemma set_eq_excl (l : list (Var * Exp)) (x y : list Var) :
-  x ={}= y -> excludeSrc l x = excludeSrc l y. intros.
+  x ={}= y -> excludeSrc l x = excludeSrc l y.
+Proof.
+  intros.
   induction l. reflexivity. simpl. destruct a.
   remember (in_dec eqDecVar v x). destruct s.
   remember (in_dec eqDecVar v y). destruct s. assumption.
   clear Heqs. rewrite (H v) in i. apply False_ind. apply n.
   assumption. remember (in_dec eqDecVar v y). destruct s.
   clear Heqs0. apply H in i. apply False_ind. apply n.
-  assumption. f_equal. assumption. Qed.
+  assumption. f_equal. assumption.
+Qed.
 
 Lemma set_eq_res_preord (l : list (Var * Exp)) (x y : list Var) :
-  x ={}= y -> restrictSrc l x <[] restrictSrc l y. intros.
+  x ={}= y -> restrictSrc l x <[] restrictSrc l y.
+Proof.
+  intros.
   rewrite preordBindListAlt. intros. rewrite restrictSrc_source in H0.
   addHyp H0. apply H in H1. split. rewrite restrictSrc_source.
   assumption. repeat (rewrite restrictSrc_in;[|assumption]).
-  reflexivity. Qed. 
+  reflexivity.
+Qed. 
 
 Lemma set_eq_res_equiv (l : list (Var * Exp)) (x y : list Var) :
-  x ={}= y -> restrictSrc l x =[]= restrictSrc l y. intros.
+  x ={}= y -> restrictSrc l x =[]= restrictSrc l y.
+Proof.
+  intros.
   split; apply set_eq_res_preord. assumption. apply set_equal_symm.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma set_eq_freeVars_map (x : list Var) :
-  (freeVarsListExp (map eVar x)) ={}= x. induction x.
+  (freeVarsListExp (map eVar x)) ={}= x.
+Proof.
+  induction x.
   unfold freeVarsListExp. simpl. apply set_equal_refl.
   unfold freeVarsListExp. simpl. unfold set_equal. intros.
   split; intros. apply set_union_elim in H. invertClear H.
@@ -2512,22 +2976,29 @@ Lemma set_eq_freeVars_map (x : list Var) :
   apply IHx. apply H0. apply in_cons_not_var in H. invertClear H.
   apply set_union_intro1. left. symmetry. assumption.
   apply set_union_intro2. apply IHx. invertClear H0.
-  assumption. Qed.
+  assumption.
+Qed.
 
 Lemma firstOcc_in_src (v : Var) (e : Exp) (x : list Var) (l : list (Var * Exp)) : 
-  firstOcc v e (restrictSrc l x) -> v _: x. intros. induction x. inversion H.
-  simpl in H. inversion H. left. reflexivity. right. apply IHx. assumption. Qed.
+  firstOcc v e (restrictSrc l x) -> v _: x.
+Proof.
+  intros. induction x. inversion H.
+  simpl in H. inversion H. left. reflexivity. right. apply IHx. assumption.
+Qed.
 
 Lemma restrict_add_cons_equiv (v : Var) (x : list Var) (l : list (Var * Exp)) :   
   restrictSrc l (set_add eqDecVar v x) =[]= restrictSrc l (v :: x).
+Proof.
   apply set_eq_res_equiv. unfold set_equal. intros. split; intros.
   apply set_add_elim in H. invertClear H. left. symmetry. assumption.
   right. assumption. apply in_cons_not_var in H. invertClear H.
   rewrite H0. apply set_add_intro. left. reflexivity.
-  invertClear H0. apply set_add_intro. right. assumption. Qed.
+  invertClear H0. apply set_add_intro. right. assumption.
+Qed.
 
 Lemma diff_restrict_exclude (l : list (Var * Exp)) (x y : list Var) :
   restrictSrc l (set_diff eqDecVar x y) =[]= (excludeSrc (restrictSrc l x) y).
+Proof.
   induction x. apply equivBindList_refl. simpl. remember (set_mem eqDecVar a y).
   destruct b. remember (in_dec eqDecVar a y). destruct s.
   apply IHx. apply False_ind. apply n. eapply set_mem_correct1.
@@ -2535,45 +3006,62 @@ Lemma diff_restrict_exclude (l : list (Var * Exp)) (x y : list Var) :
   destruct s. apply False_ind. symmetry in Heqb.
   apply set_mem_complete1 in Heqb. apply Heqb. apply i.
   eapply equivBindList_trans; [apply restrict_add_cons_equiv|].
-  simpl. apply equivBindList_cons. assumption. Qed.
+  simpl. apply equivBindList_cons. assumption.
+Qed.
   
 (********END: Equivalence stuff***************)
 
 Lemma preord_restrict_app_join (x w : list Var) (l l1 l2 : list (Var * Exp)) :
   l1 <[] restrictSrc l x -> l2 <[] restrictSrc l w ->
-  joinBindList (restrictSrc l (x ++ w)) l1 l2. intros.
+  joinBindList (restrictSrc l (x ++ w)) l1 l2.
+Proof.
+  intros.
   apply (preord_restrict_union1 l1 l x w) in H.
   apply (preord_restrict_union2 l2 l x w) in H0.
   eapply equivBindList_join;[|split;[apply H | apply H0]].
-  apply set_eq_res_equiv. apply set_equal_union_app. Qed.
+  apply set_eq_res_equiv. apply set_equal_union_app.
+Qed.
 
 
 (*********** END: Matching Stuff.*************)
 
 (*LOCAL TIDY*)
 
-Lemma listSub_emp_id l : listsToSub l [] = idSubst. induction l.
-  reflexivity. simpl. reflexivity. Qed.
+Lemma listSub_emp_id l : listsToSub l [] = idSubst.
+Proof.
+  induction l.
+  reflexivity. simpl. reflexivity.
+Qed.
 
 Lemma resetSub_neq s v1 v2 :
-  v1 <> v2 -> (resetSub s [v1]) v2 = s v2. intros.
+  v1 <> v2 -> (resetSub s [v1]) v2 = s v2.
+Proof.
+  intros.
   unfold resetSub. remember (inVarList v2 [v1]). destruct b.
   symmetry in Heqb. rewrite inVarList_in in Heqb. apply in_sing in Heqb.
-  apply False_ind. apply H. symmetry. assumption. reflexivity. Qed.
+  apply False_ind. apply H. symmetry. assumption. reflexivity.
+Qed.
 
-Lemma varEq_eq x a : true = varEq x a <-> x = a. unfold varEq.
+Lemma varEq_eq x a : true = varEq x a <-> x = a.
+Proof.
+  unfold varEq.
   remember (varEqDec x a). destruct s. split; intro. assumption. 
   reflexivity. split; intro. inversion H. apply False_ind.
-  apply n. assumption. Qed.
+  apply n. assumption.
+Qed.
 
 Lemma varEq_neq x a : false = varEq x a <-> x <> a.
+Proof.
   remember (varEq x a). destruct b. split; intro. inversion H.
   rewrite varEq_eq in Heqb. apply False_ind. apply H. assumption.
   split; intro. unfold varEq in Heqb. remember (varEqDec x a).
-  destruct s. inversion Heqb. assumption. reflexivity. Qed.
+  destruct s. inversion Heqb. assumption. reflexivity.
+Qed.
 
 Lemma inVarList_out (x : Var) (l : list Var) :
-  inVarList x l = false <-> ~ x _: l. split; intros.
+  inVarList x l = false <-> ~ x _: l.
+Proof.
+  split; intros.
   induction l. apply in_nil. simpl in H. remember (varEq x a).
   destruct b. inversion H. apply IHl in H. unfold not. intro.
   rewrite varEq_neq in Heqb. inversion H0. rewrite H1 in Heqb.
@@ -2581,19 +3069,25 @@ Lemma inVarList_out (x : Var) (l : list Var) :
   induction l. reflexivity. lets NI : H. apply notIn_cons in NI.
   apply IHl in NI. clear IHl. simpl. remember (varEq x a).
   destruct b. rewrite varEq_eq in Heqb. rewrite Heqb in H.
-  apply False_ind. apply H. apply in_eq. assumption. Qed.
+  apply False_ind. apply H. apply in_eq. assumption.
+Qed.
 
-Lemma resetSub_eq s v : (resetSub s [v]) v = v. unfold resetSub.
+Lemma resetSub_eq s v : (resetSub s [v]) v = v.
+Proof.
+  unfold resetSub.
   remember (inVarList v [v]). destruct b. reflexivity. symmetry in Heqb.
   rewrite inVarList_out in Heqb. apply False_ind. apply Heqb.
-  apply in_eq. Qed.
+  apply in_eq.
+Qed.
 
  
 (**If an expression evaluates to some b, then applying a substitution to this expression
 leaves it unchanged. The intuition is that evaluation entails no free variables.*)
-Lemma eval_pres_sub e b s : e |_| b -> subExp s e = e. intros. induction H; simpl;
+Lemma eval_pres_sub e b s : e |_| b -> subExp s e = e.
+Proof.
+  intros. induction H; simpl;
   try (rewrite IHevalExp1; rewrite IHevalExp2); try rewrite IHevalExp; reflexivity.
-  Qed.
+Qed.
 
 (** The same for an expression that evaluates to a time.*)
 Lemma subExp_eval_id (s : Subst) (e : Exp) (t : Time) :
@@ -2607,8 +3101,10 @@ Qed.
 expressions. In this version, any substitution is allowed to be applied to the
 expression in one of the evaluations and the equality still holds.*)
 Lemma evalExp_sub_unique_strong e b b' s : e |_| b -> subExp s e |_| b' -> b = b'.
+Proof.
   intros. eapply evalExpUnique. apply H. erewrite eval_pres_sub in H0.
-  assumption. apply H. Qed.
+  assumption. apply H.
+Qed.
 
 (** Repeatedly matches the goal to matching evaluations, creates the equality that the
 corresponding base values are equal, inverts this to unpackage the contents of the base
@@ -2633,8 +3129,10 @@ Ltac inList_in_tac := match goal with
   end.
 
 Lemma cons_notIn {T : Type} (a b : T) l : b <> a -> ~b _: l -> ~b _: (a :: l).
+Proof.
   unfold not. intros. inversion H1. apply H. symmetry. assumption.
-  apply H0. assumption. Qed.
+  apply H0. assumption.
+Qed.
 
 (** Given a goal of type ~a _: l, this tactic repeatedly checks if a is the head of l,
 drilling into l until either the empty list is reached, in which case the tactic fails,

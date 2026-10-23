@@ -79,7 +79,9 @@ Record Entity : Type := mkEntity
 Notation "[| p , l , i , k |]" := (mkEntity p l i k) (at level 30).
 
 (** Equality on entities is decidable.*)
-Lemma eqDecEnt : eqDec Entity. unfold eqDec.
+Lemma eqDecEnt : eqDec Entity.
+Proof.
+  unfold eqDec.
   destruct x1, x2. addHyp (eqDecModeState mstEnt0 mstEnt1).
   addHyp (eqDecPosition posEnt0 posEnt1).
   addHyp (eqDecInterface interEnt0 interEnt1).
@@ -90,7 +92,7 @@ Lemma eqDecEnt : eqDec Entity. unfold eqDec.
   right. unfold not. intro. apply H. inversion H0. reflexivity.
   right. unfold not. intro. apply H2. inversion H. reflexivity.
   right. unfold not. intro. apply H3. inversion H2. reflexivity.
-  Qed.
+Qed.
 
 (** The current mode of an entity is the current mode of the mode state.*)
 Coercion currModeEnt (e : Entity) : Mode :=
@@ -141,8 +143,10 @@ Notation "e1 ~~ e2" := (compatible e1 e2) (left associativity, at level 40).
 
 (** Compatibility is a symmetric relation.*)
 Lemma compatibleSymmetric : forall (e1 e2 : Entity), (e1 ~~ e2) <-> (e2 ~~ e1).
+Proof.
   unfold compatible. intros. split; intros; rewrite minDistCompSymmetric in H;
-  rewrite distSymmetric in H; assumption. Qed.
+  rewrite distSymmetric in H; assumption.
+Qed.
 
 
 (***************Semantics*********************)
@@ -276,6 +280,7 @@ output on mCurr, and the mode state input on the same channel.*)
 Theorem curr_switch_proc (p p' : ProcTerm) (l l' : Position) (h h' : Interface) (k k' : ModeState) :
   [|p, l, h, k|] -EA- aeTau ->> [|p', l', h', k'|] -> currModeMState k <> currModeMState k' ->
   p -PA- chanMCurrWrite *! -PA> p' /\ k -ms- chanMCurrWrite @? -ms> k'.
+Proof.
   intros H H0.
   (*By inversion on the discrete entity transition*)
   (*We first eliminate the cases where the mode state is the preserved.*)
@@ -286,33 +291,40 @@ Theorem curr_switch_proc (p p' : ProcTerm) (l l' : Position) (h h' : Interface) 
   (*Now we have this case which follows from assumptions.*)
   split;assumption.
   (*Finally we deal with a stray case that wasn't caught in our earlier elimination.*)
-  lets K : curr_switch_mState H2 H0. inversion K. Qed.
+  lets K : curr_switch_mState H2 H0. inversion K.
+Qed.
 
 (** The derivative of an ignore transition is the same as the source.*)
 Theorem ignoreEqEnt : forall (e e' : Entity) (m : Message),
-  e -EA- m#: ->> e' -> e = e'. intros. invertClear H. reflexivity. Qed.
+  e -EA- m#: ->> e' -> e = e'.
+Proof. intros. invertClear H. reflexivity. Qed.
 
 (** An entity can always either input or ignore a message.*)
 Theorem inOrIgEnt : forall (e : Entity) (m : Message),
-  discActEnabledEnt e (m#?) \/ discActEnabledEnt e (m#:). intros.
+  discActEnabledEnt e (m#?) \/ discActEnabledEnt e (m#:).
+Proof.
+  intros.
   destruct m as [v l' r]. destruct e as [p l i k].
   addHyp (Rlt_or_le r (dist2d l l')). invertClear H. right.
   exists ([|p, l, i, k|]). apply stepDeIgnore. assumption. 
   left. addHyp (interfaceInEnabled i v). invertClear H.
   rename x into i'. exists ([|p, l, i', k|]).
-  apply stepDeIn; assumption. Qed.
+  apply stepDeIn; assumption.
+Qed.
 
 Lemma dec_compatible : forall (e1 e2 : Entity),
   e1 ~~ e2 \/ ~(e1 ~~e2).
 Proof.
   intros. unfold compatible. destruct (Rle_dec (minDistComp e1 e2) (dist2d e1 e2));
-  [left | right]; assumption. Qed.
+  [left | right]; assumption.
+Qed.
 (**Proof: Obvious*)
 
 Lemma currMode_ent_mState : forall (p : ProcTerm) (l : Position) (h : Interface)
   (k : ModeState) (m : Mode), currModeEnt ([|p, l, h, k|]) = m -> currModeMState k = m.
 Proof.
-  intros. simpl in H. assumption. Qed.
+  intros. simpl in H. assumption.
+Qed.
 (**Proof: Obvious from definitions*)
 
 Lemma link_ent_inter_disc p p' l l' h h' k k' a :
@@ -324,6 +336,7 @@ Lemma link_ent_inter_disc p p' l l' h h' k k' a :
   (exists v, (h -i- chanAN {! v -i> h' /\ p -PA- chanAN;? v -PA> p')) \/
   (exists v, h -i- chanIOEnv {? v -i> h') \/
   (exists v r, h -i- chanIOEnv _! v !_ r -i> h'))).
+Proof.
   (*Inversion on entity transition and try LHS*)
   introz U. inversion U; subst; try (left; reflexivity); right;
   (split; [ reflexivity | ]).
@@ -332,22 +345,26 @@ Lemma link_ent_inter_disc p p' l l' h h' k k' a :
   right. left. exists v. split; assumption.
   right. right. left. exists v. split; assumption.
   do 3 right. left. exists v. assumption.
-  do 4 right. exists v r. assumption. Qed.
+  do 4 right. exists v r. assumption.
+Qed.
 
 
 Lemma link_ent_inter_del p p' l l' h h' k k' d :
   [|p, l, h, k|] -ED- d ->> [|p', l', h', k'|] ->
-  h -i- d -i> h'. intros. inversion H. assumption. Qed.
+  h -i- d -i> h'.
+Proof. intros. inversion H. assumption. Qed.
 
 
 Lemma link_ent_soft_del p p' l l' h h' k k' d :
   [|p, l, h, k|] -ED- d ->> [|p', l', h', k'|] ->
-  p -PD- d -PD> p'. intros. inversion H. assumption. Qed.
+  p -PD- d -PD> p'.
+Proof. intros. inversion H. assumption. Qed.
 
 
 Lemma link_ent_mState_del p p' l l' h h' k k' d :
   [|p, l, h, k|] -ED- d ->> [|p', l', h', k'|] ->
-  k -ms- d -ms> k'. intros. inversion H. assumption. Qed.
+  k -ms- d -ms> k'.
+Proof. intros. inversion H. assumption. Qed.
 
 (** If the software components of an entity transition are not equal, then
 the transition is necessarily a tau action, and either the process performs a tau,
@@ -363,6 +380,7 @@ Lemma link_ent_proc_neq_disc p p' h h' l l' k k' a :
   (exists k' c, p -PA- c *! -PA> p' /\ k -ms- c @? -ms> k') \/
   (exists k' c, p -PA- c *? -PA> p' /\ k -ms- c @! -ms> k') \/
   p -PA- chanPos ;? [basePosition l] -PA> p').
+Proof.
   intros. inversion H0; (split;[ try reflexivity | ]);
   try (subst; contradict H; reflexivity).
   left; repeat eexists; eassumption.
@@ -376,7 +394,7 @@ Lemma link_ent_proc_neq_disc p p' h h' l l' k k' a :
   do 3 right. left. repeat eexists; eassumption.
   do 4 right. left. repeat eexists; eassumption.
   repeat right. repeat eexists; eassumption.
-  Qed.
+Qed.
 
 (** A discrete entity transition either leaves the software unchanged or the software takes a step.*)
 Lemma link_ent_soft_disc p p' l l' h h' k k' a :
@@ -400,7 +418,9 @@ Qed.
 (** A discrete entity step leaves the mode state unchanged or takes it a step.*)
 Lemma ent_disc_mState p l h k p' l' h' k' a : [|p, l, h, k|] -EA- a ->> [|p', l', h', k'|] ->
   k' = k \/ exists am, k -ms- am -ms> k'.
-Proof. intro S. inversion S; subst; first [left; reflexivity | right; eexists; eassumption]. Qed.
+Proof.
+  intro S. inversion S; subst; first [left; reflexivity | right; eexists; eassumption].
+Qed.
 
 (***************Components of the software*********************)
 (** When an entity's software is a parallel composition, a step of the entity is taken down
@@ -695,8 +715,11 @@ Qed.
 
 (** A discrete action doesn't move an entity.*)
 Lemma stepEnt_disc_pres_pos (e e' : Entity) a :
-  e -EA- a ->> e' -> posEnt e = posEnt e'. intros.
-  destruct e, e'. inversion H; reflexivity. Qed.
+  e -EA- a ->> e' -> posEnt e = posEnt e'.
+Proof.
+  intros.
+  destruct e, e'. inversion H; reflexivity.
+Qed.
 
 (** The software step inside a discrete entity step, when there is one: if it is an input on
 chanPos, the value read is the entity's position, since only the position read rule

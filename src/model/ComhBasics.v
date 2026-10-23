@@ -118,8 +118,10 @@ Definition waitTime (m1 m2 : Mode) (p : m1 -mtr-> m2) : Time :=
   (msgLatency +t+ (timeMax adaptNotif transMax) +t+ waitSurplus).
 
 Lemma speedMax_nonneg : 0 <= speedMax.
+Proof.
   (*Proof: follows from speedMax_pos*)
-  apply Rlt_le. apply speedMax_pos. Qed.
+  apply Rlt_le. apply speedMax_pos.
+Qed.
 
 (** The coverage r is sufficient for an entity broadcasting in mode m.*)
 Definition sufficient (m : Mode) (r : Distance) : Prop :=
@@ -128,7 +130,8 @@ Definition sufficient (m : Mode) (r : Distance) : Prop :=
 
 (** The sufficient predicate is decidable.*)
 Lemma suffDec : forall (m : Mode) (r : Distance),
-  {sufficient m r} + {~sufficient m r}. intros. apply Rle_dec. Qed.
+  {sufficient m r} + {~sufficient m r}.
+Proof. intros. apply Rle_dec. Qed.
 
 (** A version of the sufficient Prop that gives a bool as a result.*)
 Definition suffBool (m : Mode) (r : Distance) : bool :=
@@ -147,8 +150,11 @@ Definition possiblyIncompatible (m m' : Mode) (r : R) :=
   r < possIncDist m m'.
 
 Lemma possIncDec : forall (m m' : Mode) (r : Distance),
-  {possiblyIncompatible m m' r} + {~possiblyIncompatible m m' r}. intros.
-  apply Rlt_dec. Qed.
+  {possiblyIncompatible m m' r} + {~possiblyIncompatible m m' r}.
+Proof.
+  intros.
+  apply Rlt_dec.
+Qed.
 
 (** A version of the possiblyIncompatible Prop that gives a bool as a result.*)
 Definition possIncBool (m m' : Mode) (r : Distance) : bool :=
@@ -159,10 +165,12 @@ Definition possIncBool (m m' : Mode) (r : Distance) : bool :=
 r <= r'.*)
 Theorem possIncSuff : forall (m m' : Mode) (r r' : Distance),
   possiblyIncompatible m m' r -> sufficient m' r' -> r < r'.
+Proof.
   unfold possiblyIncompatible, sufficient. intros.
   eapply Rlt_le_trans. apply H. eapply Rle_trans; try apply H0.
   apply Rplus_le_compat. rewrite minDistCompSymmetric.
-  apply maxMinDistCompBound. apply Rle_refl. Qed.
+  apply maxMinDistCompBound. apply Rle_refl.
+Qed.
 
 (** This is the interval in the past during which we show that any entity
 in a non fail safe mode m must have sent a message containing mode m.*)
@@ -182,48 +190,66 @@ Definition preDeliveredInterval (m : Mode) : Interval :=
 
 (** The upper bound of the pre bc suff interval is positive*)
 Lemma preBcSuffUpperPos : forall m : Mode,
-  0 <= upper (preDeliveredInterval m). intros. apply Rle_trans with (r2 := adaptNotif).
+  0 <= upper (preDeliveredInterval m).
+Proof.
+  intros. apply Rle_trans with (r2 := adaptNotif).
   destruct adaptNotif. destruct time. apply cond_nonneg.
   replace (nonneg (time adaptNotif)) with
   (nonneg (time adaptNotif) + 0 + 0). 
   unfold preDeliveredInterval. simpl. repeat apply Rplus_le_compat.
   apply Rmax_l. destruct (period m). destruct time. apply cond_nonneg.
   destruct (trans m). destruct time. apply cond_nonneg.
-  ring. Qed.
+  ring.
+Qed.
 
 (*2*speedMax gets used a lot, as it is the maximum relative speed, so we prove this special
 result for it*)
-Lemma speedMax_double_nonneg : 0 <= 2*speedMax. replace 0 with (2*0).
+Lemma speedMax_double_nonneg : 0 <= 2*speedMax.
+Proof.
+  replace 0 with (2*0).
   apply Rmult_le_compat_l. apply two_nonneg. apply speedMax_nonneg.
-  ring. Qed.
+  ring.
+Qed.
 
 (**All numbers within the preDeliveredInterval are strictly positive.*)
 Lemma inPreBcSuffPos : forall (m : Mode) (u : Time),
-  u [:] (preDeliveredInterval m) -> 0 < u. intros. inversion H.
+  u [:] (preDeliveredInterval m) -> 0 < u.
+Proof.
+  intros. inversion H.
   simpl in H0. apply Rle_lt_trans with (r2 := adaptNotif).
   timeNonneg. eapply Rle_lt_trans; try apply H0.
-  apply Rmax_l. Qed.
+  apply Rmax_l.
+Qed.
 
 (*LOCAL TIDY*)
 
 Lemma sufficient_suffBool m r : sufficient m r ->
-  suffBool m r = true. intros. unfold suffBool.
+  suffBool m r = true.
+Proof.
+  intros. unfold suffBool.
   remember (suffDec m r) as SD. destruct SD. reflexivity.
-  false. Qed.
+  false.
+Qed.
 
 Lemma possInc_possIncBool m m' r :
   possiblyIncompatible m m' (distance r) ->
-  possIncBool m m' r = true. intros. unfold possIncBool.
+  possIncBool m m' r = true.
+Proof.
+  intros. unfold possIncBool.
   remember (possIncDec m m' r) as PD. destruct PD. reflexivity.
-  false. Qed.
+  false.
+Qed.
 
 Lemma possIncBool_possInc m m' r :
   possIncBool m m' r = true ->
   possiblyIncompatible m m' (distance r).
+Proof.
   unfold possIncBool. intros. remember (possIncDec m m' r) as PD.
-  destruct PD. assumption. inversion H. Qed.
+  destruct PD. assumption. inversion H.
+Qed.
 
 Lemma possIncDist_positive m1 m2 : 0 < possIncDist m1 m2.
+Proof.
   (*Proof: follows from adaptNotif_positive and speedMax_pos.*)
   replace 0 with (0 + 0); [ | ring]. apply Rplus_le_lt_compat.
   apply cond_nonneg. repeat(apply Rmult_lt_0_compat ||
@@ -231,6 +257,7 @@ Lemma possIncDist_positive m1 m2 : 0 < possIncDist m1 m2.
   apply Rlt_le_trans with (r2 := adaptNotif). apply adaptNotif_positive.
   rewrite <- Rplus_0_r at 1. rewrite <- Rplus_0_r at 1.
   repeat (apply Rplus_le_compat); try timeNonneg.
-  apply Rmax_l. Qed.
+  apply Rmax_l.
+Qed.
 
 End ComhBasics.
