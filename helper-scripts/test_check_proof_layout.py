@@ -239,7 +239,7 @@ def rocq_sentences(text, workdir, name):
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(text)
     r = subprocess.run(["rocq", "compile", "-time", path], cwd=workdir,
-                       capture_output=True, text=True)
+                       capture_output=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         return None
     char_at, byte = {}, 0  # Rocq counts in bytes, the checker in characters
