@@ -18,12 +18,18 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check_proof_layout as cpl  # noqa: E402
 
-CLASS = "Class C := { c : nat }.\n"
+def rocq(text):
+    """The text of a case, written below as an indented, triple-quoted string. The line break
+    after the opening quotes and the indentation that every line shares are dropped, and all
+    other whitespace is kept as written. The strings are raw, so `/\\` needs no escaping."""
+    assert text.startswith("\n")
+    return textwrap.dedent(text[1:])
 
 
 def one_liner(length):
@@ -34,137 +40,398 @@ def one_liner(length):
 
 # Cases that follow the layout: the checker must find no problem in them.
 GOOD = {
-    "multi-line proof": "Lemma a : True.\nProof.\n  exact I.\nQed.\n",
-    "one-line proof": "Lemma a : True.\nProof. exact I. Qed.\n",
+    "multi-line proof": rocq(r"""
+        Lemma a : True.
+        Proof.
+          exact I.
+        Qed.
+        """),
+    "one-line proof": rocq(r"""
+        Lemma a : True.
+        Proof. exact I. Qed.
+        """),
     "one-line proof of 80 characters": one_liner(80),
     "empty file": "",
-    "only comments": "(* Lemma a : True. exact I. Qed. *)\n",
-    "proofs back to back": "Lemma a : True.\nProof. exact I. Qed.\nLemma b : True.\nProof.\n"
-                           "  exact I.\nQed.\n\n\nTheorem c : True.\nProof. exact I. Qed.\n",
-    "every kind of result": "Theorem a : True.\nProof. exact I. Qed.\nCorollary b : True.\n"
-                            "Proof. exact I. Qed.\nProposition c : True.\nProof. exact I. Qed.\n"
-                            "Fact d : True.\nProof. exact I. Qed.\nRemark e : True.\n"
-                            "Proof. exact I. Qed.\nProperty f : True.\nProof. exact I. Qed.\n",
-    "goal": "Goal True.\nProof.\n  exact I.\nQed.\n",
-    "local and attributes": "Local Lemma a : True.\nProof. exact I. Qed.\n"
-                            "#[local] Lemma b : True.\nProof. exact I. Qed.\n"
-                            "#[ local ]\nLemma c : True.\nProof. exact I. Qed.\n",
-    "Proof using": "Section S.\nVariable n : nat.\nLemma a : n = n.\nProof using n.\n"
-                   "  reflexivity.\nQed.\nEnd S.\n",
-    "Proof with and an ellipsis": "Lemma a : True.\nProof with auto.\n  idtac...\nQed.\n",
-    "Proof term": "Lemma a : True.\nProof I.\nLemma b : True.\nProof. exact I. Qed.\n",
-    "Proof term in brackets": "Lemma a : True /\\ True.\nProof (conj I I).\n",
-    "spaces before dots": "Lemma a : True .\nProof .\n  exact I .\nQed .\n",
-    "Defined": "Definition d : nat.\nProof.\n  exact 0.\nDefined.\n",
-    "Admitted": "Lemma a : True.\nAdmitted.\nLemma b : True.\nProof.\n  idtac.\nAdmitted.\n",
-    "Abort": "Lemma a : False.\nProof.\n  idtac.\nAbort.\n",
-    "definitions with bodies": "Definition two := 2.\nDefinition three : nat := 3.\n"
-                               "Example e := 1.\nFixpoint f (n : nat) : nat := n.\n"
-                               "Lemma a : True.\nProof. exact I. Qed.\n",
-    "definition with a let binder": "Definition d (x := 1) : nat.\nProof.\n  exact x.\nDefined.\n",
-    "instances": CLASS + "#[local] Instance i : C := {| c := 1 |}.\n#[local] Instance j : C.\n"
-                         "Proof.\n  exact {| c := 0 |}.\nDefined.\n",
-    "example": "Example e : 1 = 1.\nProof. reflexivity. Qed.\n",
-    "let in a section": "Section S.\nLet l : nat.\nProof.\n  exact 0.\nDefined.\nEnd S.\n",
-    "statement over several lines": "Lemma a :\n  (* a comment. with dots. *)\n  True /\\\n"
-                                    "  True.\nProof.\n  split; exact I.\nQed.\n",
-    "comments around the proof": "Lemma (* c *) a : True. (* hard *)\n(*Proof: trivial.*)\n\n"
-                                 "Proof. (* sketch *)\n  exact I. (* done *)\nQed. (* end *)\n"
-                                 "Lemma b : True.\nProof. exact I. Qed. (* short *)\n",
-    "comment before the closer": "Lemma a : True.\nProof.\n  exact I.\n(* end *) Qed.\n",
-    "nested comments and strings in comments":
-        '(* outer (* inner. Qed. *) "a string with *) in it" still a comment. *)\n'
-        "Lemma a : True.\nProof. exact I. Qed.\n",
-    "strings with dots and quotes": 'Lemma a : True.\nProof.\n  idtac "a. (* Qed.";'
-                                    ' idtac "say ""hi"". Qed.".\n  exact I.\nQed.\n',
-    "qualified names": "Lemma a : Nat.add 0 0 = 0.\nProof. reflexivity. Qed.\n",
-    "recursive notation": 'Notation "[[ x ; .. ; y ]]" := (cons x .. (cons y nil) ..).\n'
-                          "Lemma a : [[1 ; 2]] = cons 1 (cons 2 nil).\nProof. reflexivity. Qed.\n",
-    "keywords inside names": "Definition Lemmas := 1.\nDefinition Proofs := 2.\n"
-                             "Definition Qeds := 3.\n",
-    "bullets and braces": "Lemma a : True /\\ (True /\\ True).\nProof.\n  split.\n"
-                          "  - exact I.\n  - split.\n    + exact I.\n    + { exact I. }\nQed.\n",
-    "deep bullets": "Lemma a : True /\\ (True /\\ (True /\\ True)).\nProof.\n  split.\n"
-                    "  - exact I.\n  - split.\n    + exact I.\n    + split.\n"
-                    "      * exact I.\n      * exact I.\nQed.\n",
-    "goal selector with a brace": "Lemma a : True /\\ (True /\\ True).\nProof.\n  split.\n"
-                                  "  2: { split.\n       - exact I.\n       - exact I. }\n"
-                                  "  exact I.\nQed.\n",
-    "closing brace before the closer": "Lemma a : True.\nProof.\n  { exact I. }\nQed.\n",
-    "unicode": "(* Comhordú *)\nLemma ú : True.\nProof. exact I. Qed.\n",
-    "module": "Module M.\n  Lemma a : True.\n  Proof. exact I. Qed.\n  Lemma b : True.\n"
-              "  Proof.\n    exact I.\n  Qed.\nEnd M.\n",
-    "ltac mentioning Proof and Qed": 'Ltac t := idtac "Proof. Qed.".\nLemma a : True.\n'
-                                     "Proof. t. exact I. Qed.\n",
-    "no final newline": "Lemma a : True.\nProof. exact I. Qed.",
+    "only comments": rocq(r"""
+        (* Lemma a : True. exact I. Qed. *)
+        """),
+    "proofs back to back": rocq(r"""
+        Lemma a : True.
+        Proof. exact I. Qed.
+        Lemma b : True.
+        Proof.
+          exact I.
+        Qed.
+
+
+        Theorem c : True.
+        Proof. exact I. Qed.
+        """),
+    "every kind of result": rocq(r"""
+        Theorem a : True.
+        Proof. exact I. Qed.
+        Corollary b : True.
+        Proof. exact I. Qed.
+        Proposition c : True.
+        Proof. exact I. Qed.
+        Fact d : True.
+        Proof. exact I. Qed.
+        Remark e : True.
+        Proof. exact I. Qed.
+        Property f : True.
+        Proof. exact I. Qed.
+        """),
+    "goal": rocq(r"""
+        Goal True.
+        Proof.
+          exact I.
+        Qed.
+        """),
+    "local and attributes": rocq(r"""
+        Local Lemma a : True.
+        Proof. exact I. Qed.
+        #[local] Lemma b : True.
+        Proof. exact I. Qed.
+        #[ local ]
+        Lemma c : True.
+        Proof. exact I. Qed.
+        """),
+    "Proof using": rocq(r"""
+        Section S.
+        Variable n : nat.
+        Lemma a : n = n.
+        Proof using n.
+          reflexivity.
+        Qed.
+        End S.
+        """),
+    "Proof with and an ellipsis": rocq(r"""
+        Lemma a : True.
+        Proof with auto.
+          idtac...
+        Qed.
+        """),
+    "Proof term": rocq(r"""
+        Lemma a : True.
+        Proof I.
+        Lemma b : True.
+        Proof. exact I. Qed.
+        """),
+    "Proof term in brackets": rocq(r"""
+        Lemma a : True /\ True.
+        Proof (conj I I).
+        """),
+    "spaces before dots": rocq(r"""
+        Lemma a : True .
+        Proof .
+          exact I .
+        Qed .
+        """),
+    "Defined": rocq(r"""
+        Definition d : nat.
+        Proof.
+          exact 0.
+        Defined.
+        """),
+    "Admitted": rocq(r"""
+        Lemma a : True.
+        Admitted.
+        Lemma b : True.
+        Proof.
+          idtac.
+        Admitted.
+        """),
+    "Abort": rocq(r"""
+        Lemma a : False.
+        Proof.
+          idtac.
+        Abort.
+        """),
+    "definitions with bodies": rocq(r"""
+        Definition two := 2.
+        Definition three : nat := 3.
+        Example e := 1.
+        Fixpoint f (n : nat) : nat := n.
+        Lemma a : True.
+        Proof. exact I. Qed.
+        """),
+    "definition with a let binder": rocq(r"""
+        Definition d (x := 1) : nat.
+        Proof.
+          exact x.
+        Defined.
+        """),
+    "instances": rocq(r"""
+        Class C := { c : nat }.
+        #[local] Instance i : C := {| c := 1 |}.
+        #[local] Instance j : C.
+        Proof.
+          exact {| c := 0 |}.
+        Defined.
+        """),
+    "example": rocq(r"""
+        Example e : 1 = 1.
+        Proof. reflexivity. Qed.
+        """),
+    "let in a section": rocq(r"""
+        Section S.
+        Let l : nat.
+        Proof.
+          exact 0.
+        Defined.
+        End S.
+        """),
+    "statement over several lines": rocq(r"""
+        Lemma a :
+          (* a comment. with dots. *)
+          True /\
+          True.
+        Proof.
+          split; exact I.
+        Qed.
+        """),
+    "comments around the proof": rocq(r"""
+        Lemma (* c *) a : True. (* hard *)
+        (*Proof: trivial.*)
+
+        Proof. (* sketch *)
+          exact I. (* done *)
+        Qed. (* end *)
+        Lemma b : True.
+        Proof. exact I. Qed. (* short *)
+        """),
+    "comment before the closer": rocq(r"""
+        Lemma a : True.
+        Proof.
+          exact I.
+        (* end *) Qed.
+        """),
+    "nested comments and strings in comments": rocq(r"""
+        (* outer (* inner. Qed. *) "a string with *) in it" still a comment. *)
+        Lemma a : True.
+        Proof. exact I. Qed.
+        """),
+    "strings with dots and quotes": rocq(r"""
+        Lemma a : True.
+        Proof.
+          idtac "a. (* Qed."; idtac "say ""hi"". Qed.".
+          exact I.
+        Qed.
+        """),
+    "qualified names": rocq(r"""
+        Lemma a : Nat.add 0 0 = 0.
+        Proof. reflexivity. Qed.
+        """),
+    "recursive notation": rocq(r"""
+        Notation "[[ x ; .. ; y ]]" := (cons x .. (cons y nil) ..).
+        Lemma a : [[1 ; 2]] = cons 1 (cons 2 nil).
+        Proof. reflexivity. Qed.
+        """),
+    "keywords inside names": rocq(r"""
+        Definition Lemmas := 1.
+        Definition Proofs := 2.
+        Definition Qeds := 3.
+        """),
+    "bullets and braces": rocq(r"""
+        Lemma a : True /\ (True /\ True).
+        Proof.
+          split.
+          - exact I.
+          - split.
+            + exact I.
+            + { exact I. }
+        Qed.
+        """),
+    "deep bullets": rocq(r"""
+        Lemma a : True /\ (True /\ (True /\ True)).
+        Proof.
+          split.
+          - exact I.
+          - split.
+            + exact I.
+            + split.
+              * exact I.
+              * exact I.
+        Qed.
+        """),
+    "goal selector with a brace": rocq(r"""
+        Lemma a : True /\ (True /\ True).
+        Proof.
+          split.
+          2: { split.
+               - exact I.
+               - exact I. }
+          exact I.
+        Qed.
+        """),
+    "closing brace before the closer": rocq(r"""
+        Lemma a : True.
+        Proof.
+          { exact I. }
+        Qed.
+        """),
+    "unicode": rocq(r"""
+        (* Comhordú *)
+        Lemma ú : True.
+        Proof. exact I. Qed.
+        """),
+    "module": rocq(r"""
+        Module M.
+          Lemma a : True.
+          Proof. exact I. Qed.
+          Lemma b : True.
+          Proof.
+            exact I.
+          Qed.
+        End M.
+        """),
+    "ltac mentioning Proof and Qed": rocq(r"""
+        Ltac t := idtac "Proof. Qed.".
+        Lemma a : True.
+        Proof. t. exact I. Qed.
+        """),
+    "no final newline": rocq(r"""
+        Lemma a : True.
+        Proof. exact I. Qed."""),
 }
 
 # Cases that break the layout, with the problems the checker must report: (line, part of the
 # message). The cases are valid Rocq, so their sentences can be checked against Rocq's too.
 BAD = {
-    "no Proof": ("Lemma a : True.\n  exact I.\nQed.\n",
-                 [(2, "start the proof with `Proof.`")]),
-    "no Proof, proof on the statement's line": ("Lemma a : True. exact I.\nQed.\n",
-                                                [(1, "start the proof with `Proof.`")]),
-    "no Proof, all on one line": ("Lemma a : True. exact I. Qed.\n",
-                                  [(1, "start the proof with `Proof.`")]),
-    "no Proof, one-line proof": ("Lemma a : True.\nexact I. Qed.\n",
-                                 [(2, "start the proof with `Proof.`")]),
-    "no Proof after a multi-line statement": ("Lemma a :\n  True. exact I.\nQed.\n",
-                                              [(2, "start the proof with `Proof.`")]),
-    "no Proof after a sketch": ("Lemma a : True.\n  (*Proof: trivial.*)\n  exact I.\nQed.\n",
-                                [(3, "start the proof with `Proof.`")]),
-    "no Proof in a goal": ("Goal True.\n  exact I.\nQed.\n",
-                           [(2, "start the proof with `Proof.`")]),
-    "no Proof in an instance": (CLASS + "#[local] Instance i : C.\n  exact {| c := 0 |}.\n"
-                                        "Defined.\n",
-                                [(3, "start the proof with `Proof.`")]),
-    "no Proof in a local lemma": ("Local Lemma a : True.\n  exact I.\nQed.\n",
-                                  [(2, "start the proof with `Proof.`")]),
-    "no Proof after an attribute": ("#[local] Lemma a : True.\n  exact I.\nQed.\n",
-                                    [(2, "start the proof with `Proof.`")]),
-    "no Proof after a let binder": ("Definition d (x := 1) : nat.\n  exact x.\nDefined.\n",
-                                    [(2, "start the proof with `Proof.`")]),
-    "Proof on the statement's line": ("Lemma a : True. Proof.\n  exact I.\nQed.\n",
-                                      [(1, "put `Proof.` on a new line after the statement")]),
-    "Proof after a comment on the statement's line": (
-        "Lemma a : True. (* c *) Proof.\n  exact I.\nQed.\n",
-        [(1, "put `Proof.` on a new line after the statement")]),
-    "one-line proof on the statement's line": (
-        "Lemma a : True. Proof. exact I. Qed.\n",
-        [(1, "put `Proof.` on a new line after the statement")]),
-    "Proof term on the statement's line": ("Lemma a : True. Proof I.\n",
-                                           [(1, "put `Proof.` on a new line after the statement")]),
-    "tactic after Proof": ("Lemma a : True.\nProof. idtac.\n  exact I.\nQed.\n",
-                           [(2, "put nothing after `Proof.` on its line")]),
-    "Qed after the last tactic": ("Lemma a : True.\nProof.\n  exact I. Qed.\n",
-                                  [(3, "put `Qed.` on a line of its own")]),
-    "Qed after the last tactic, with Proof using": (
-        "Section S.\nVariable n : nat.\nLemma a : n = n.\nProof using n.\n  reflexivity. Qed.\n"
-        "End S.\n",
-        [(5, "put `Qed.` on a line of its own")]),
-    "Qed after the last tactic, with Proof with": (
-        "Lemma a : True.\nProof with auto.\n  idtac... Qed.\n",
-        [(3, "put `Qed.` on a line of its own")]),
-    "Defined after the last tactic": ("Definition d : nat.\nProof.\n  exact 0. Defined.\n",
-                                      [(3, "put `Defined.` on a line of its own")]),
-    "Qed after a comment after a tactic": ("Lemma a : True.\nProof.\n  exact I. (* c *) Qed.\n",
-                                           [(3, "put `Qed.` on a line of its own")]),
-    "Qed after a brace": ("Lemma a : True.\nProof.\n  { exact I. } Qed.\n",
-                          [(3, "put `Qed.` on a line of its own")]),
-    "Qed after a bullet's tactic": ("Lemma a : True /\\ True.\nProof.\n  split.\n  - exact I.\n"
-                                    "  - exact I. Qed.\n",
-                                    [(5, "put `Qed.` on a line of its own")]),
-    "statement after Qed": ("Lemma a : True.\nProof.\n  exact I.\nQed. Lemma b : True.\n"
-                            "Proof.\n  exact I.\nQed.\n",
-                            [(4, "put nothing after `Qed.` on its line")]),
-    "definition after a one-line proof": ("Lemma a : True.\nProof. exact I. Qed. Definition x := 1.\n",
-                                          [(2, "put nothing after `Qed.` on its line")]),
-    "one-line proof of 81 characters": (one_liner(81),
-                                        [(2, "at most 80 characters, not 81")]),
-    "no Proof and Qed after the last tactic": ("Lemma a : True.\n  idtac.\n  exact I. Qed.\n",
-                                               [(2, "start the proof with `Proof.`"),
-                                                (3, "put `Qed.` on a line of its own")]),
+    "no Proof": (rocq(r"""
+        Lemma a : True.
+          exact I.
+        Qed.
+        """), [(2, "start the proof with `Proof.`")]),
+    "no Proof, proof on the statement's line": (rocq(r"""
+        Lemma a : True. exact I.
+        Qed.
+        """), [(1, "start the proof with `Proof.`")]),
+    "no Proof, all on one line": (rocq(r"""
+        Lemma a : True. exact I. Qed.
+        """), [(1, "start the proof with `Proof.`")]),
+    "no Proof, one-line proof": (rocq(r"""
+        Lemma a : True.
+        exact I. Qed.
+        """), [(2, "start the proof with `Proof.`")]),
+    "no Proof after a multi-line statement": (rocq(r"""
+        Lemma a :
+          True. exact I.
+        Qed.
+        """), [(2, "start the proof with `Proof.`")]),
+    "no Proof after a sketch": (rocq(r"""
+        Lemma a : True.
+          (*Proof: trivial.*)
+          exact I.
+        Qed.
+        """), [(3, "start the proof with `Proof.`")]),
+    "no Proof in a goal": (rocq(r"""
+        Goal True.
+          exact I.
+        Qed.
+        """), [(2, "start the proof with `Proof.`")]),
+    "no Proof in an instance": (rocq(r"""
+        Class C := { c : nat }.
+        #[local] Instance i : C.
+          exact {| c := 0 |}.
+        Defined.
+        """), [(3, "start the proof with `Proof.`")]),
+    "no Proof in a local lemma": (rocq(r"""
+        Local Lemma a : True.
+          exact I.
+        Qed.
+        """), [(2, "start the proof with `Proof.`")]),
+    "no Proof after an attribute": (rocq(r"""
+        #[local] Lemma a : True.
+          exact I.
+        Qed.
+        """), [(2, "start the proof with `Proof.`")]),
+    "no Proof after a let binder": (rocq(r"""
+        Definition d (x := 1) : nat.
+          exact x.
+        Defined.
+        """), [(2, "start the proof with `Proof.`")]),
+    "Proof on the statement's line": (rocq(r"""
+        Lemma a : True. Proof.
+          exact I.
+        Qed.
+        """), [(1, "put `Proof.` on a new line after the statement")]),
+    "Proof after a comment on the statement's line": (rocq(r"""
+        Lemma a : True. (* c *) Proof.
+          exact I.
+        Qed.
+        """), [(1, "put `Proof.` on a new line after the statement")]),
+    "one-line proof on the statement's line": (rocq(r"""
+        Lemma a : True. Proof. exact I. Qed.
+        """), [(1, "put `Proof.` on a new line after the statement")]),
+    "Proof term on the statement's line": (rocq(r"""
+        Lemma a : True. Proof I.
+        """), [(1, "put `Proof.` on a new line after the statement")]),
+    "tactic after Proof": (rocq(r"""
+        Lemma a : True.
+        Proof. idtac.
+          exact I.
+        Qed.
+        """), [(2, "put nothing after `Proof.` on its line")]),
+    "Qed after the last tactic": (rocq(r"""
+        Lemma a : True.
+        Proof.
+          exact I. Qed.
+        """), [(3, "put `Qed.` on a line of its own")]),
+    "Qed after the last tactic, with Proof using": (rocq(r"""
+        Section S.
+        Variable n : nat.
+        Lemma a : n = n.
+        Proof using n.
+          reflexivity. Qed.
+        End S.
+        """), [(5, "put `Qed.` on a line of its own")]),
+    "Qed after the last tactic, with Proof with": (rocq(r"""
+        Lemma a : True.
+        Proof with auto.
+          idtac... Qed.
+        """), [(3, "put `Qed.` on a line of its own")]),
+    "Defined after the last tactic": (rocq(r"""
+        Definition d : nat.
+        Proof.
+          exact 0. Defined.
+        """), [(3, "put `Defined.` on a line of its own")]),
+    "Qed after a comment after a tactic": (rocq(r"""
+        Lemma a : True.
+        Proof.
+          exact I. (* c *) Qed.
+        """), [(3, "put `Qed.` on a line of its own")]),
+    "Qed after a brace": (rocq(r"""
+        Lemma a : True.
+        Proof.
+          { exact I. } Qed.
+        """), [(3, "put `Qed.` on a line of its own")]),
+    "Qed after a bullet's tactic": (rocq(r"""
+        Lemma a : True /\ True.
+        Proof.
+          split.
+          - exact I.
+          - exact I. Qed.
+        """), [(5, "put `Qed.` on a line of its own")]),
+    "statement after Qed": (rocq(r"""
+        Lemma a : True.
+        Proof.
+          exact I.
+        Qed. Lemma b : True.
+        Proof.
+          exact I.
+        Qed.
+        """), [(4, "put nothing after `Qed.` on its line")]),
+    "definition after a one-line proof": (rocq(r"""
+        Lemma a : True.
+        Proof. exact I. Qed. Definition x := 1.
+        """), [(2, "put nothing after `Qed.` on its line")]),
+    "one-line proof of 81 characters": (one_liner(81), [(2, "at most 80 characters, not 81")]),
+    "no Proof and Qed after the last tactic": (rocq(r"""
+        Lemma a : True.
+          idtac.
+          exact I. Qed.
+        """), [(2, "start the proof with `Proof.`"), (3, "put `Qed.` on a line of its own")]),
 }
 
 # Ways to change whitespace that must never change the checker's verdict.
@@ -224,11 +491,28 @@ PROOF_STARTS = {
 
 # None of these is valid Rocq, but the checker must not fail on them.
 NOT_ROCQ = {
-    "byte order mark": "\ufeffLemma a : True.\n  exact I.\nQed.\n",
-    "unterminated comment": "Lemma a : True.\nProof. exact I. Qed.\n(* no end",
-    "unterminated string": 'Lemma a : True.\nProof. idtac "no end',
-    "statement with no proof": "Lemma a : True.\n",
-    "Proof with no statement": "Proof.\n  exact I.\nQed.\n",
+    "byte order mark": "\ufeff" + rocq(r"""
+        Lemma a : True.
+          exact I.
+        Qed.
+        """),
+    "unterminated comment": rocq(r"""
+        Lemma a : True.
+        Proof. exact I. Qed.
+        (* no end
+        """),
+    "unterminated string": rocq(r"""
+        Lemma a : True.
+        Proof. idtac "no end
+        """),
+    "statement with no proof": rocq(r"""
+        Lemma a : True.
+        """),
+    "Proof with no statement": rocq(r"""
+        Proof.
+          exact I.
+        Qed.
+        """),
 }
 
 
