@@ -99,12 +99,14 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 - [ ] 🧑 **Lay out proofs so that each statement stands apart.** 617 of the 1,220 results have no `Proof.`, and 347 of those start their proof on the line where the statement ends, so it's hard to see where one ends and the other begins. Check the standard layouts that large Rocq projects use, and propose one in an ADR, which also says whether CI should check it. Then apply it to every proof, and make it a rule in `src/AGENTS.md` so that later changes follow it.
 - [ ] 🧑 _Placeholder: anything else the first pass couldn't decide._
 - [ ] 🧑 **Rewrite the README**, last, since it tells the outcome of every other step. Keep it short, cut anything else, and link to the thesis corrections and remarks rather than repeat them.
+  - **Keep the author's style, strictly.** The README is in the voice of the author of the thesis and of this repository, so it must read as the author wrote it, not as an agent did. Before drafting, read the whole thesis and analyse its style thoroughly: word choice, sentence length and rhythm, tone, and how it explains and argues. Then hold every sentence of the draft to that analysis. Where a habit of the thesis clashes with the writing rules in the top-level `AGENTS.md`, as its signposting does, ask the author which wins.
   - The story: the thesis (2014), its proof partly encoded in Coq, the [2015 plan](../archive/2015-05-08-coq-project-plan.pdf) to finish it, and now a full proof in Rocq, with general results about the language.
   - Advice for anyone who uses Comhordú to model a system: build on the Rocq formalisation, give the system's model as a value of `ComhModel`, so that Rocq checks it meets every assumption and `safety` applies to it, and check that its protocol matches Comhordú's exactly, with an oracle or another method.
 - [ ] 🤖 **Delete this workstream** once every other step is ticked or dropped, after moving anything that must outlive it, as [`AGENTS.md`](AGENTS.md) says.
 
 ## Log
 
+- **2026-10-23:** The README step now says to keep the author's style, strictly, after a thorough analysis of the whole thesis.
 - **2026-10-23:** The rename of `bisimulation` to `bisimilar` widens: bisimilarity is now defined from bisimulations, as the literature does.
 - **2026-10-23:** New step in the final phase: lay out every proof so that its statement stands apart, in a standard layout that an ADR picks, and make the layout a rule.
 - **2026-10-22:** New step in the final phase: rename `bisimulation` to `bisimilar`, the standard name for what it states.
