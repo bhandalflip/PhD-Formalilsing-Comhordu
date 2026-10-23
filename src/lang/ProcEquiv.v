@@ -20,55 +20,94 @@ Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : 
 
 (********************** Bisimulation **********************)
 
-(** Two process terms are bisimilar when each matches every step of the other, and the terms
-they step to are bisimilar again.*)
-CoInductive bisimilar p q : Prop :=
-  bisimWitness :
-  (forall a p', p -P- a -P> p' ->
-  exists q', q -P- a -P> q' /\ bisimilar p' q') ->
-  (forall a q', q -P- a -P> q' ->
-  exists p', p -P- a -P> p' /\ bisimilar p' q') ->
-  bisimilar p q.
+(** A bisimulation is a relation on process terms in which each term of a pair matches every
+step of the other, into a pair of the relation again.*)
+Definition bisimulation (R : ProcTerm -> ProcTerm -> Prop) : Prop :=
+  forall p q, R p q ->
+  (forall a p', p -P- a -P> p' -> exists q', q -P- a -P> q' /\ R p' q') /\
+  (forall a q', q -P- a -P> q' -> exists p', p -P- a -P> p' /\ R p' q').
+
+(** Two process terms are bisimilar when some bisimulation relates them.*)
+Definition bisimilar p q : Prop := exists R, bisimulation R /\ R p q.
 Notation "p ~p~ q" := (bisimilar p q) (at level 70).
 
 (*** Generic Properties of the Relation ***)
 
-(** Bisimilarity is reflexive.*)
-CoFixpoint bisim_refl p : p ~p~ p. constructor.
-  intros. exists p'. split. assumption. apply bisim_refl.
-  intros. exists q'. split. assumption. apply bisim_refl. Qed.
-
-(** Bisimilarity is transitive.*)
-CoFixpoint bisim_trans p1 p2 p3 : p1 ~p~ p2 -> p2 ~p~ p3 ->
-  p1 ~p~ p3. introz U. constructor.
-  intros a p'. introz U. apply U in U1. ex_flat. and_flat.
-  apply U0 in AND. ex_flat. and_flat. exists x0. split.
-  assumption. eapply bisim_trans; eassumption.
-  intros a q'. introz U. apply U0 in U1. ex_flat. and_flat.
-  apply U in AND. ex_flat. and_flat. exists x0. split.
-  assumption. eapply bisim_trans; eassumption. Qed.
-
-CoFixpoint bisim_symm p q : p ~p~ q -> q ~p~ p.
-  intros. inversion H. constructor.
-  intros. apply H1 in H2. ex_flat. and_flat.
-  apply bisim_symm in AND0. exists x. split; assumption.
-  intros. apply H0 in H2. ex_flat. and_flat.
-  apply bisim_symm in AND0. exists x. split; assumption.
-  Qed.
-
-(** A relation whose pairs match each other's steps, into pairs of the relation again, is
-contained in bisimilarity.*)
+(** A bisimulation is contained in bisimilarity.*)
 Lemma bisim_coind (R : ProcTerm -> ProcTerm -> Prop) :
+  bisimulation R -> forall p q, R p q -> p ~p~ q.
+Proof. intros H p q Rpq. exists R. split; assumption. Qed.
+
+(** Bisimilarity is a bisimulation, so two bisimilar terms match each other's steps, into
+bisimilar terms again.*)
+Lemma bisimilar_bisimulation : bisimulation bisimilar.
+Proof.
+  intros p q [R [H Rpq]]. destruct (H p q Rpq) as [F B]. split.
+  - intros a p' S. destruct (F a p' S) as [q' [S' R']]. exists q'. split; [exact S' | ].
+    exists R. split; assumption.
+  - intros a q' S. destruct (B a q' S) as [p' [S' R']]. exists p'. split; [exact S' | ].
+    exists R. split; assumption.
+Qed.
+
+(** A relation whose pairs match each other's steps, into pairs that it or bisimilarity
+relates, is contained in bisimilarity.*)
+Lemma bisim_coind_upto (R : ProcTerm -> ProcTerm -> Prop) :
   (forall p q, R p q ->
-    (forall a p', p -P- a -P> p' -> exists q', q -P- a -P> q' /\ R p' q') /\
-    (forall a q', q -P- a -P> q' -> exists p', p -P- a -P> p' /\ R p' q')) ->
+    (forall a p', p -P- a -P> p' -> exists q', q -P- a -P> q' /\ (R p' q' \/ p' ~p~ q')) /\
+    (forall a q', q -P- a -P> q' -> exists p', p -P- a -P> p' /\ (R p' q' \/ p' ~p~ q'))) ->
   forall p q, R p q -> p ~p~ q.
 Proof.
-  intro H. cofix CIH. intros p q Rpq. destruct (H p q Rpq) as [F B]. constructor.
-  - intros a p' S. destruct (F a p' S) as [q' [S' R']]. exists q'. split; [exact S' | ].
-    apply CIH. exact R'.
-  - intros a q' S. destruct (B a q' S) as [p' [S' R']]. exists p'. split; [exact S' | ].
-    apply CIH. exact R'.
+  intros H p q Rpq. apply (bisim_coind (fun x y => R x y \/ x ~p~ y)); [ | left; exact Rpq].
+  intros x y [Rxy | Bxy]; [exact (H x y Rxy) | ].
+  destruct (bisimilar_bisimulation x y Bxy) as [F B]. split.
+  - intros a x' S. destruct (F a x' S) as [y' [S' B']]. exists y'. split; [exact S' | ].
+    right. exact B'.
+  - intros a y' S. destruct (B a y' S) as [x' [S' B']]. exists x'. split; [exact S' | ].
+    right. exact B'.
+Qed.
+
+(** Two terms that match each other's steps, into bisimilar terms, are bisimilar.*)
+Lemma bisim_intro p q :
+  (forall a p', p -P- a -P> p' -> exists q', q -P- a -P> q' /\ p' ~p~ q') ->
+  (forall a q', q -P- a -P> q' -> exists p', p -P- a -P> p' /\ p' ~p~ q') ->
+  p ~p~ q.
+Proof.
+  intros F B. apply (bisim_coind_upto (fun x y => x = p /\ y = q)); [ | split; reflexivity].
+  intros x y [-> ->]. split.
+  - intros a p' S. destruct (F a p' S) as [q' [S' B']]. exists q'. split; [exact S' | ].
+    right. exact B'.
+  - intros a q' S. destruct (B a q' S) as [p' [S' B']]. exists p'. split; [exact S' | ].
+    right. exact B'.
+Qed.
+
+(** Bisimilarity is reflexive.*)
+Lemma bisim_refl p : p ~p~ p.
+Proof.
+  apply (bisim_coind eq); [ | reflexivity]. intros x y <-.
+  split; intros a x' S; exists x'; split; [exact S | reflexivity | exact S | reflexivity].
+Qed.
+
+(** Bisimilarity is transitive.*)
+Lemma bisim_trans p1 p2 p3 : p1 ~p~ p2 -> p2 ~p~ p3 -> p1 ~p~ p3.
+Proof.
+  intros B12 B23. apply (bisim_coind (fun x z => exists y, x ~p~ y /\ y ~p~ z));
+    [ | exists p2; split; assumption].
+  intros x z [y [Bxy Byz]].
+  destruct (bisimilar_bisimulation x y Bxy) as [F1 G1].
+  destruct (bisimilar_bisimulation y z Byz) as [F2 G2]. split.
+  - intros a x' S. destruct (F1 a x' S) as [y' [Sy B1]]. destruct (F2 a y' Sy) as [z' [Sz B2]].
+    exists z'. split; [exact Sz | exists y'; split; assumption].
+  - intros a z' S. destruct (G2 a z' S) as [y' [Sy B2]]. destruct (G1 a y' Sy) as [x' [Sx B1]].
+    exists x'. split; [exact Sx | exists y'; split; assumption].
+Qed.
+
+(** Bisimilarity is symmetric.*)
+Lemma bisim_symm p q : p ~p~ q -> q ~p~ p.
+Proof.
+  intro B. apply (bisim_coind (fun x y => y ~p~ x)); [ | exact B]. intros x y Byx.
+  destruct (bisimilar_bisimulation y x Byx) as [F G]. split.
+  - intros a x' S. destruct (G a x' S) as [y' [S' B']]. exists y'. split; assumption.
+  - intros a y' S. destruct (F a y' S) as [x' [S' B']]. exists x'. split; assumption.
 Qed.
 
 (*** Matching Steps ***)
@@ -78,7 +117,7 @@ derivatives.*)
 Lemma bisim_step_disc p q a p' : p ~p~ q -> p -PA- a -PA> p' ->
   exists q', q -PA- a -PA> q' /\ p' ~p~ q'.
 Proof.
-  intros B TR. inversion B as [F _].
+  intros B TR. destruct (bisimilar_bisimulation _ _ B) as [F _].
   destruct (F _ _ (stepPDisc _ _ _ TR)) as [q' [TQ BQ]].
   exists q'. split; [ | exact BQ]. inversion TQ; subst; assumption.
 Qed.
@@ -88,7 +127,7 @@ derivatives.*)
 Lemma bisim_step_del p q d p' : p ~p~ q -> p -PD- d -PD> p' ->
   exists q', q -PD- d -PD> q' /\ p' ~p~ q'.
 Proof.
-  intros B TR. inversion B as [F _].
+  intros B TR. destruct (bisimilar_bisimulation _ _ B) as [F _].
   destruct (F _ _ (stepPTimed _ _ _ TR)) as [q' [TQ BQ]].
   exists q'. split; [ | exact BQ]. inversion TQ; subst; assumption.
 Qed.
@@ -113,7 +152,7 @@ Qed.
 (** A name applied to arguments is bisimilar to its unfolding.*)
 Lemma app_bisim n l : n $( l )$ ~p~ unfoldApp n l.
 Proof.
-  rewrite unfoldApp_body. constructor.
+  rewrite unfoldApp_body. apply bisim_intro.
   - intros a p' H. exists p'. split; [ | apply bisim_refl].
     inversion H; subst.
     + apply stepPDisc.
@@ -149,19 +188,21 @@ Qed.
 (** Bisimilarity is a congruence for the output prefix.*)
 Lemma outPrefix_bisim_context c l p q : p ~p~ q -> c $< l >$ ! p ~p~ c $< l >$ ! q.
 Proof.
-  revert p q. cofix CIH. intros p q B. constructor.
+  intro B. apply (bisim_coind_upto (fun x y => x = c $< l >$ ! p /\ y = c $< l >$ ! q));
+    [ | split; reflexivity].
+  intros x y [-> ->]. split.
   - intros a p1 S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
-    + inversion S0; subst. exists q. split; [ | exact B].
+    + inversion S0; subst. exists q. split; [ | right; exact B].
       apply stepPDisc. constructor. assumption.
     + inversion S0; subst. exists (c $< l >$ ! q). split.
       * apply stepPTimed. constructor.
-      * apply CIH. exact B.
+      * left. split; reflexivity.
   - intros a q1 S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
-    + inversion S0; subst. exists p. split; [ | exact B].
+    + inversion S0; subst. exists p. split; [ | right; exact B].
       apply stepPDisc. constructor. assumption.
     + inversion S0; subst. exists (c $< l >$ ! p). split.
       * apply stepPTimed. constructor.
-      * apply CIH. exact B.
+      * left. split; reflexivity.
 Qed.
 
 (** Bisimilarity is a congruence for the input prefix, when the bodies are bisimilar for
@@ -172,101 +213,107 @@ Lemma inPrefix_bisim_context c xs p q :
     subProcTerm (listsToSub xs (listBaselistExp v)) q) ->
   c $< xs >$ ? p ~p~ c $< xs >$ ? q.
 Proof.
-  revert p q. cofix CIH. intros p q B. constructor.
+  intro B. apply (bisim_coind_upto (fun x y => x = c $< xs >$ ? p /\ y = c $< xs >$ ? q));
+    [ | split; reflexivity].
+  intros x y [-> ->]. split.
   - intros a p1 S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
     + inversion S0; subst. eexists. split.
       * apply stepPDisc. constructor. eassumption.
-      * apply B. assumption.
+      * right. apply B. assumption.
     + inversion S0; subst. exists (c $< xs >$ ? q). split.
       * apply stepPTimed. constructor.
-      * apply CIH. exact B.
+      * left. split; reflexivity.
   - intros a q1 S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
     + inversion S0; subst. eexists. split.
       * apply stepPDisc. constructor. eassumption.
-      * apply B. assumption.
+      * right. apply B. assumption.
     + inversion S0; subst. exists (c $< xs >$ ? p). split.
       * apply stepPTimed. constructor.
-      * apply CIH. exact B.
+      * left. split; reflexivity.
 Qed.
 
 (** Bisimilarity is a congruence for the delay guard.*)
 Lemma del_bisim_context e p q : p ~p~ q -> $< e >$ p ~p~ $< e >$ q.
 Proof.
-  revert e p q. cofix CIH. intros e p q B.
-  destruct B as [B1 B2]. constructor.
+  intro B. destruct (bisimilar_bisimulation _ _ B) as [B1 B2].
+  apply (bisim_coind_upto (fun x y => exists e', x = $< e' >$ p /\ y = $< e' >$ q));
+    [ | exists e; split; reflexivity].
+  clear e. intros x y [e [-> ->]]. split.
   - intros a p1 S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
     + inversion S0; subst.
       match goal with H : p -PA- _ -PA> _ |- _ =>
         apply stepPDisc in H; apply B1 in H; destruct H as [q' [Sq Bq]] end.
       inversion Sq; subst.
-      exists q'. split; [ | exact Bq].
+      exists q'. split; [ | right; exact Bq].
       apply stepPDisc. apply stepDpTimeOut; assumption.
     + inversion S0; subst.
       * match goal with H : p -PD- _ -PD> _ |- _ =>
           apply stepPTimed in H; apply B1 in H; destruct H as [q' [Sq Bq]] end.
         inversion Sq; subst.
-        exists q'. split; [ | exact Bq].
+        exists q'. split; [ | right; exact Bq].
         apply stepPTimed. apply stepTpDelAdd; assumption.
       * eexists. split.
         -- apply stepPTimed. eapply stepTpDelSub. eassumption.
-        -- apply CIH. constructor; assumption.
+        -- left. eexists. split; reflexivity.
       * exists ($< e >$ q). split.
         -- apply stepPTimed. apply stepTpDelIll. assumption.
-        -- apply CIH. constructor; assumption.
+        -- left. eexists. split; reflexivity.
   - intros a q1 S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
     + inversion S0; subst.
       match goal with H : q -PA- _ -PA> _ |- _ =>
         apply stepPDisc in H; apply B2 in H; destruct H as [p' [Sp Bp]] end.
       inversion Sp; subst.
-      exists p'. split; [ | exact Bp].
+      exists p'. split; [ | right; exact Bp].
       apply stepPDisc. apply stepDpTimeOut; assumption.
     + inversion S0; subst.
       * match goal with H : q -PD- _ -PD> _ |- _ =>
           apply stepPTimed in H; apply B2 in H; destruct H as [p' [Sp Bp]] end.
         inversion Sp; subst.
-        exists p'. split; [ | exact Bp].
+        exists p'. split; [ | right; exact Bp].
         apply stepPTimed. apply stepTpDelAdd; assumption.
       * eexists. split.
         -- apply stepPTimed. eapply stepTpDelSub. eassumption.
-        -- apply CIH. constructor; assumption.
+        -- left. eexists. split; reflexivity.
       * exists ($< e >$ p). split.
         -- apply stepPTimed. apply stepTpDelIll. assumption.
-        -- apply CIH. constructor; assumption.
+        -- left. eexists. split; reflexivity.
 Qed.
 
 (** A delay guard matters only through its value.*)
 Lemma del_bisim_guard e1 e2 p : evalExpFunTime e1 = evalExpFunTime e2 ->
   $< e1 >$ p ~p~ $< e2 >$ p.
 Proof.
-  revert e1 e2. cofix CIH. intros e1 e2 E. constructor.
+  intro E. apply (bisim_coind_upto (fun x y => x = $< e1 >$ p /\ y = $< e2 >$ p));
+    [ | split; reflexivity].
+  intros x y [-> ->]. split.
   - intros a x S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
-    + inversion S0; subst. eexists. split; [ | apply bisim_refl].
+    + inversion S0; subst. eexists. split; [ | right; apply bisim_refl].
       apply stepPDisc. apply stepDpTimeOut; [assumption | congruence].
     + inversion S0; subst.
-      * eexists. split; [ | apply bisim_refl].
+      * eexists. split; [ | right; apply bisim_refl].
         apply stepPTimed. apply stepTpDelAdd; [assumption | congruence].
-      * eexists. split; [ | apply bisim_refl].
+      * eexists. split; [ | right; apply bisim_refl].
         apply stepPTimed. apply stepTpDelSub. congruence.
       * exists ($< e2 >$ p). split.
         -- apply stepPTimed. apply stepTpDelIll. congruence.
-        -- apply CIH. assumption.
+        -- left. split; reflexivity.
   - intros a x S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
-    + inversion S0; subst. eexists. split; [ | apply bisim_refl].
+    + inversion S0; subst. eexists. split; [ | right; apply bisim_refl].
       apply stepPDisc. apply stepDpTimeOut; [assumption | congruence].
     + inversion S0; subst.
-      * eexists. split; [ | apply bisim_refl].
+      * eexists. split; [ | right; apply bisim_refl].
         apply stepPTimed. apply stepTpDelAdd; [assumption | congruence].
-      * eexists. split; [ | apply bisim_refl].
+      * eexists. split; [ | right; apply bisim_refl].
         apply stepPTimed. apply stepTpDelSub. congruence.
       * exists ($< e1 >$ p). split.
         -- apply stepPTimed. apply stepTpDelIll. congruence.
-        -- apply CIH. assumption.
+        -- left. split; reflexivity.
 Qed.
 
 (** A delay guard that has run out does nothing.*)
 Lemma del_zero_bisim e p : evalExpFunTime e = Some zeroTime -> $< e >$ p ~p~ p.
 Proof.
-  intro E. constructor.
+  intro E. apply bisim_intro.
   - intros a p1 S. inversion S as [a0 t0 S0 | d0 t0 S0]; subst.
     + inversion S0; subst. exists p1. split; [ | apply bisim_refl].
       apply stepPDisc. assumption.
@@ -431,7 +478,7 @@ Lemma sort_del a d p : sort a d p -> timedActEnabled p d ->
 
 Lemma bisim_dae p q a : p ~p~ q -> discActEnabled p a ->
   discActEnabled q a. introz U. invertClear U0.
-  apply stepPDisc in H. apply U in H. ex_flat. and_flat.
+  apply stepPDisc in H. apply (bisimilar_bisimulation _ _ U) in H. ex_flat. and_flat.
   econstructor. inversion AND. eassumption. Qed.
 
 (*-TIDY*)
@@ -439,7 +486,7 @@ Lemma bisim_dae p q a : p ~p~ q -> discActEnabled p a ->
 Lemma bisim_del_sort p q a d : p ~p~ q -> timedActEnabled p d ->
   sort a d p -> sort a d q. introz U.
   lets SD : sort_del U1 U0. elim_intro SD PD DA.
-  ex_flat. and_flat. apply stepPTimed in AND. apply U in AND.
+  ex_flat. and_flat. apply stepPTimed in AND. apply (bisimilar_bisimulation _ _ U) in AND.
   ex_flat. and_flat. invertClear AND.
   lets DAX : bisim_dae AND0 AND2.
   apply sort_complete. split. eapply sortNotTau. eassumption.
@@ -468,57 +515,63 @@ Qed.
 
 (*** Bisimulation and Syntax ***)
 
-CoFixpoint choice_bisim_symm p1 p2 : p1 $+$ p2 ~p~ p2 $+$ p1. constructor.
+Lemma choice_bisim_symm p1 p2 : p1 $+$ p2 ~p~ p2 $+$ p1.
+  apply (bisim_coind_upto (fun x y => exists p1 p2, x = p1 $+$ p2 /\ y = p2 $+$ p1));
+    [ | exists p1 p2; split; reflexivity].
+  clear p1 p2. intros x y [p1 [p2 [-> ->]]]. split.
   intros. inversion H.
   (*Discrete case*)
   inversion H0.
   (*Left sub-case*)
   exists p'. split. apply stepPDisc. apply stepDpChoiceR.
-  assumption. apply bisim_refl.
+  assumption. right. apply bisim_refl.
   (*Right sub-case*)
   exists p'. split. apply stepPDisc. apply stepDpChoiceL.
-  assumption. apply bisim_refl.
+  assumption. right. apply bisim_refl.
   (*Timed case*)
   inversion H0. exists (p2' $+$ p1'). split.
   apply stepPTimed. constructor; assumption.
-  apply choice_bisim_symm .
+  left. do 2 eexists. split; reflexivity.
   (*Repeat everything again for symmetric case*)
   intros. inversion H.
   (*Discrete case*)
   inversion H0.
   (*Left sub-case*)
   exists q'. split. apply stepPDisc. apply stepDpChoiceR.
-  assumption. apply bisim_refl.
+  assumption. right. apply bisim_refl.
   (*Right sub-case*)
   exists q'. split. apply stepPDisc. apply stepDpChoiceL.
-  assumption. apply bisim_refl.
+  assumption. right. apply bisim_refl.
   (*Timed case*)
   inversion H0. exists (p2' $+$ p1'). split.
   apply stepPTimed. constructor; assumption.
-  apply choice_bisim_symm . Qed.
+  left. do 2 eexists. split; reflexivity. Qed.
 
-CoFixpoint par_bisim_symm p1 p2 : p1 $||$ p2 ~p~ p2 $||$ p1. constructor.
+Lemma par_bisim_symm p1 p2 : p1 $||$ p2 ~p~ p2 $||$ p1.
+  apply (bisim_coind (fun x y => exists p1 p2, x = p1 $||$ p2 /\ y = p2 $||$ p1));
+    [ | exists p1 p2; split; reflexivity].
+  clear p1 p2. intros x y [p1 [p2 [-> ->]]]. split.
   intros. inversion H.
   (*Discrete case*)
   inversion H0; subst.
   (*Left sub-case*)
   exists (p2 $||$ p'0). split. apply stepPDisc. apply stepDpParR.
-  assumption. apply par_bisim_symm.
+  assumption. do 2 eexists. split; reflexivity.
   (*Right sub-case*)
   exists (q' $||$ p1). split. apply stepPDisc. apply stepDpParL.
-  assumption. apply par_bisim_symm.
+  assumption. do 2 eexists. split; reflexivity.
   (*Sync LR*)
   exists (q' $||$ p'0). split. apply stepPDisc. eapply stepDpSyncRL;
-  eassumption. apply par_bisim_symm.
+  eassumption. do 2 eexists. split; reflexivity.
   (*Sync RL*)
   exists (q' $||$ p'0). split. apply stepPDisc. eapply stepDpSyncLR;
-  eassumption. apply par_bisim_symm.
+  eassumption. do 2 eexists. split; reflexivity.
   (*Timed case*)
   inversion H0. exists (q' $||$ p'0). split.
   apply stepPTimed. constructor; try assumption.
   unfold not. intros. eapply H9. eassumption.
   my_applys_eq H10. symmetry. apply complementInvol.
-  apply par_bisim_symm.
+  do 2 eexists. split; reflexivity.
   (*Repeat everything again for symmetric case-
   with left and right reversed.*)
   intros. inversion H.
@@ -526,95 +579,103 @@ CoFixpoint par_bisim_symm p1 p2 : p1 $||$ p2 ~p~ p2 $||$ p1. constructor.
   inversion H0; subst.
   (*Right sub-case*)
   exists (p1 $||$ p'). split. apply stepPDisc. apply stepDpParR.
-  assumption. apply par_bisim_symm.
+  assumption. do 2 eexists. split; reflexivity.
   (*Left sub-case*)
   exists (q'0 $||$ p2). split. apply stepPDisc. apply stepDpParL.
-  assumption. apply par_bisim_symm.
+  assumption. do 2 eexists. split; reflexivity.
   (*Sync LR*)
   exists (q'0 $||$ p'). split. apply stepPDisc. eapply stepDpSyncRL;
-  eassumption. apply par_bisim_symm.
+  eassumption. do 2 eexists. split; reflexivity.
   (*Sync RL*)
   exists (q'0 $||$ p'). split. apply stepPDisc. eapply stepDpSyncLR;
-  eassumption. apply par_bisim_symm.
+  eassumption. do 2 eexists. split; reflexivity.
   (*Timed case*)
   inversion H0. exists (q'0 $||$ p'). split.
   apply stepPTimed. constructor; try assumption.
   unfold not. intros. eapply H9. eassumption.
   my_applys_eq H10. symmetry. apply complementInvol.
-  apply par_bisim_symm. Qed.
+  do 2 eexists. split; reflexivity. Qed.
 
-CoFixpoint choice_bism_unit_r p : p $+$ nilProc ~p~ p.
-  constructor; intros; inversion H.
+Lemma choice_bism_unit_r p : p $+$ nilProc ~p~ p.
+  apply (bisim_coind_upto (fun x y => x = y $+$ nilProc)); [ | reflexivity].
+  clear p. intros x p ->.
+  split; intros; inversion H.
   (*Discrete case*)
   inversion H0; subst.
   (*Left sub-case*)
   apply stepPDisc in H7. exists p'. split.
-  assumption. apply bisim_refl.
+  assumption. right. apply bisim_refl.
   (*Right sub-case*)
   inversion H7.
   (*Timed case*)
   inversion H0; inversion H8; subst.
   exists p1'. split. apply stepPTimed.
-  assumption. apply choice_bism_unit_r.
+  assumption. left. reflexivity.
   (*Right to left case is easy.*)
   (*Discrete case*)
   subst. exists q'. split. apply stepPDisc.
-  eapply stepDpChoiceL. assumption. apply bisim_refl.
+  eapply stepDpChoiceL. assumption. right. apply bisim_refl.
   (*Timed case*)
   subst. exists (q' $+$ nilProc). split. apply stepPTimed.
   eapply stepTpSum. assumption. constructor.
-  apply choice_bism_unit_r. Qed.
+  left. reflexivity. Qed.
 
-CoFixpoint choice_bism_unit_l p : nilProc $+$ p ~p~ p.
+Lemma choice_bism_unit_l p : nilProc $+$ p ~p~ p.
   eapply bisim_trans. apply choice_bisim_symm.
   apply choice_bism_unit_r. Qed.
 
-CoFixpoint choice_bisim_context p1 p2 p1' p2' :
+Lemma choice_bisim_context p1 p2 p1' p2' :
   p1 ~p~ p1' -> p2 ~p~ p2' ->
-  p1 $+$ p2 ~p~ p1' $+$ p2'. introz U. constructor.
+  p1 $+$ p2 ~p~ p1' $+$ p2'. introz U.
+  apply (bisim_coind_upto (fun x y => exists p1 p2 p1' p2',
+    x = p1 $+$ p2 /\ y = p1' $+$ p2' /\ p1 ~p~ p1' /\ p2 ~p~ p2'));
+    [ | exists p1 p2 p1' p2'; split; [reflexivity | split; [reflexivity | split; assumption]]].
+  clear p1 p2 p1' p2' U U0. intros x y [p1 [p2 [p1' [p2' [-> [-> [U U0]]]]]]]. split.
   intros. inversion H.
   (*Discrete case*)
   inversion H0.
   (*Left sub-case*)
-  apply stepPDisc in H7. apply U in H7. ex_flat. and_flat.
+  apply stepPDisc in H7. apply (bisimilar_bisimulation _ _ U) in H7. ex_flat. and_flat.
   exists x. split. apply stepPDisc. inversion AND.
-  apply stepDpChoiceL. assumption. assumption.
+  apply stepDpChoiceL. assumption. right. assumption.
   (*Right sub-case*)
-  apply stepPDisc in H7. apply U0 in H7. ex_flat. and_flat.
+  apply stepPDisc in H7. apply (bisimilar_bisimulation _ _ U0) in H7. ex_flat. and_flat.
   exists x. split. apply stepPDisc. inversion AND.
-  apply stepDpChoiceR. assumption. assumption.
+  apply stepDpChoiceR. assumption. right. assumption.
   (*Timed case*)
   inversion H0.
   apply stepPTimed in H5. apply stepPTimed in H8.
-  apply U in H5. apply U0 in H8. ex_flat. and_flat.
+  apply (bisimilar_bisimulation _ _ U) in H5.
+  apply (bisimilar_bisimulation _ _ U0) in H8. ex_flat. and_flat.
   exists (x0 $+$ x). inversion AND. inversion AND1.
   split. apply stepPTimed. constructor; assumption.
-  apply choice_bisim_context; assumption.
+  left. do 4 eexists. split; [reflexivity | split; [reflexivity | split; assumption]].
   (*Repeat everything again for symmetric case*)
   intros. inversion H.
   (*Discrete case*)
   inversion H0.
   (*Left sub-case*)
-  apply stepPDisc in H7. apply U in H7. ex_flat. and_flat.
+  apply stepPDisc in H7. apply (bisimilar_bisimulation _ _ U) in H7. ex_flat. and_flat.
   exists x. split. apply stepPDisc. inversion AND.
-  apply stepDpChoiceL. assumption. assumption.
+  apply stepDpChoiceL. assumption. right. assumption.
   (*Right sub-case*)
-  apply stepPDisc in H7. apply U0 in H7. ex_flat. and_flat.
+  apply stepPDisc in H7. apply (bisimilar_bisimulation _ _ U0) in H7. ex_flat. and_flat.
   exists x. split. apply stepPDisc. inversion AND.
-  apply stepDpChoiceR. assumption. assumption.
+  apply stepDpChoiceR. assumption. right. assumption.
   (*Timed case*)
   inversion H0.
   apply stepPTimed in H5. apply stepPTimed in H8.
-  apply U in H5. apply U0 in H8. ex_flat. and_flat.
+  apply (bisimilar_bisimulation _ _ U) in H5.
+  apply (bisimilar_bisimulation _ _ U0) in H8. ex_flat. and_flat.
   exists (x0 $+$ x). inversion AND. inversion AND1.
   split. apply stepPTimed. constructor; assumption.
-  apply choice_bisim_context; assumption.
+  left. do 4 eexists. split; [reflexivity | split; [reflexivity | split; assumption]].
   Qed.
 
 (*LOCAL TIDY*)
 
 Ltac bisim_disc_tac_parm U V :=
-  apply stepPDisc in V; apply U in V; ex_flat; and_flat;
+  apply stepPDisc in V; apply (bisimilar_bisimulation _ _ U) in V; ex_flat; and_flat;
   match goal with [U1 : _ -P- _ -P> _ |- _] => inversion U1; subst end.
 
 (**If there are bisimilar processes in the context and there's a discrete
@@ -629,7 +690,7 @@ Ltac bisim_disc_tac :=
   end.
 
 Ltac bisim_timed_tac_parm U V :=
-  apply stepPTimed in V; apply U in V; ex_flat; and_flat;
+  apply stepPTimed in V; apply (bisimilar_bisimulation _ _ U) in V; ex_flat; and_flat;
   match goal with [U1 : _ -P- _ -P> _ |- _] => inversion U1; subst end.
 
 (**Similar to bisim_disc_tac but matches a delay rather than a discrete step.*)
@@ -644,7 +705,7 @@ Ltac bisim_timed_tac :=
 (*-LOCAL TIDY*)
 
 Lemma cond_bisim_lift_true p q b : p ~p~ q -> evalBoolExp b true ->
-  b $> p ~p~ b $> q. intros. constructor.
+  b $> p ~p~ b $> q. intros. apply bisim_intro.
   intros. inversion H1.
   (*Disc case*)
   inversion H2.
@@ -668,29 +729,32 @@ Lemma cond_bisim_lift_true p q b : p ~p~ q -> evalBoolExp b true ->
   inversion H9.
   Qed.
 
-CoFixpoint par_bisim_context p p' q :
+Lemma par_bisim_context p p' q :
   p ~p~ p' -> p $||$ q ~p~ p' $||$ q.
-  intros. constructor. 
+  intros. apply (bisim_coind (fun x y => exists p p' q,
+    x = p $||$ q /\ y = p' $||$ q /\ p ~p~ p'));
+    [ | exists p p' q; split; [reflexivity | split; [reflexivity | assumption]]].
+  clear p p' q H. intros x y [p [p' [q [-> [-> H]]]]]. split.
   (*We discriminate the cases*)
   intros. invertClear H0; subst.
   (*First, the discrete case.*)
   invertClear H1; subst.
   (*Sub case: left component action*)
   bisim_disc_tac. exists (x $||$ q). split. apply stepPDisc.
-  apply stepDpParL. assumption. apply par_bisim_context.
-  assumption.
+  apply stepDpParL. assumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Sub case: right component action*)
   exists (p' $||$ q'). split. apply stepPDisc.
-  apply stepDpParR. assumption. apply par_bisim_context.
-  assumption.
+  apply stepDpParR. assumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Sub case: left to right synch*)
   bisim_disc_tac. exists (x $||$ q'). split. apply stepPDisc.
-  eapply stepDpSyncLR; eassumption. apply par_bisim_context.
-  assumption.
+  eapply stepDpSyncLR; eassumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Sub case: right to left synch*)
   bisim_disc_tac. exists (x $||$ q'). split. apply stepPDisc.
-  eapply stepDpSyncRL; eassumption. apply par_bisim_context.
-  assumption.
+  eapply stepDpSyncRL; eassumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Now the delay case. This is where we need to use that quirky,
   beautiful little result about sort.*)
   invertClear H1; subst. bisim_timed_tac.
@@ -698,7 +762,7 @@ CoFixpoint par_bisim_context p p' q :
   unfold not. intros. eapply H7. eapply bisim_del_sort.
   apply bisim_symm. eassumption. econstructor. eassumption.
   eassumption. assumption.
-  apply par_bisim_context. assumption.
+  do 3 eexists. split; [reflexivity | split; [reflexivity | assumption]].
   (*Symmetric case*)
   (*We discriminate the cases*)
   intros. invertClear H0; subst.
@@ -706,20 +770,20 @@ CoFixpoint par_bisim_context p p' q :
   invertClear H1; subst.
   (*Sub case: left component action*)
   bisim_disc_tac. exists (x $||$ q). split. apply stepPDisc.
-  apply stepDpParL. assumption. apply par_bisim_context.
-  assumption.
+  apply stepDpParL. assumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Sub case: right component action*)
   exists (p $||$ q'0). split. apply stepPDisc.
-  apply stepDpParR. assumption. apply par_bisim_context.
-  assumption.
+  apply stepDpParR. assumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Sub case: left to right synch*)
   bisim_disc_tac. exists (x $||$ q'0). split. apply stepPDisc.
-  eapply stepDpSyncLR; eassumption. apply par_bisim_context.
-  assumption.
+  eapply stepDpSyncLR; eassumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Sub case: right to left synch*)
   bisim_disc_tac. exists (x $||$ q'0). split. apply stepPDisc.
-  eapply stepDpSyncRL; eassumption. apply par_bisim_context.
-  assumption.
+  eapply stepDpSyncRL; eassumption. do 3 eexists.
+  split; [reflexivity | split; [reflexivity | assumption]].
   (*Now the delay case. This is where we need to use that quirky,
   beautiful little result about sort.*)
   invertClear H1; subst. bisim_timed_tac.
@@ -727,7 +791,7 @@ CoFixpoint par_bisim_context p p' q :
   unfold not. intros. eapply H7. eapply bisim_del_sort.
   apply bisim_symm. apply bisim_symm in H. eassumption. econstructor.
   eassumption. eassumption. assumption.
-  apply par_bisim_context. assumption.
+  do 3 eexists. split; [reflexivity | split; [reflexivity | assumption]].
   Qed.
 
 Corollary par_bisim_context2 p q q' :
@@ -753,7 +817,7 @@ Qed.
 
 Lemma cond_bisim_true p b : evalBoolExp b true ->
   b $> p ~p~ p. introz U.
-  split; intros. exists p'. split;[ | apply bisim_refl].
+  apply bisim_intro; intros. exists p'. split;[ | apply bisim_refl].
   inversion H; inversion H0. apply stepPDisc. assumption.
   apply stepPTimed. assumption. apply evalBoolExpTrueTot in U.
   rewrite U in H7. inversion H7.
@@ -778,18 +842,20 @@ Qed.
 
 (*TOGO*)
 
-CoFixpoint cond_bisim_false p b : evalBoolExpFunTot b = false ->
-  b $> p ~p~ nilProc. introz U. split; intros. 
+Lemma cond_bisim_false p b : evalBoolExpFunTot b = false ->
+  b $> p ~p~ nilProc. introz U.
+  apply (bisim_coind (fun x y => x = b $> p /\ y = nilProc)); [ | split; reflexivity].
+  intros x y [-> ->]. split; intros.
   inversion H; inversion H0.
   apply evalBoolExpTrueTot in H8.
   apply evalBoolExpTrueTot in H8. rewrite U in H8.
   inversion H8. rewrite U in H8. inversion H8.
   subst. exists nilProc. split. do 2 constructor.
-  apply cond_bisim_false; assumption.
+  split; reflexivity.
   inversion H; inversion H0; subst.
   exists (b $> p). split. constructor.
-  apply stepTpIfFalse; assumption. apply cond_bisim_false.
-  assumption. Qed.
+  apply stepTpIfFalse; assumption. split; reflexivity.
+  Qed.
 
 Lemma if_then_bisim_true b p q :
   evalBoolExp b true -> b $> p $+$ !~b $> q ~p~ p.

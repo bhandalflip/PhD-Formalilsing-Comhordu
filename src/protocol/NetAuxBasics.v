@@ -244,7 +244,7 @@ Proof.
   assert (STEP : forall p q, R p q -> forall a p', p -P- a -P> p' ->
     exists q', q -P- a -P> q' /\ R p' q').
   { intros p q [B | [v0 [m0 [E0 [Bp Bq]]]]] a p' S.
-    - inversion B as [F _]. destruct (F a p' S) as [q' [S' B']].
+    - destruct (bisimilar_bisimulation _ _ B) as [F _]. destruct (F a p' S) as [q' [S' B']].
       exists q'. split; [exact S' | left; exact B'].
     - inversion S as [a0 p1 SD | d p1 SD]; subst.
       + destruct (bisim_step_disc _ _ _ _ Bp SD) as [r [SR Br]].

@@ -1170,7 +1170,8 @@ Proof.
       exists q'. split; [apply stepPTimed; exact SQ | ].
       eapply owrReady; [exact Br | apply bisim_symm; exact Bq' | exact Eu | exact Eu' | exact Emod].
   - (* bisimilar already *)
-    intros a p' S. destruct B as [F _]. destruct (F a p' S) as [q' [S' B']].
+    intros a p' S. destruct (bisimilar_bisimulation _ _ B) as [F _].
+    destruct (F a p' S) as [q' [S' B']].
     exists q'. split; [exact S' | apply owrBisim; exact B'].
 Qed.
 
