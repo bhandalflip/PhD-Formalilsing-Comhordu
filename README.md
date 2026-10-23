@@ -32,7 +32,9 @@ Check @safety my_model.
 
 [`concrete_model`](src/model/ModelConsistency.v) is a small, complete example.
 
-Then check that your system runs exactly Comhordú's protocol, as [`src/protocol/Protocol.v`](src/protocol/Protocol.v) defines it. A test oracle, which checks what your system does against what the protocol allows, is one way to do it. `safety` says nothing about a protocol that differs, however slightly.
+Then check that your system runs exactly Comhordú's protocol, as [`src/protocol/Protocol.v`](src/protocol/Protocol.v) defines it. `safety` says nothing about a protocol that differs, however slightly. A test oracle, which checks what your system does against what the protocol allows, is one way to check.
+
+A formal refinement, from the protocol down to your system, is another way, but a limited one. The model runs in real time, so any refinement must include a timed semantics. The language's tiers may also make standard refinement techniques hard to apply. Still, refinement is not out of reach: existing techniques could be adapted to it.
 
 ## Build and check
 
