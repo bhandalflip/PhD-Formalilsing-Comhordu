@@ -33,7 +33,7 @@
 - `make` builds everything (`_CoqProject` → `rocq makefile` → `Makefile.coq`).
 - `make assumptions` prints the unproved results that `safety` still rests on, then the axioms.
 - `make clean` removes build products.
-- CI (`.github/workflows/build.yml`) builds every pull request (when it's opened, and on each new commit), checks its proof layout and reports the unproved results that remain. Keep it green: never merge a red build.
+- CI runs on every pull request, when it's opened and on each new commit. `build` (`.github/workflows/build.yml`) compiles every file, which checks every proof, and reports the unproved results that remain. `lint` (`.github/workflows/lint.yml`) checks formatting only, such as the proof layout. Keep both green: never merge a red build.
 
 ## Writing
 

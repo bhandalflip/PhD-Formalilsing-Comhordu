@@ -24,18 +24,3 @@ jobs:
         run: make -j"$(nproc)"
       - name: Report remaining assumptions under safety
         run: python3 helper-scripts/summarise_assumptions.py | tee -a "$GITHUB_STEP_SUMMARY"
-
-  layout:
-    runs-on: ubuntu-latest
-    # The same image as the build, so that the checker's tests can compile their cases with Rocq.
-    container:
-      image: rocq/rocq-prover:9.2.0
-      options: --user root
-    env:
-      PATH: /home/rocq/.opam/4.14.2+flambda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test the proof layout checker
-        run: python3 helper-scripts/test_check_proof_layout.py
-      - name: Check the proof layout
-        run: python3 helper-scripts/check_proof_layout.py
