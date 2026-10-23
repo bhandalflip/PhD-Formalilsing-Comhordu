@@ -1,6 +1,10 @@
 # Standard Rocq project Makefile: generates Makefile.coq from _CoqProject via `rocq makefile`
 # and delegates every other target to it (e.g. `make html`, `make install`, `make validate`).
 
+# Have Rocq write, beside each file it compiles, where each of the file's sentences starts and
+# ends, in a .v.timing file. It costs no build time, and the proof layout check reads them.
+export TIMING ?= 1
+
 all: Makefile.coq
 	@+$(MAKE) -f Makefile.coq all
 

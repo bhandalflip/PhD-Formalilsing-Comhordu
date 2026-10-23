@@ -19,6 +19,7 @@ GEMINI.md
 *.vo
 *.vos
 *.vok
+*.v.timing
 *Makefile.coq*
 .lia.cache
 .nia.cache

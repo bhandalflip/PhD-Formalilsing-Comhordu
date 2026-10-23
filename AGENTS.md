@@ -30,10 +30,10 @@
 
 - Use Rocq **9.2.0** with `rocq-stdlib`. Dependencies are declared in `rocq-comhordu.opam`. The reference environment is the Docker image `rocq/rocq-prover:9.2.0`, the same one CI uses.
 - If `rocq` isn't on the `PATH`, and neither a Docker daemon nor opam is available (the usual case in a sandboxed agent session, where opam's repository is also blocked), run `helper-scripts/install_rocq.sh` as root and then `export PATH=/home/rocq/.opam/4.14.2+flambda/bin:$PATH`. It downloads the reference image's layers from Docker Hub with `curl` and unpacks the image's Rocq to the path it has in the image; see [`helper-scripts/README.md`](helper-scripts/README.md). Check `rocq --version` first: it may already be installed.
-- `make` builds everything (`_CoqProject` → `rocq makefile` → `Makefile.coq`).
+- `make` builds everything (`_CoqProject` → `rocq makefile` → `Makefile.coq`). Beside each file it compiles, Rocq also writes where each of the file's sentences starts and ends, in a `.v.timing` file, which the proof layout check reads.
 - `make assumptions` prints the unproved results that `safety` still rests on, then the axioms.
 - `make clean` removes build products.
-- CI runs on every pull request, when it's opened and on each new commit. `build` (`.github/workflows/build.yml`) compiles every file, which checks every proof, and reports the unproved results that remain. `lint` (`.github/workflows/lint.yml`) checks formatting only, such as the proof layout. Keep both green: never merge a red build.
+- CI (`.github/workflows/build.yml`) builds every pull request (when it's opened, and on each new commit), reports the unproved results that remain, and then checks the proof layout. Keep it green: never merge a red build.
 
 ## Writing
 

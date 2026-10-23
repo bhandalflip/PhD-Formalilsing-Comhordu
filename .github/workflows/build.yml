@@ -24,3 +24,8 @@ jobs:
         run: make -j"$(nproc)"
       - name: Report remaining assumptions under safety
         run: python3 helper-scripts/summarise_assumptions.py | tee -a "$GITHUB_STEP_SUMMARY"
+      # The proof layout: formatting only, read from the sentences Rocq found in the build.
+      - name: Test the proof layout checker
+        run: python3 helper-scripts/test_check_proof_layout.py
+      - name: Check the proof layout
+        run: python3 helper-scripts/check_proof_layout.py

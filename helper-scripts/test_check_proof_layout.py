@@ -2,10 +2,9 @@
 """Test check_proof_layout.py on the corners of Rocq's syntax and of the layout rule.
 
 Each case is a small Rocq file: some follow the layout, some break it, and every one that
-follows it must still pass with its whitespace changed, its line endings, tabs, trailing spaces
-and blank lines. Where `rocq` is on the PATH, each case is also compiled with `rocq compile
--time`, which prints where every sentence starts and ends, to check that the checker splits
-sentences exactly as Rocq does.
+follows it must still pass with its whitespace changed: its line endings, tabs, trailing spaces
+and blank lines. Rocq compiles every case, as `make` does, and the checker reads the sentences
+that Rocq found in it, so the tests need `rocq` on the PATH.
 
 Usage: python3 helper-scripts/test_check_proof_layout.py   (from the repository root)
 """
@@ -473,6 +472,8 @@ OPENS = {
     "#[local] (* c *) Lemma a : True.": True,
     "Definition d (* := 1 *) : nat.": True,
     'Example e : "a := b" = "a := b".': True,
+    "Definition d (* a (* b *) := *) : nat.": True,
+    'Definition d (* "*)" *) := 1.': False,
 }
 
 # What a sentence that starts with `Proof` does: open the proof, or be the whole proof.
@@ -489,144 +490,160 @@ PROOF_STARTS = {
     "exact I.": None,
 }
 
-# None of these is valid Rocq, but the checker must not fail on them.
-NOT_ROCQ = {
-    "byte order mark": "\ufeff" + rocq(r"""
-        Lemma a : True.
-          exact I.
-        Qed.
-        """),
-    "unterminated comment": rocq(r"""
-        Lemma a : True.
-        Proof. exact I. Qed.
-        (* no end
-        """),
-    "unterminated string": rocq(r"""
-        Lemma a : True.
-        Proof. idtac "no end
-        """),
-    "statement with no proof": rocq(r"""
-        Lemma a : True.
-        """),
-    "Proof with no statement": rocq(r"""
-        Proof.
-          exact I.
-        Qed.
-        """),
-}
+# The kinds of whitespace change that a case which breaks the layout is also tested under.
+KEEP_PROBLEMS = ("CRLF line endings", "tabs for indentation", "trailing spaces and tabs")
 
 
-def rocq_sentences(text, workdir, name):
-    """The sentences of a file as Rocq's `-time` output gives them, as (start, end) character
-    offsets, or None if the file doesn't compile."""
+def compile_case(workdir, name, text):
+    """Write a case to workdir and compile it with Rocq, as `make` does. Return its path, or
+    None if Rocq refuses it."""
     path = os.path.join(workdir, name + ".v")
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(text)
-    r = subprocess.run(["rocq", "compile", "-time", path], cwd=workdir,
-                       capture_output=True, encoding="utf-8", errors="replace")
-    if r.returncode != 0:
-        return None
-    char_at, byte = {}, 0  # Rocq counts in bytes, the checker in characters
-    for i, ch in enumerate(text):
-        char_at[byte] = i
-        byte += len(ch.encode("utf-8"))
-    char_at[byte] = len(text)
-    spans = re.findall(r"^Chars (\d+) - (\d+) \[", r.stdout, re.M)
-    return [(char_at[int(s)], char_at[int(e)]) for s, e in spans]
+    r = subprocess.run(["rocq", "compile", "-time-file", path + ".timing", path],
+                       cwd=workdir, capture_output=True)
+    return path if r.returncode == 0 else None
+
+
+def sentences_by_hand(text, parts):
+    """The sentences of a text, given their texts in order, for a file that Rocq refuses."""
+    sentences, at = [], 0
+    for part in parts:
+        at = text.index(part, at)
+        sentences.append((at, at + len(part)))
+        at += len(part)
+    return sentences
 
 
 class CheckProofLayout(unittest.TestCase):
 
-    def test_good_layouts_pass(self):
+    @classmethod
+    def setUpClass(cls):
+        if not shutil.which("rocq"):
+            raise RuntimeError("the tests compile their cases with Rocq: put rocq on the PATH")
+        cases = {(name, None): text for name, text in GOOD.items()}
+        cases.update({(name, None): text for name, (text, _) in BAD.items()})
         for name, text in GOOD.items():
+            for noise, change in NOISE.items():
+                if (name, noise) != ("one-line proof of 80 characters", "deeper indentation"):
+                    cases[(name, noise)] = change(text)  # indentation counts in a line's length
+        for name, (text, _) in BAD.items():
+            cases.update({(name, noise): NOISE[noise](text) for noise in KEEP_PROBLEMS})
+        cls.workdir = tempfile.TemporaryDirectory()
+        keys = list(cases)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 2) as pool:
+            paths = pool.map(lambda i: compile_case(cls.workdir.name, f"Case{i}", cases[keys[i]]),
+                             range(len(keys)))
+        cls.compiled = {key: (cases[key], path) for key, path in zip(keys, paths)}
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.workdir.cleanup()
+
+    def problems(self, name, noise=None):
+        """The problems the checker finds in a case, from the sentences Rocq found in it."""
+        text, path = self.compiled[(name, noise)]
+        self.assertIsNotNone(path, "Rocq refuses the case")
+        return sorted(cpl.check_text(text, cpl.rocq_sentences(path, text)))
+
+    def test_good_layouts_pass(self):
+        for name in GOOD:
             with self.subTest(name):
-                self.assertEqual(cpl.check_text(text), [])
+                self.assertEqual(self.problems(name), [])
 
     def test_bad_layouts_fail_where_expected(self):
-        for name, (text, expected) in BAD.items():
+        for name, (_, expected) in BAD.items():
             with self.subTest(name):
-                problems = sorted(cpl.check_text(text))
+                problems = self.problems(name)
                 self.assertEqual([line for line, _ in problems],
                                  [line for line, _ in expected], problems)
                 for (_, message), (_, part) in zip(problems, expected):
                     self.assertIn(part, message)
 
     def test_whitespace_never_matters(self):
-        for name, text in GOOD.items():
-            for noise, change in NOISE.items():
-                if name == "one-line proof of 80 characters" and noise == "deeper indentation":
-                    continue  # indentation is part of a line's length
+        for name, noise in self.compiled:
+            if name in GOOD and noise:
                 with self.subTest(name, noise=noise):
-                    self.assertEqual(cpl.check_text(change(text)), [])
+                    self.assertEqual(self.problems(name, noise), [])
 
     def test_whitespace_keeps_the_same_problems(self):
-        for name, (text, expected) in BAD.items():
-            for noise in ("CRLF line endings", "tabs for indentation", "trailing spaces and tabs"):
+        for name in BAD:
+            for noise in KEEP_PROBLEMS:
                 with self.subTest(name, noise=noise):
-                    self.assertEqual(cpl.check_text(NOISE[noise](text)), cpl.check_text(text))
+                    self.assertEqual(self.problems(name, noise), self.problems(name))
+
+    def test_sentences_are_read_in_characters(self):
+        # Rocq counts bytes, and `ú` takes two.
+        text, path = self.compiled[("unicode", None)]
+        sentences = cpl.rocq_sentences(path, text)
+        self.assertEqual([text[s:e] for s, e in sentences],
+                         ["Lemma ú : True.", "Proof.", "exact I.", "Qed."])
 
     def test_which_sentences_open_a_proof(self):
         for text, opens in OPENS.items():
             with self.subTest(text):
-                sentences, masked = cpl.lex(text)
-                self.assertEqual(len(sentences), 1)
-                self.assertEqual(cpl.opens_proof(masked, sentences[0]), opens)
+                self.assertEqual(cpl.opens_proof(cpl.blank_out(text)), opens)
 
     def test_what_a_proof_sentence_does(self):
         for text, kind in PROOF_STARTS.items():
             with self.subTest(text):
-                sentences, masked = cpl.lex(text)
-                self.assertEqual(cpl.proof_start(masked, sentences[0]), kind)
-
-    def test_files_that_are_not_rocq_do_not_crash(self):
-        for name, text in NOT_ROCQ.items():
-            with self.subTest(name):
-                self.assertIsInstance(cpl.check_text(text), list)
+                self.assertEqual(cpl.proof_start(cpl.blank_out(text)), kind)
 
     def test_statement_without_proof_is_skipped(self):
         # Rocq refuses this file, but the checker must not take b's proof for a's.
-        self.assertEqual(cpl.check_text("Lemma a : True.\nLemma b : True.\nProof. exact I. Qed.\n"),
-                         [])
+        text = "Lemma a : True.\nLemma b : True.\nProof. exact I. Qed.\n"
+        sentences = sentences_by_hand(
+            text, ["Lemma a : True.", "Lemma b : True.", "Proof.", "exact I.", "Qed."])
+        self.assertEqual(cpl.check_text(text, sentences), [])
 
-    def test_bom_is_skipped(self):
-        problems = cpl.check_text(NOT_ROCQ["byte order mark"])
-        self.assertEqual([line for line, _ in problems], [2])
-
-    def test_sentences_match_rocq(self):
-        if not shutil.which("rocq"):
-            self.skipTest("rocq is not on the PATH")
-        cases = dict(GOOD)
-        cases.update({name: text for name, (text, _) in BAD.items()})
-        for noise in ("CRLF line endings", "tabs for indentation", "blank lines between lines"):
-            cases.update({f"{name}, {noise}": NOISE[noise](text) for name, text in GOOD.items()})
-        with tempfile.TemporaryDirectory() as workdir:
-            names = {name: f"Case{i}" for i, name in enumerate(cases)}
-            with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 2) as pool:
-                spans = dict(zip(cases, pool.map(
-                    lambda name: rocq_sentences(cases[name], workdir, names[name]), cases)))
-        for name, text in cases.items():
-            with self.subTest(name):
-                self.assertIsNotNone(spans[name], "the case doesn't compile")
-                self.assertEqual(cpl.lex(text)[0], spans[name])
-
-    def test_default_files_skip_vendored_code(self):
-        files = cpl.default_files()
-        self.assertIn(os.path.join(cpl.SRC, "protocol", "Main.v"), files)
-        self.assertFalse([f for f in files if f.startswith(cpl.VENDORED + os.sep)])
-
-    def test_main_reports_problems_and_exit_code(self):
+    def test_missing_stale_or_unreadable_sentences(self):
+        text = GOOD["multi-line proof"]
         with tempfile.TemporaryDirectory() as d:
-            good, bad = os.path.join(d, "Good.v"), os.path.join(d, "Bad.v")
-            with open(good, "w") as f:
+            path = os.path.join(d, "A.v")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            with self.assertRaisesRegex(cpl.NoSentences, "missing"):
+                cpl.rocq_sentences(path, text)
+            self.assertIsNotNone(compile_case(d, "A", text))
+            later = os.path.getmtime(path + ".timing") + 10
+            os.utime(path, (later, later))
+            with self.assertRaisesRegex(cpl.NoSentences, "older"):
+                cpl.rocq_sentences(path, text)
+            os.utime(path, (0, 0))
+            with open(path + ".timing", "w", encoding="utf-8") as f:
+                f.write("no sentences here\n")
+            with self.assertRaisesRegex(cpl.NoSentences, "format"):
+                cpl.rocq_sentences(path, text)
+            with open(path + ".timing", "w", encoding="utf-8") as f:
+                f.write("Chars 0 - 999 [Lemma~a~:~True.] 0. secs (0.u,0.s)\n")
+            with self.assertRaisesRegex(cpl.NoSentences, "doesn't match"):
+                cpl.rocq_sentences(path, text)
+
+    def test_a_file_of_comments_has_no_sentences(self):
+        text, path = self.compiled[("only comments", None)]
+        self.assertEqual(cpl.rocq_sentences(path, text), [])
+
+    def test_default_files_are_the_built_ones_without_vendored_code(self):
+        files = cpl.default_files()
+        self.assertIn(os.path.join(cpl.ROOT, "src", "protocol", "Main.v"), files)
+        self.assertFalse([f for f in files if f.startswith(cpl.VENDORED + os.sep)])
+        self.assertTrue(all(os.path.isfile(f) for f in files))
+
+    def test_main_reports_problems_and_exit_codes(self):
+        with tempfile.TemporaryDirectory() as d:
+            good = compile_case(d, "Good", GOOD["multi-line proof"])
+            bad = compile_case(d, "Bad", BAD["no Proof"][0])
+            unbuilt = os.path.join(d, "Unbuilt.v")
+            with open(unbuilt, "w", encoding="utf-8") as f:
                 f.write(GOOD["multi-line proof"])
-            with open(bad, "w") as f:
-                f.write(BAD["no Proof"][0])
-            out = io.StringIO()
-            with contextlib.redirect_stdout(out):
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 self.assertEqual(cpl.main([good]), 0)
                 self.assertEqual(cpl.main([good, bad]), 1)
+                self.assertEqual(cpl.main([good, bad, unbuilt]), 2)
             self.assertIn("Bad.v:2: a: start the proof with `Proof.`", out.getvalue())
             self.assertNotIn("Good.v", out.getvalue())
+            self.assertIn("Unbuilt.v are missing: run `make`", err.getvalue())
 
 
 if __name__ == "__main__":

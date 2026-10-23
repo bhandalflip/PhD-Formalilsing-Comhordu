@@ -25,7 +25,7 @@
 - Write an intro pattern with a space after its bracket, as `[ | x]`: `[|` is a token of the entity notation `[| p, l, h, k |]`, so `[|x]` fails to parse once `EntityLanguage` is imported.
 - **Helper lemmas** go immediately before the lemma that first needs them. Mark them `Local`: that, not the name, is what says a result is auxiliary.
 - **Name every result by what it states**, helpers included. Only a helper that states nearly what the result it supports states takes that result's name with `_aux`, `_aux2`, …
-- **Lay out every proof** from `Proof.`, on a new line after its statement, to its closer, such as `Qed.`, on a line of its own, with the proof indented by 2 spaces between them. A short proof can instead take one line of at most 80 characters, as `Proof. auto. Qed.`. CI checks these line breaks and that length with [`check_proof_layout.py`](../helper-scripts/check_proof_layout.py), and the [ADR](../doc/adr/2026-10-23-lay-out-every-proof.md) says why.
+- **Lay out every proof** from `Proof.`, on a new line after its statement, to its closer, such as `Qed.`, on a line of its own, with the proof indented by 2 spaces between them. A short proof can instead take one line of at most 80 characters, as `Proof. auto. Qed.`. CI checks these line breaks and that length with [`check_proof_layout.py`](../helper-scripts/check_proof_layout.py), on the sentences Rocq found in the build, and the [ADR](../doc/adr/2026-10-23-lay-out-every-proof.md) says why.
 
 ## Libraries and tactics
 
@@ -37,4 +37,4 @@
 
 - `make` must succeed from clean.
 - `make assumptions` must not gain any new entry except proofs that left the list.
-- `python3 helper-scripts/check_proof_layout.py` must find no problem.
+- `python3 helper-scripts/check_proof_layout.py`, after `make`, must find no problem.
