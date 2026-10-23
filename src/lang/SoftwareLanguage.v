@@ -377,12 +377,11 @@ Lemma subProc_id_eq p : subProcTerm idSubst p = p.
   try rewrite idSubList; try rewrite idSubExp; try reflexivity.
   Qed.
 
-(** An application can do whatever the body of its definition can do, with the
-arguments substituted for the parameters.*)
+(** An application can do whatever its unfolding can do.*)
 Lemma stepDpApp_alt : forall (n : Name) (l2 : list Exp) (p' : ProcTerm) (a : DiscAct),
-  stepDiscProc (subProcTerm (listsToSub (fst (def n)) l2) (snd (def n))) a p' ->
-  stepDiscProc (app n l2) a p'. intros. remember (def n). destruct p. eapply stepDpApp.
-  rewrite <- Heqp. reflexivity. apply H. Qed.
+  stepDiscProc (unfoldApp n l2) a p' ->
+  stepDiscProc (app n l2) a p'. intros. rewrite unfoldApp_body in H. remember (def n).
+  destruct p. eapply stepDpApp. rewrite <- Heqp. reflexivity. apply H. Qed.
 
 (** guarded_rect for the terms that apply only names of rank below n outside a prefix.*)
 Local Lemma guarded_rect_aux (P : ProcTerm -> Type)
@@ -469,12 +468,11 @@ Lemma daeApp : forall (a : DiscAct) (x : list Var) (l : list Exp)
   discActEnabled (h $(l)$) a. intros. invertClear H0.
   eapply dae. eapply stepDpApp. apply H. apply H1. Qed.
 
-(** More cumbersome version but it fills in the variable list x and the process p automatically by
-extracting them from the process definition of p.*)
+(** If the unfolding of an application is discActEnabled, then so is the application.*)
 Lemma daeAppAuto : forall (a : DiscAct) (l : list Exp) (h : Name),
-  discActEnabled (subProcTerm (listsToSub (fst (def h)) l) (snd (def h))) a ->
-  discActEnabled (h $(l)$) a. intros. remember (def h) as e. destruct e.
-  symmetry in Heqe. eapply daeApp. apply Heqe. assumption. Qed.
+  discActEnabled (unfoldApp h l) a ->
+  discActEnabled (h $(l)$) a. intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply daeApp. apply Heqe. assumption. Qed.
 
 (** If the then branch of an ifThen construct is discActEnabled for an action a,
 and the guard evaluates to true, then the whole construct is dae by action a.*)
@@ -512,12 +510,11 @@ Lemma taeApp : forall (d : Delay) (x : list Var) (l : list Exp)
   timedActEnabled (h $(l)$) d. intros. invertClear H0.
   eapply tae. eapply stepTpApp. apply H. apply H1. Qed.
 
-(** More cumbersome version but it fills in the variable list x and the process p automatically by
-extracting them from the process definition of p.*)
+(** If the unfolding of an application is timedActEnabled, then so is the application.*)
 Lemma taeAppAuto : forall (d : Delay) (l : list Exp) (h : Name),
-  timedActEnabled (subProcTerm (listsToSub (fst (def h)) l) (snd (def h))) d ->
-  timedActEnabled (h $(l)$) d. intros. remember (def h) as e. destruct e.
-  symmetry in Heqe. eapply taeApp. apply Heqe. assumption. Qed.
+  timedActEnabled (unfoldApp h l) d ->
+  timedActEnabled (h $(l)$) d. intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply taeApp. apply Heqe. assumption. Qed.
 
 (** If the then branch of an ifThen construct is timedActEnabled for an amount d,
 then the whole construct can delay by this amount.*)
@@ -1084,12 +1081,11 @@ Lemma mgAppEx : forall (x : list Var) (l : list Exp) (h : Name) (p : ProcTerm),
   exists d, d %; (h $(l)$). intros. invertClear H0. exists x0. eapply mgApp.
   apply H. assumption. Qed.
 
-(** More cumbersome version but it fills in the variable list x and the process p automatically by
-extracting them from the process definition of p.*)
+(** If the unfolding of an application has some minGuard, then so does the application.*)
 Lemma mgAppAutoEx : forall (l : list Exp) (h : Name),
-  (exists d, d %; (subProcTerm (listsToSub (fst (def h)) l) (snd (def h)))) ->
-  exists d, d %; (h $(l)$). intros. remember (def h) as e. destruct e.
-  symmetry in Heqe. eapply mgAppEx. apply Heqe. assumption. Qed.
+  (exists d, d %; (unfoldApp h l)) ->
+  exists d, d %; (h $(l)$). intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply mgAppEx. apply Heqe. assumption. Qed.
 
 (** If the then branch of an ifThen construct is minGuard for some amount d,
 then the whole construct is for some amount also.*)
@@ -1126,7 +1122,7 @@ Proof.
   - intros p q [d1 H1] [d2 H2]. destruct (Rle_or_lt d1 d2).
     + exists d1. eapply mgParL; eassumption.
     + exists d2. eapply mgParR; eassumption.
-  - intros h l H. apply mgAppAutoEx. rewrite <- unfoldApp_body. assumption.
+  - intros. apply mgAppAutoEx. assumption.
   - intros. apply mgDelEx. assumption.
 Qed.
 
@@ -1281,12 +1277,11 @@ Lemma outListAppIndEx : forall (x : list Var) (l : list Exp) (h : Name) (p : Pro
   {l' | outListProc (h $(l)$) l'}. intros. invertClear H0. exists x0. constructor.
   unfold unfoldApp. rewrite H. apply H1. Qed.
 
-(** More cumbersome version but it fills in the variable list x and the
-process p automatically by extracting them from the process definition of p.*)
+(** If the unfolding of an application has an output list, then so does the application.*)
 Lemma outListAppAutoEx : forall (l : list Exp) (h : Name),
-  {l' | outListProc (subProcTerm (listsToSub (fst (def h)) l) (snd (def h))) l'} ->
-  {l' | outListProc (h $(l)$) l'}. intros. remember (def h) as e. destruct e.
-  symmetry in Heqe. eapply outListAppIndEx. apply Heqe. assumption. Qed.
+  {l' | outListProc (unfoldApp h l) l'} ->
+  {l' | outListProc (h $(l)$) l'}. intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply outListAppIndEx. apply Heqe. assumption. Qed.
 
 (** If the then branch of an ifThen construct has some outListProc,
 then the whole construct has one also.*)
@@ -1353,12 +1348,11 @@ Lemma inListAppIndEx : forall (x : list Var) (l : list Exp) (h : Name) (p : Proc
   {l' | inListProc (h $(l)$) l'}. intros. invertClear H0. exists x0. constructor.
   unfold unfoldApp. rewrite H. apply H1. Qed.
 
-(** More cumbersome version but it fills in the variable list x and the
-process p automatically by extracting them from the process definition of p.*)
+(** If the unfolding of an application has an input list, then so does the application.*)
 Lemma inListAppAutoEx : forall (l : list Exp) (h : Name),
-  {l' | inListProc (subProcTerm (listsToSub (fst (def h)) l) (snd (def h))) l'} ->
-  {l' | inListProc (h $(l)$) l'}. intros. remember (def h) as e. destruct e.
-  symmetry in Heqe. eapply inListAppIndEx. apply Heqe. assumption. Qed.
+  {l' | inListProc (unfoldApp h l) l'} ->
+  {l' | inListProc (h $(l)$) l'}. intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply inListAppIndEx. apply Heqe. assumption. Qed.
 
 (** If the then branch of an ifThen construct has some inListProc,
 then the whole construct has one also.*)
@@ -1714,12 +1708,11 @@ Lemma progressAppInd : forall (x : list Var) (l : list Exp) (h : Name) (p : Proc
   eapply daeApp. apply H. assumption. inversion H1. exists x0. eapply taeApp.
   apply H. assumption. Qed.
 
-(** More cumbersome version but it fills in the variable list x and the
-process p automatically by extracting them from the process definition of p.*)
+(** If the unfolding of an application can progress, then so can the application.*)
 Lemma progressAppAuto : forall (l : list Exp) (h : Name),
-  progress (subProcTerm (listsToSub (fst (def h)) l) (snd (def h))) ->
-  progress (h $(l)$). intros. remember (def h) as e. destruct e.
-  symmetry in Heqe. eapply progressAppInd. apply Heqe. assumption. Qed.
+  progress (unfoldApp h l) ->
+  progress (h $(l)$). intros. rewrite unfoldApp_body in H. remember (def h) as e.
+  destruct e. symmetry in Heqe. eapply progressAppInd. apply Heqe. assumption. Qed.
 
 (** If the then branch of an ifThen construct can progress,
 then the whole construct can also.*)
@@ -1781,7 +1774,7 @@ Proof.
   eapply stepDpSyncLR. apply H1. apply H2.
   eapply stepDpParL. apply H1.
   (*Case: app*)
-  - intros h l H. apply progressAppAuto. rewrite <- unfoldApp_body. assumption.
+  - intros. apply progressAppAuto. assumption.
   (*Case: del*)
   - apply progressDel.
 Qed.

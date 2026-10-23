@@ -76,8 +76,7 @@ Ltac lift_act_then b p := match goal with
 hypothesis on the application process (n x)*)
 Ltac lift_act_app h l2 :=
   match goal with
-  | [V : (subProcTerm (listsToSub (fst (def h)) l2) (snd (def h))) -PA- _ -PA> _ |- _] =>
-    apply stepDpApp_alt in V
+  | [V : unfoldApp h l2 -PA- _ -PA> _ |- _] => apply stepDpApp_alt in V
   end.
 
 (*Generate all the discrete actions for some process p as hypotheses. Might leave some
@@ -114,12 +113,11 @@ Ltac gen_disc_acts p :=
     | _ => false
     end
   | ?p1 $+$ ?p2 => gen_disc_acts p1; gen_disc_acts p2; repeat lift_act_sum p1 p2
-  | ?h $( ?l2 )$ => gen_disc_acts (subProcTerm (listsToSub (fst (def h)) l2) (snd (def h)));
-    repeat lift_act_app h l2
-  | subProcTerm ?s ?p' =>
+  | ?h $( ?l2 )$ => gen_disc_acts (unfoldApp h l2); repeat lift_act_app h l2
+  | unfoldApp _ _ =>
     let p'' := fresh "p" in let Hp1 := fresh "Hp1" in 
     let Hp2 := fresh "Hp2" in
-    remember p as p'' eqn:Hp1; lets Hp2 : Hp1; simpl in Hp2;
+    remember p as p'' eqn:Hp1; lets Hp2 : Hp1; rewrite unfoldApp_body in Hp2; simpl in Hp2;
     remove_resets_hyp Hp2; remove_updates_hyp Hp2;
     match type of Hp2 with _ = ?q => gen_disc_acts q end;
     symmetry in Hp2; subst_all Hp2; subst_all Hp1

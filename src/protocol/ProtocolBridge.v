@@ -54,7 +54,7 @@ Ltac taeAutoSing := match goal with
     | _ $< _ >$ ! _  => apply taeOut
     | _ $> _  => apply taeThenBranch
     | _ $+$ _  => apply taeSum
-    | _ $(_)$  => apply taeAppAuto; simpl
+    | _ $(_)$  => apply taeAppAuto; rewrite unfoldApp_body; simpl
     | $< _ >$ _  => apply taeDel
     end
   end.
