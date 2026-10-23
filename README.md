@@ -22,7 +22,7 @@ My version of Comhordú can't promise, on its own, that entities never collide. 
 
 Under some assumptions, though, it can. Say a car's fail-safe mode is to be stopped on the hard shoulder, its other modes are to be in the traffic lanes, and distance is measured only along the road, in its direction of travel. Two cars can then be at the same point in this abstract space without touching, as when one is stopped on the hard shoulder and the other is in a lane. The idea builds on a scenario in Bouroche's thesis, in which cars change lane to make way for an emergency vehicle (p.140). One weakness is the assumption that every car can reach an empty slot on the hard shoulder, and stop there, in a bounded time. If coverage suddenly degraded for every car and they all rushed for the hard shoulder, this would likely fail. Still, this is the closest example I can think of where Comhordú guarantees freedom from collisions (Remark 4.20, p.97).
 
-Even there, I don't think Comhordú in its current form is the best protocol for the job. It ignores velocities, so I feel it may be overly conservative.
+Even there, I don't know if Comhordú in its current form is the best protocol for the job. It ignores velocities, so I feel it may be overly conservative.
 
 ## Model your own system
 
