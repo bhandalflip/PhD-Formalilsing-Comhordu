@@ -96,6 +96,7 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 - [x] 🧑 **Rename `BaseType`** in `lang/LanguageFoundations.v` to say what it is, a base value, now that `ValType` names the type of one. A mechanical rename of 145 uses in 15 files. ✅ 2026-10-22. With approval, it is now `BaseValue`. `safety` still rests on no unproved result. [#28](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/28).
 - [x] 🧑 **Restate unfoldings as `unfoldApp`.** Seven lemmas in `lang/SoftwareLanguage.v`, `stepDpApp_alt` and the six `…AppAuto…` ones, spell out `subProcTerm (listsToSub (fst (def h)) l) (snd (def h))`, which is `unfoldApp h l`. Restate them with `unfoldApp h l`, and update the two tactics in `ProtAuxResults.v` that match the long form. ✅ 2026-10-23. With approval, the seven say `unfoldApp h l`, and three tactics are updated to match. `safety` still rests on no unproved result. [#29](https://github.com/bhandalflip/PhD-Formalilsing-Comhordu/pull/29).
 - [ ] 🤖 **Rename `bisimulation` to `bisimilar`** in `lang/ProcEquiv.v`. `bisimulation p q` says that p and q are bisimilar, while a bisimulation is a relation that shows it. The notation `p ~p~ q` stays, so 22 uses of the name in 4 files change.
+- [ ] 🧑 **Lay out proofs so that each statement stands apart.** 617 of the 1,220 results have no `Proof.`, and 347 of those start their proof on the line where the statement ends, so it's hard to see where one ends and the other begins. Check the standard layouts that large Rocq projects use, and propose one in an ADR, which also says whether CI should check it. Then apply it to every proof, and make it a rule in `src/AGENTS.md` so that later changes follow it.
 - [ ] 🧑 _Placeholder: anything else the first pass couldn't decide._
 - [ ] 🧑 **Rewrite the README**, last, since it tells the outcome of every other step. Keep it short, cut anything else, and link to the thesis corrections and remarks rather than repeat them.
   - The story: the thesis (2014), its proof partly encoded in Coq, the [2015 plan](../archive/2015-05-08-coq-project-plan.pdf) to finish it, and now a full proof in Rocq, with general results about the language.
@@ -104,6 +105,7 @@ Step 12, steps 18 to 21 and step 23 cover every known reason `safety` is vacuous
 
 ## Log
 
+- **2026-10-23:** New step in the final phase: lay out every proof so that its statement stands apart, in a standard layout that an ADR picks, and make the layout a rule.
 - **2026-10-22:** New step in the final phase: rename `bisimulation` to `bisimilar`, the standard name for what it states.
 - **2026-10-22:** Steps 33 to 35 and the study of calls and steps each move to a workstream of their own, a stub for now, since they go beyond the upgrade, proof completion and tidy-up that this workstream is for.
 - **2026-10-22:** Step 32 makes the model a class rather than a `Module Type`, as the [ADR](../adr/2026-10-22-make-the-model-a-class.md) records. The README step's advice now says to give a system's model as a value of the class.
