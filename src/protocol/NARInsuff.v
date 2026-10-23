@@ -45,9 +45,9 @@ Ltac currModeNet_notifBad_pres_bkwd_close :=
     currCompState, pausedState, gotMsgState, gotRangeState, currEqState, nextEqState,
     currPincCheckState, nextPincCheckState in *;
   match goal with
-  | [V : ProcEquiv.bisimulation ?p ?x, V1 : ProcEquiv.bisimulation ?p ?y |- False] =>
+  | [V : ProcEquiv.bisimilar ?p ?x, V1 : ProcEquiv.bisimilar ?p ?y |- False] =>
     let BT := fresh "BT" in
-    assert (ProcEquiv.bisimulation x y) as BT by
+    assert (ProcEquiv.bisimilar x y) as BT by
       (eapply ProcEquiv.bisim_trans; [apply ProcEquiv.bisim_symm; exact V | exact V1]);
     unfold bcWait, sleeping, bcReady, dormant, init, ovWait, ovReady, switchBc,
       switchCurr, switchListen, tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen, ovAbort,
@@ -566,9 +566,9 @@ Ltac badOvlp_listening_tfs_close :=
     currCompState, pausedState, gotMsgState, gotRangeState, currEqState, nextEqState,
     currPincCheckState, nextPincCheckState in *;
   match goal with
-  | [V : ProcEquiv.bisimulation ?p ?x, V1 : ProcEquiv.bisimulation ?p ?y |- False] =>
+  | [V : ProcEquiv.bisimilar ?p ?x, V1 : ProcEquiv.bisimilar ?p ?y |- False] =>
     let BT := fresh "BT" in
-    assert (ProcEquiv.bisimulation x y) as BT by
+    assert (ProcEquiv.bisimilar x y) as BT by
       (eapply ProcEquiv.bisim_trans; [apply ProcEquiv.bisim_symm; exact V | exact V1]);
     unfold bcWait, sleeping, bcReady, dormant, init, ovWait, ovReady, switchBc,
       switchCurr, switchListen, tfsStart, tfsNext, tfsCurr, tfsBc, tfsListen, ovAbort,

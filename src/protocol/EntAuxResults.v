@@ -1940,11 +1940,11 @@ Proof.
 Qed.
 
 (* begin helpers for tfsNext_next_ent *)
-Lemma tfsNext_next_ent_currN : ProcEquiv.bisimulation (tfsCurrN $([])$) tfsCurr.
+Lemma tfsNext_next_ent_currN : ProcEquiv.bisimilar (tfsCurrN $([])$) tfsCurr.
 Proof. apply app_bisim_nil. reflexivity. Qed.
 
 Lemma tfsNext_next_ent_nextN (m : Mode) :
-  ProcEquiv.bisimulation (tfsNextN $([eBase (baseMode m)])$) (tfsNext m).
+  ProcEquiv.bisimilar (tfsNextN $([eBase (baseMode m)])$) (tfsNext m).
 Proof.
   replace (tfsNext m)
     with (subProcTerm (listsToSub [vM] [eBase (baseMode m)]) (tfsNext (eVar vM))).
@@ -2007,7 +2007,7 @@ Qed.
 (** Closes a goal [S p'] (S a bisimilarity-class state predicate) from a
 hypothesis [p' ~p~ n $(l)$] by unfolding the application.*)
 Ltac tfsCurr_next_ent_close_tac :=
-  match goal with [B1 : ProcEquiv.bisimulation ?p' ?q' |- _] =>
+  match goal with [B1 : ProcEquiv.bisimilar ?p' ?q' |- _] =>
     hnf; eapply ProcEquiv.bisim_trans; [exact B1 | ];
     eapply ProcEquiv.bisim_trans; [apply app_bisim | ];
     rewrite unfoldApp_body; clean_proc; apply ProcEquiv.bisim_refl

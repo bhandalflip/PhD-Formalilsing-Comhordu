@@ -129,7 +129,7 @@ and clean up some substitution stuff.*)
 Ltac invert_trans_rich := invert_trans; try invert_def; clean_proc_trans.
 
 (*Given a hypothesis V1 which says p ~ q, this tactic finds a hypotheses
-of the form p -a> p', applies the bisimulation to yield the same for q, and then
+of the form p -a> p', applies V1 to yield the same for q, and then
 tries to solve the goal by contradiction on this q-transition. If the contradiction
 fails, then the tactic moves on to the next p-transition, and fails when there are
 no more p-transitions left.*)
@@ -1979,7 +1979,7 @@ Proof.
 Qed.
 (*Proof: lift delay preservation results in a similar fashion to del_pres_nextSinceState*)
 
-(*** The broadcaster's wait, observed through bisimulation ***)
+(*** The broadcaster's wait, up to bisimilarity ***)
 (** A state predicate is a bisimilarity class, and two named states with different
 parameters can fall in one class when the difference is not observable (root cause 10 of the
 first proving pass). The broadcaster's wait is not such a case: its timer is observable through

@@ -20,24 +20,25 @@ Context {Model : ComhModel} {PNames : ProcNames} {PDefs : ProcDefs} {PGuarded : 
 
 (********************** Bisimulation **********************)
 
-(** Single step equivlance on process terms is defined as a bisimulation.*)
-CoInductive bisimulation p q : Prop :=
+(** Two process terms are bisimilar when each matches every step of the other, and the terms
+they step to are bisimilar again.*)
+CoInductive bisimilar p q : Prop :=
   bisimWitness :
   (forall a p', p -P- a -P> p' ->
-  exists q', q -P- a -P> q' /\ bisimulation p' q') ->
+  exists q', q -P- a -P> q' /\ bisimilar p' q') ->
   (forall a q', q -P- a -P> q' ->
-  exists p', p -P- a -P> p' /\ bisimulation p' q') ->
-  bisimulation p q.
-Notation "p ~p~ q" := (bisimulation p q) (at level 70).
+  exists p', p -P- a -P> p' /\ bisimilar p' q') ->
+  bisimilar p q.
+Notation "p ~p~ q" := (bisimilar p q) (at level 70).
 
 (*** Generic Properties of the Relation ***)
 
-(** The siumlation relation is reflexive.*)
+(** Bisimilarity is reflexive.*)
 CoFixpoint bisim_refl p : p ~p~ p. constructor.
   intros. exists p'. split. assumption. apply bisim_refl.
   intros. exists q'. split. assumption. apply bisim_refl. Qed.
 
-(** The siumlation relation is transitive.*)
+(** Bisimilarity is transitive.*)
 CoFixpoint bisim_trans p1 p2 p3 : p1 ~p~ p2 -> p2 ~p~ p3 ->
   p1 ~p~ p3. introz U. constructor.
   intros a p'. introz U. apply U in U1. ex_flat. and_flat.
@@ -72,7 +73,7 @@ Qed.
 
 (*** Matching Steps ***)
 
-(** One side of a bisimulation matches a discrete step of the other, with bisimilar
+(** One side of a bisimilar pair matches a discrete step of the other, with bisimilar
 derivatives.*)
 Lemma bisim_step_disc p q a p' : p ~p~ q -> p -PA- a -PA> p' ->
   exists q', q -PA- a -PA> q' /\ p' ~p~ q'.
@@ -82,7 +83,7 @@ Proof.
   exists q'. split; [ | exact BQ]. inversion TQ; subst; assumption.
 Qed.
 
-(** One side of a bisimulation matches a delay of the other, with bisimilar
+(** One side of a bisimilar pair matches a delay of the other, with bisimilar
 derivatives.*)
 Lemma bisim_step_del p q d p' : p ~p~ q -> p -PD- d -PD> p' ->
   exists q', q -PD- d -PD> q' /\ p' ~p~ q'.
@@ -92,7 +93,7 @@ Proof.
   exists q'. split; [ | exact BQ]. inversion TQ; subst; assumption.
 Qed.
 
-(** If one side of a bisimulation can do a discrete action, so can the other.*)
+(** If one side of a bisimilar pair can do a discrete action, so can the other.*)
 Lemma bisim_disc_match p p' q a : p ~p~ q -> p -PA- a -PA> p' ->
   exists q', q -PA- a -PA> q'.
 Proof.
@@ -742,7 +743,7 @@ Corollary par_bisim_context_strong p p' q q' :
 
 (** Bisimilarity is a congruence for the parallel composition of any number of processes.*)
 Lemma parAll_bisim_context p ps p' ps' :
-  Forall2 bisimulation (p :: ps) (p' :: ps') -> parAll p ps ~p~ parAll p' ps'.
+  Forall2 bisimilar (p :: ps) (p' :: ps') -> parAll p ps ~p~ parAll p' ps'.
 Proof.
   revert p p' ps'. induction ps as [ |q qs IH]; intros p p' ps' F;
     inversion F as [ | ? ? ? ? B F']; subst; inversion F'; subst; simpl.
@@ -826,4 +827,4 @@ End ProcEquiv.
 
 (** A section's notations and tactics end with it. So that later files can use them, the
 notations are declared again here.*)
-Notation "p ~p~ q" := (bisimulation p q) (at level 70).
+Notation "p ~p~ q" := (bisimilar p q) (at level 70).
